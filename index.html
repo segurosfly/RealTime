@@ -3,373 +3,324 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SegurosFlyCRM · Revenue Tracker Mayo 2026</title>
+  <title>SegurosFlyCRM · Dashboard 2026</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #f0f4f8; font-family: 'Sora', system-ui, sans-serif; color: #1e293b; }
-    input:focus { border-color: #6366f1 !important; outline: none; box-shadow: 0 0 0 3px #6366f118; }
-    button { transition: opacity 0.15s; cursor: pointer; }
-    button:hover { opacity: 0.85; }
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#f0f4f8;font-family:'Sora',system-ui,sans-serif;color:#1e293b;}
+    input:focus,select:focus{border-color:#6366f1!important;outline:none;box-shadow:0 0 0 3px #6366f118;}
+    select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px!important;cursor:pointer;}
+    button{transition:opacity .15s;cursor:pointer;}
+    button:hover{opacity:.85;}
+    ::-webkit-scrollbar{width:4px;}
+    ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px;}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:9999;animation:fadeIn .15s ease;}
+    th{text-align:right;}
+    th:first-child{text-align:left;}
   </style>
 </head>
 <body>
 <div id="root"></div>
-
 <script type="text/babel">
-const { useState, useEffect, useCallback, useRef } = React;
+const { useState, useEffect, useCallback, useRef, useMemo } = React;
 
-// ── CONSTANTS ─────────────────────────────────────────────────────────────────
-const DIAS         = 31;
-const DIA_HOY      = new Date().getDate();
-const DIAS_REST    = Math.max(1, DIAS - DIA_HOY);
-const DOW          = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
-const META_BASE_IND = 6250;
-const META_ALTA_IND = 7500;
-const META_BASE_EQ  = 12500;
-const META_ALTA_EQ  = 15000;
-const METAS_IND = [
-  { label: "Ritmo actual",    value: null,           color: "#64748b", bg: "#f8fafc" },
-  { label: "Meta base (8%)",  value: META_BASE_IND,  color: "#3b82f6", bg: "#eff6ff" },
-  { label: "Meta alta (10%)", value: META_ALTA_IND,  color: "#10b981", bg: "#ecfdf5" },
-];
-const METAS_EQ = [
-  { label: "Meta base (8%)",  value: META_BASE_EQ,   color: "#3b82f6", bg: "#eff6ff" },
-  { label: "Meta alta (10%)", value: META_ALTA_EQ,   color: "#10b981", bg: "#ecfdf5" },
-];
-
-// ── SHEETS CONFIG ─────────────────────────────────────────────────────────────
-// ⚠️ Si cambias el script, actualiza esta URL:
+// ── CONSTANTS ──────────────────────────────────────────────────────────────────
+const DOW      = ["Dom","Lun","Mar","Mie","Jue","Vie","Sab"];
+const ASESORES = ["guillermo","carolina"];
+const SYNC_PIN = "1234";
 const SHEETS_URL = "https://script.google.com/macros/s/AKfycby2NkWxPbvu08G5HTev1Jqj7_cbmNZr0kmusQ6MDT22jeK5diDm5X5AUnb-q3w3uhk/exec";
 
-const enviarASheets = async (asesor, dia, fila) => {
-  try {
-    const ahora = new Date();
-    const params = new URLSearchParams({
-      fecha:  ahora.toLocaleDateString("es-CO"),
-      hora:   ahora.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
-      asesor, dia: String(dia),
-      orden:  fila.orden || "—",
-      plan:   fila.plan  || "—",
-      valor:  String(parseFloat(fila.valor) || 0),
-    });
-    await fetch(`${SHEETS_URL}?${params.toString()}`, { method: "GET", mode: "no-cors" });
-    return true;
-  } catch { return false; }
+const PLANES = [
+  "Plan Lite","Plan Smart","Plan Plus","Plan Max",
+  "Plan Elite","Plan Infinity","Adultos Mayores",
+  "Multiples Viajes","Viaje Nacional"
+];
+
+const MESES = [
+  { id:"2026-01", label:"Enero",      dias:31, dow0:3 },
+  { id:"2026-02", label:"Febrero",    dias:28, dow0:6 },
+  { id:"2026-03", label:"Marzo",      dias:31, dow0:6 },
+  { id:"2026-04", label:"Abril",      dias:30, dow0:2 },
+  { id:"2026-05", label:"Mayo",       dias:31, dow0:4 },
+  { id:"2026-06", label:"Junio",      dias:30, dow0:0 },
+  { id:"2026-07", label:"Julio",      dias:31, dow0:2 },
+  { id:"2026-08", label:"Agosto",     dias:31, dow0:5 },
+  { id:"2026-09", label:"Septiembre", dias:30, dow0:1 },
+  { id:"2026-10", label:"Octubre",    dias:31, dow0:3 },
+  { id:"2026-11", label:"Noviembre",  dias:30, dow0:6 },
+  { id:"2026-12", label:"Diciembre",  dias:31, dow0:1 },
+];
+
+const getMesActual = () => {
+  const n = new Date();
+  return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0");
+};
+const getDiaHoy = () => new Date().getDate();
+const getMesInfo = (mesId) => MESES.find(m=>m.id===mesId) || MESES[4];
+const dowDia = (dia, mesId) => {
+  const m = getMesInfo(mesId);
+  return DOW[(m.dow0 + dia - 1) % 7];
 };
 
-// ── STORAGE (localStorage — funciona en GitHub Pages) ─────────────────────────
-const STORE_KEY = "sfly_mayo2026";
+// ── STORAGE ────────────────────────────────────────────────────────────────────
+const STORE_KEY = "sfly_crm_v2";
 const loadStore = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } };
 const saveStore = (d) => { try { localStorage.setItem(STORE_KEY, JSON.stringify(d)); } catch {} };
 
-// ── CSV DOWNLOAD ──────────────────────────────────────────────────────────────
-const descargarCSV = (store) => {
-  const header = "Fecha export,Asesor,Día,Día semana,Orden,Plan,Valor USD";
-  const rows = [];
+const getMonthData = (store, mesId, asesor) => (store[mesId] && store[mesId][asesor]) ? store[mesId][asesor] : {};
+const getConfig    = (store, mesId) => (store.config && store.config[mesId]) ? store.config[mesId] : { meta: 12500, comision: 10 };
+
+const setMonthData = (store, mesId, asesor, data) => {
+  const next = Object.assign({}, store, { [mesId]: Object.assign({}, store[mesId]||{}, { [asesor]: data }) });
+  saveStore(next);
+  return next;
+};
+const setConfigStore = (store, mesId, cfg) => {
+  const next = Object.assign({}, store, { config: Object.assign({}, store.config||{}, { [mesId]: cfg }) });
+  saveStore(next);
+  return next;
+};
+const pushDeleted = (store, fila) => {
+  const deleted = (store.deleted||[]).concat([fila]);
+  const next = Object.assign({}, store, { deleted });
+  saveStore(next);
+  return next;
+};
+
+// ── UTILS ──────────────────────────────────────────────────────────────────────
+const usd  = (n,d=2) => "$"+Number(n||0).toLocaleString("es-CO",{minimumFractionDigits:d,maximumFractionDigits:d});
+const pc   = (n) => Number(n||0).toFixed(1)+"%";
+const uid  = () => Math.random().toString(36).slice(2,9);
+const sumR = (rows) => (rows||[]).reduce((s,r) => s+(parseFloat(r.valor)||0), 0);
+const cap  = (s) => s.charAt(0).toUpperCase()+s.slice(1);
+
+// ── SHEETS SYNC ────────────────────────────────────────────────────────────────
+const sincronizarConSheets = async (store, mesId, silent) => {
+  const rows  = [];
+  const ts    = new Date().toISOString();
   const fecha = new Date().toLocaleDateString("es-CO");
-  ["guillermo","carolina"].forEach(asesor => {
-    const data = store[asesor] || {};
-    Object.entries(data).forEach(([dia, ventas]) => {
-      (ventas || []).forEach(v => {
-        const dow = DOW[(4 + +dia) % 7];
-        rows.push([fecha, asesor.charAt(0).toUpperCase()+asesor.slice(1),
-          `Día ${dia}`, dow, v.orden||"—", v.plan||"—", parseFloat(v.valor)||0].join(","));
+  const mesLabel = getMesInfo(mesId).label;
+  ASESORES.forEach(asesor => {
+    const data = getMonthData(store, mesId, asesor);
+    Object.entries(data).forEach(function(entry) {
+      var dia = entry[0]; var ventas = entry[1];
+      (ventas||[]).forEach(v => {
+        rows.push([fecha, mesLabel, cap(asesor), "Dia "+dia, dowDia(+dia,mesId), v.orden||"-", v.plan||"-", parseFloat(v.valor)||0, ts]);
       });
     });
   });
-  if (rows.length === 0) { alert("No hay datos para exportar aún."); return; }
-  const csv = [header, ...rows].join("\n");
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  if (!rows.length) { if (!silent) alert("Sin datos para sincronizar en este mes."); return false; }
+  try {
+    const params = new URLSearchParams({ bulk: JSON.stringify(rows), mes: mesLabel });
+    await fetch(SHEETS_URL+"?"+params.toString(), { method:"GET", mode:"no-cors" });
+    if (!silent) alert("Sincronizadas "+rows.length+" filas en Google Sheets (hoja RealTime)");
+    return true;
+  } catch(e) { if (!silent) alert("Error al sincronizar."); return false; }
+};
+
+const enviarEliminacion = async (fila, mesId) => {
+  try {
+    const params = new URLSearchParams({
+      accion:"eliminar", mes:getMesInfo(mesId).label, asesor:cap(fila.asesor||""),
+      dia:String(fila.dia||""), orden:fila.orden||"-", plan:fila.plan||"-",
+      valor:String(parseFloat(fila.valor)||0), deletedAt:fila.deletedAt||new Date().toISOString(),
+      nota:"Dato eliminado del Real-Time"
+    });
+    await fetch(SHEETS_URL+"?"+params.toString(), { method:"GET", mode:"no-cors" });
+  } catch(e) {}
+};
+
+const descargarCSV = (store, mesId) => {
+  const mesLabel = getMesInfo(mesId).label;
+  const header   = "Mes,Asesor,Dia,Dia semana,Orden,Plan,Valor USD";
+  const rows     = [];
+  ASESORES.forEach(asesor => {
+    const data = getMonthData(store, mesId, asesor);
+    Object.entries(data).forEach(function(entry) {
+      var dia = entry[0]; var ventas = entry[1];
+      (ventas||[]).forEach(v => {
+        rows.push([mesLabel,cap(asesor),"Dia "+dia,dowDia(+dia,mesId),v.orden||"-",v.plan||"-",parseFloat(v.valor)||0].join(","));
+      });
+    });
+  });
+  if (!rows.length) { alert("Sin datos."); return; }
+  const csv  = [header].concat(rows).join("\n");
+  const blob = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8;"});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
-  a.href = url;
-  a.download = `SegurosFlyCRM_Mayo2026_${new Date().toISOString().slice(0,10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  a.href=url; a.download="SegurosFlyCRM_"+mesLabel+"_"+new Date().toISOString().slice(0,10)+".csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
 };
 
-// ── SYNC TO GOOGLE SHEETS (bulk) ──────────────────────────────────────────────
-const sincronizarConSheets = async (store, silent = false) => {
-  const fecha = new Date().toLocaleDateString("es-CO");
-  const ts    = new Date().toISOString();
-  const rows  = [];
-  ["guillermo","carolina"].forEach(asesor => {
-    const data = store[asesor] || {};
-    Object.entries(data).forEach(([dia, ventas]) => {
-      (ventas || []).forEach(v => {
-        const dow = DOW[(4 + +dia) % 7];
-        rows.push([
-          fecha,
-          asesor.charAt(0).toUpperCase()+asesor.slice(1),
-          `Día ${dia}`, dow,
-          v.orden||"—", v.plan||"—",
-          parseFloat(v.valor)||0,
-          ts
-        ]);
-      });
-    });
-  });
-  if (rows.length === 0) { if (!silent) alert("No hay datos para sincronizar aún."); return false; }
-  try {
-    const params = new URLSearchParams({ bulk: JSON.stringify(rows) });
-    await fetch(`${SHEETS_URL}?${params.toString()}`, { method: "GET", mode: "no-cors" });
-    if (!silent) alert(`✅ ${rows.length} filas sincronizadas en Google Sheets (hoja RealTime)`);
-    return true;
-  } catch (e) {
-    if (!silent) alert("❌ Error al sincronizar. Revisa la URL del Apps Script.");
-    return false;
-  }
-};
+// ── STYLES ─────────────────────────────────────────────────────────────────────
+const iStyle = { height:38, border:"1px solid #e2e8f0", borderRadius:8, padding:"0 12px", fontSize:13, color:"#1e293b", background:"#f8fafc", outline:"none", width:"100%", fontFamily:"'Sora',sans-serif" };
+const btnS = (c,sm) => ({ height:sm?32:38, background:c, color:"#fff", border:"none", borderRadius:8, padding:"0 "+(sm?12:16)+"px", fontWeight:700, fontSize:sm?11:13, cursor:"pointer", whiteSpace:"nowrap" });
+const icoBtn = (c) => ({ width:28, height:28, border:"1px solid "+c+"33", borderRadius:6, background:c+"0d", color:c, cursor:"pointer", fontSize:12, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, flexShrink:0 });
 
-// ── UTILS ─────────────────────────────────────────────────────────────────────
-const usd    = (n, d=2) => `$${Number(n||0).toLocaleString("es-CO",{minimumFractionDigits:d,maximumFractionDigits:d})}`;
-const pc     = (n) => `${Number(n||0).toFixed(1)}%`;
-const uid    = () => Math.random().toString(36).slice(2,8);
-const sumR   = (rows) => rows.reduce((s,r) => s+(parseFloat(r.valor)||0), 0);
-const dowDia = (d) => DOW[(4+d)%7];
-
-// ── UI ATOMS ──────────────────────────────────────────────────────────────────
-function Pill({ color, bg, children, size=11 }) {
-  return <span style={{ display:"inline-block", padding:"2px 10px", borderRadius:20, fontSize:size, fontWeight:700, letterSpacing:"0.04em", background:bg, color, border:`1px solid ${color}44` }}>{children}</span>;
+// ── UI ATOMS ───────────────────────────────────────────────────────────────────
+function Pill({color,bg,children,size}) {
+  size = size||11;
+  return React.createElement("span",{style:{display:"inline-block",padding:"2px 10px",borderRadius:20,fontSize:size,fontWeight:700,letterSpacing:"0.04em",background:bg,color:color,border:"1px solid "+color+"44"}},children);
 }
-function Card({ children, accent, style:st={} }) {
-  return <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:12, borderTop:accent?`3px solid ${accent}`:undefined, padding:"16px 20px", ...st }}>{children}</div>;
+function Card({children,accent,style:st}) {
+  st = st||{};
+  return React.createElement("div",{style:Object.assign({background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,borderTop:accent?"3px solid "+accent:undefined,padding:"16px 20px"},st)},children);
 }
-function SLabel({ children }) {
-  return <div style={{ fontSize:11, color:"#94a3b8", textTransform:"uppercase", letterSpacing:"0.09em", fontWeight:700, marginBottom:14 }}>{children}</div>;
+function SLabel({children}) {
+  return React.createElement("div",{style:{fontSize:11,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:700,marginBottom:14}},children);
 }
-function StatCard({ label, value, sub, accent, large }) {
+function StatCard({label,value,sub,accent,large}) {
   return (
     <Card accent={accent}>
-      <div style={{ fontSize:11, color:"#94a3b8", textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:600, marginBottom:4 }}>{label}</div>
-      <div style={{ fontSize:large?26:21, fontWeight:800, color:accent||"#1e293b", lineHeight:1.1, fontFamily:"'Sora',sans-serif" }}>{value}</div>
-      {sub && <div style={{ fontSize:11, color:"#64748b", marginTop:4 }}>{sub}</div>}
+      <div style={{fontSize:11,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.08em",fontWeight:600,marginBottom:4}}>{label}</div>
+      <div style={{fontSize:large?24:19,fontWeight:800,color:accent||"#1e293b",lineHeight:1.1}}>{value}</div>
+      {sub&&<div style={{fontSize:11,color:"#64748b",marginTop:4}}>{sub}</div>}
     </Card>
   );
 }
 
-// ── META BAR ──────────────────────────────────────────────────────────────────
-function MetaBar({ acum, meta, proy }) {
-  const val  = meta.value;
-  const p    = val ? Math.min(100,(acum/val)*100) : 0;
-  const falt = val ? Math.max(0,val-acum) : 0;
-  if (!val) return (
-    <div style={{ marginBottom:14 }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5 }}>
-        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-          <span style={{ fontSize:12, fontWeight:700, color:"#1e293b" }}>{meta.label}</span>
-          <Pill color={meta.color} bg={meta.bg}>{usd(proy,0)}</Pill>
-        </div>
-        <span style={{ fontSize:11, color:"#64748b" }}>Proyección con ritmo actual</span>
-      </div>
-      <div style={{ height:8, background:"#f1f5f9", borderRadius:4, overflow:"hidden" }}>
-        <div style={{ width:`${Math.min(100,(proy/META_ALTA_IND)*100)}%`, height:"100%", background:meta.color, borderRadius:4, transition:"width 0.5s" }} />
-      </div>
-    </div>
-  );
+// ── MODAL PIN ──────────────────────────────────────────────────────────────────
+function ModalPin({onSuccess,onCancel}) {
+  const [pin,setPin]   = useState("");
+  const [err,setErr]   = useState(false);
+  const check = () => {
+    if (pin===SYNC_PIN) { onSuccess(); }
+    else { setErr(true); setPin(""); setTimeout(()=>setErr(false),1200); }
+  };
   return (
-    <div style={{ marginBottom:14 }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5 }}>
-        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-          <span style={{ fontSize:12, fontWeight:700, color:"#1e293b" }}>{meta.label}</span>
-          <Pill color={meta.color} bg={meta.bg}>{usd(val,0)}</Pill>
+    <div className="modal-overlay" onClick={onCancel}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:16,padding:"28px 32px",width:320,textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.15)"}}>
+        <div style={{fontSize:32,marginBottom:8}}>🔒</div>
+        <div style={{fontSize:16,fontWeight:800,color:"#1e293b",marginBottom:6}}>Sync protegido</div>
+        <div style={{fontSize:13,color:"#64748b",marginBottom:20}}>Ingresa el PIN de 4 digitos para sincronizar</div>
+        <input type="password" maxLength={4} value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,""))}
+          onKeyDown={e=>e.key==="Enter"&&check()} placeholder="* * * *"
+          style={Object.assign({},iStyle,{textAlign:"center",fontSize:22,letterSpacing:8,marginBottom:12,
+            border:"2px solid "+(err?"#ef4444":"#e2e8f0"),background:err?"#fef2f2":"#f8fafc"})} autoFocus />
+        {err&&<div style={{color:"#ef4444",fontSize:12,fontWeight:700,marginBottom:8}}>PIN incorrecto</div>}
+        <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+          <button onClick={onCancel} style={Object.assign({},btnS("#94a3b8"),{height:36})}>Cancelar</button>
+          <button onClick={check}   style={Object.assign({},btnS("#6366f1"),{height:36})}>Confirmar</button>
         </div>
-        <div style={{ textAlign:"right" }}>
-          <span style={{ fontSize:13, fontWeight:800, color:falt===0?"#10b981":meta.color }}>{falt===0?"✓ LOGRADO":`Falta ${usd(falt,0)}`}</span>
-          <span style={{ fontSize:11, color:"#94a3b8", marginLeft:8 }}>{pc(p)}</span>
-          {proy>0&&falt>0&&<span style={{ fontSize:10, marginLeft:6, color:proy>=val?"#10b981":"#f97316" }}>· Proy {proy>=val?"✓":"✗"}</span>}
-        </div>
-      </div>
-      <div style={{ height:8, background:"#f1f5f9", borderRadius:4, overflow:"hidden" }}>
-        <div style={{ width:`${p}%`, height:"100%", background:meta.color, borderRadius:4, transition:"width 0.5s" }} />
       </div>
     </div>
   );
 }
 
-// ── PANEL PRESIÓN ─────────────────────────────────────────────────────────────
-function PanelPresion({ acum, promDia, proy, name }) {
-  const necBase = acum<META_BASE_IND?(META_BASE_IND-acum)/DIAS_REST:0;
-  const necAlta = acum<META_ALTA_IND?(META_ALTA_IND-acum)/DIAS_REST:0;
-  const ritmoOk = promDia>=necBase;
-  const pctBajo = necBase>0?Math.max(0,(necBase-promDia)/necBase*100):0;
-  let ec,el,m1,m2;
-  if (acum>=META_ALTA_IND) { ec="#10b981";el="🏆 Meta alta lograda";m1=`Superaste la meta alta, ${name}. Comisión al 10% activada.`;m2="Cada dólar extra suma directo a tu bolsillo. Sigue."; }
-  else if (acum>=META_BASE_IND) { ec="#3b82f6";el="✅ Meta base lograda";m1=`Meta base lista. Te faltan ${usd(META_ALTA_IND-acum,0)} para el 10%.`;m2=`Necesitas ${usd(necAlta)}/día para la meta alta.`; }
-  else if (ritmoOk) { ec="#10b981";el="En ritmo ✓";m1=`Vas bien. Con ${usd(promDia,0)}/día proyectas ${usd(proy,0)} al cierre.`;m2=proy>=META_BASE_IND?"Proyección alcanza meta base. Apunta más alto.":"Mantén el ritmo — sube el ticket promedio."; }
-  else if (pctBajo<30) { ec="#f59e0b";el="⚠️ Ajustar ritmo";m1=`Estás ${pc(pctBajo)} bajo el ritmo. Necesitas ${usd(necBase)}/día para meta base.`;m2=proy>=META_BASE_IND?"Proyección aún alcanza meta base, pero está ajustada.":"Si no subes hoy, perderás la meta base."; }
-  else { ec="#ef4444";el="🔴 Ritmo bajo";m1=`Vas ${pc(pctBajo)} bajo el ritmo. Necesitas ${usd(necBase)}/día urgente.`;m2=`Con el ritmo actual proyectas ${usd(proy,0)}. Actúa HOY.`; }
+// ── MODAL CONFIRMAR ELIMINAR ───────────────────────────────────────────────────
+function ModalConfirmDelete({fila,onConfirm,onCancel}) {
   return (
-    <div style={{ background:"#fff", borderRadius:12, padding:"16px 20px", border:`1px solid ${ec}33`, borderLeft:`4px solid ${ec}` }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
-        <div style={{ flex:1 }}>
-          <div style={{ fontSize:11, color:"#94a3b8", textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:700, marginBottom:4 }}>🧠 Análisis — {name}</div>
-          <div style={{ fontSize:14, fontWeight:700, color:"#1e293b", lineHeight:1.5 }}>{m1}</div>
-          <div style={{ fontSize:12, color:"#64748b", marginTop:3 }}>{m2}</div>
+    <div className="modal-overlay" onClick={onCancel}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:16,padding:"28px 32px",width:360,boxShadow:"0 20px 60px rgba(0,0,0,0.15)"}}>
+        <div style={{fontSize:32,marginBottom:8,textAlign:"center"}}>⚠️</div>
+        <div style={{fontSize:15,fontWeight:800,color:"#1e293b",marginBottom:8,textAlign:"center"}}>Esta seguro de que desea borrar esta informacion?</div>
+        <div style={{background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:10,padding:"12px 16px",marginBottom:16}}>
+          <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>Registro a eliminar:</div>
+          <div style={{fontSize:13,fontWeight:700,color:"#1e293b"}}>{fila.orden||"-"}</div>
+          <div style={{fontSize:12,color:"#64748b"}}>{fila.plan||"-"} · {usd(fila.valor)}</div>
         </div>
-        <Pill color={ec} bg={`${ec}12`} size={12}>{el}</Pill>
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-        {necBase>0&&<div style={{ background:"#eff6ff", border:"1px solid #bfdbfe", borderRadius:8, padding:"8px 14px" }}>
-          <div style={{ fontSize:10, color:"#3b82f6", fontWeight:700, textTransform:"uppercase" }}>Necesitas hoy · Meta base</div>
-          <div style={{ fontSize:22, fontWeight:800, color:"#1d4ed8", fontFamily:"'Sora',sans-serif" }}>{usd(necBase,0)}</div>
-        </div>}
-        {necAlta>0&&<div style={{ background:"#ecfdf5", border:"1px solid #a7f3d0", borderRadius:8, padding:"8px 14px" }}>
-          <div style={{ fontSize:10, color:"#10b981", fontWeight:700, textTransform:"uppercase" }}>Necesitas hoy · Meta alta</div>
-          <div style={{ fontSize:22, fontWeight:800, color:"#059669", fontFamily:"'Sora',sans-serif" }}>{usd(necAlta,0)}</div>
-        </div>}
+        <div style={{fontSize:12,color:"#94a3b8",marginBottom:18,textAlign:"center"}}>
+          Se marcara en Google Sheets como <strong style={{color:"#ef4444"}}>Dato eliminado del Real-Time</strong>
+        </div>
+        <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+          <button onClick={onCancel}  style={Object.assign({},btnS("#94a3b8"),{height:36})}>Cancelar</button>
+          <button onClick={onConfirm} style={Object.assign({},btnS("#ef4444"),{height:36})}>Eliminar</button>
+        </div>
       </div>
     </div>
   );
 }
 
-// ── INSIGHTS ──────────────────────────────────────────────────────────────────
-function InsightsPanel({ data }) {
-  const allRows = Object.values(data).flat();
-  if (allRows.length===0) return null;
-  const diasCon = Object.keys(data).filter(d=>data[d]?.length>0);
-  const totDia  = diasCon.reduce((acc,d)=>({...acc,[d]:sumR(data[d])}),{});
-  const mejorD  = diasCon.reduce((b,d)=>totDia[d]>(totDia[b]||0)?d:b, diasCon[0]);
-  const ventaMax = Math.max(...allRows.map(r=>parseFloat(r.valor)||0));
-  const rowMax   = allRows.find(r=>(parseFloat(r.valor)||0)===ventaMax);
-  const dowAcum  = {};
-  diasCon.forEach(d=>{
-    const dow=dowDia(+d);
-    if(!dowAcum[dow]) dowAcum[dow]={total:0,cnt:0};
-    dowAcum[dow].total+=totDia[d]; dowAcum[dow].cnt+=1;
-  });
-  const dowProms = Object.entries(dowAcum).map(([dow,{total,cnt}])=>({dow,prom:total/cnt})).sort((a,b)=>b.prom-a.prom);
-  const mejorDow = dowProms[0];
-  const promTotal = diasCon.length>0?Object.values(totDia).reduce((s,v)=>s+v,0)/diasCon.length:0;
-  const pctMejor  = mejorDow&&promTotal>0?((mejorDow.prom/promTotal-1)*100):0;
-  const items = [
-    mejorD&&{icon:"🏅",label:"Mejor día del mes",value:`Día ${mejorD} (${dowDia(+mejorD)})`,sub:usd(totDia[mejorD],0)},
-    ventaMax>0&&{icon:"💎",label:"Venta más alta",value:usd(ventaMax),sub:rowMax?.plan||rowMax?.orden||"—"},
-    mejorDow&&{icon:"📆",label:"Mejor día de semana",value:mejorDow.dow,sub:pctMejor>0?`+${pc(pctMejor)} vs promedio`:"Top día"},
-  ].filter(Boolean);
-  if (items.length===0) return null;
+// ── CONFIG MES ─────────────────────────────────────────────────────────────────
+function ConfigMes({config,onSave}) {
+  const [meta,setMeta] = useState(String(config.meta));
+  const [com,setCom]   = useState(String(config.comision));
+  const [open,setOpen] = useState(false);
+  useEffect(()=>{ setMeta(String(config.meta)); setCom(String(config.comision)); },[config.meta,config.comision]);
+  const save = () => { onSave({meta:parseFloat(meta)||12500,comision:parseFloat(com)||10}); setOpen(false); };
   return (
-    <Card>
-      <SLabel>📊 Insights del Mes</SLabel>
-      <div style={{ display:"grid", gridTemplateColumns:`repeat(${items.length},1fr)`, gap:10 }}>
-        {items.map(it=>(
-          <div key={it.label} style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:10, padding:"12px 14px" }}>
-            <div style={{ fontSize:20, marginBottom:5 }}>{it.icon}</div>
-            <div style={{ fontSize:10, color:"#94a3b8", textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:700 }}>{it.label}</div>
-            <div style={{ fontSize:16, fontWeight:800, color:"#1e293b", marginTop:2 }}>{it.value}</div>
-            <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>{it.sub}</div>
+    <div style={{position:"relative"}}>
+      <button onClick={()=>setOpen(!open)} style={{display:"flex",alignItems:"center",gap:5,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"5px 11px",fontSize:11,fontWeight:700,color:"#64748b"}}>
+        ⚙️ Meta &amp; %
+      </button>
+      {open&&(
+        <div style={{position:"absolute",right:0,top:38,background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"16px 18px",zIndex:200,boxShadow:"0 10px 40px rgba(0,0,0,0.12)",width:250}}>
+          <div style={{fontSize:12,fontWeight:800,color:"#1e293b",marginBottom:12}}>Configuracion del Mes</div>
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:4}}>META EQUIPO (USD)</div>
+            <input value={meta} onChange={e=>setMeta(e.target.value)} type="number" style={Object.assign({},iStyle,{height:34})} />
           </div>
-        ))}
-      </div>
-    </Card>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:4}}>% COMISION</div>
+            <input value={com} onChange={e=>setCom(e.target.value)} type="number" min="0" max="100" step="0.5" style={Object.assign({},iStyle,{height:34})} />
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setOpen(false)} style={Object.assign({},btnS("#94a3b8",true),{flex:1})}>Cancelar</button>
+            <button onClick={save}               style={Object.assign({},btnS("#6366f1",true),{flex:1})}>Guardar</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
-// ── ESCENARIOS ────────────────────────────────────────────────────────────────
-function EscenariosPanel({ acum }) {
-  const guias=[{label:"$100/día",diario:100},{label:"$300/día",diario:300},{label:"$500/día",diario:500}];
+// ── META BAR ───────────────────────────────────────────────────────────────────
+function MetaBar({acum,metaVal,label,color,bg,proy}) {
+  if (!metaVal) return null;
+  const p    = Math.min(100,(acum/metaVal)*100);
+  const falt = Math.max(0,metaVal-acum);
   return (
-    <Card>
-      <SLabel>📈 Escenarios — Si mantienes este ritmo diario</SLabel>
-      {guias.map(g=>{
-        const proy=acum+g.diario*DIAS_REST;
-        const top=proy>=META_ALTA_IND?{label:"Meta alta (10%)",color:"#10b981",bg:"#ecfdf5"}:proy>=META_BASE_IND?{label:"Meta base (8%)",color:"#3b82f6",bg:"#eff6ff"}:{label:"Sin meta",color:"#94a3b8",bg:"#f8fafc"};
-        return (
-          <div key={g.label} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:8, marginBottom:6 }}>
-            <span style={{ fontSize:13, fontWeight:800, color:"#1e293b", minWidth:90 }}>{g.label}</span>
-            <div style={{ flex:1, height:7, background:"#e2e8f0", borderRadius:3, overflow:"hidden" }}>
-              <div style={{ width:`${Math.min(100,(proy/META_ALTA_IND)*100)}%`, height:"100%", background:top.color, borderRadius:3 }} />
-            </div>
-            <span style={{ fontSize:13, fontWeight:700, color:"#334155", minWidth:90, textAlign:"right" }}>{usd(proy,0)}</span>
-            <span style={{ minWidth:110, textAlign:"right" }}><Pill color={top.color} bg={top.bg}>{top.label}</Pill></span>
-          </div>
-        );
-      })}
-    </Card>
-  );
-}
-
-// ── HISTORIAL ─────────────────────────────────────────────────────────────────
-function HistorialPanel({ data, color }) {
-  const diasCon = Object.keys(data).filter(d=>data[d]?.length>0).sort((a,b)=>+a-+b);
-  const totales = diasCon.map(d=>({dia:+d,val:sumR(data[d]),dow:dowDia(+d)}));
-  const maxVal  = Math.max(...totales.map(t=>t.val),1);
-  const diasSin = Array.from({length:DIA_HOY},(_,i)=>i+1).filter(d=>!diasCon.includes(String(d)));
-  let tendencia=null;
-  if (totales.length>=4){
-    const mid=Math.floor(totales.length/2);
-    const p1=totales.slice(0,mid).reduce((s,t)=>s+t.val,0)/mid;
-    const p2=totales.slice(mid).reduce((s,t)=>s+t.val,0)/(totales.length-mid);
-    tendencia=p2>p1*1.05?"subiendo":p2<p1*0.95?"bajando":"estable";
-  }
-  if (totales.length===0&&diasSin.length===0) return null;
-  return (
-    <Card>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-        <SLabel>📅 Historial por Día</SLabel>
-        <div style={{ display:"flex", gap:8, marginTop:-14 }}>
-          {tendencia&&<Pill color={tendencia==="subiendo"?"#10b981":tendencia==="bajando"?"#ef4444":"#64748b"} bg={tendencia==="subiendo"?"#ecfdf5":tendencia==="bajando"?"#fef2f2":"#f8fafc"}>{tendencia==="subiendo"?"↑ Subiendo":tendencia==="bajando"?"↓ Bajando":"→ Estable"}</Pill>}
-          {diasSin.length>0&&<Pill color="#f97316" bg="#fff7ed">{diasSin.length} día{diasSin.length>1?"s":""} sin ventas</Pill>}
+    <div style={{marginBottom:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <span style={{fontSize:12,fontWeight:700,color:"#1e293b"}}>{label}</span>
+          <Pill color={color} bg={bg}>{usd(metaVal,0)}</Pill>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <span style={{fontSize:13,fontWeight:800,color:falt===0?"#10b981":color}}>{falt===0?"LOGRADO":"Falta "+usd(falt,0)}</span>
+          <span style={{fontSize:11,color:"#94a3b8",marginLeft:8}}>{pc(p)}</span>
+          {proy>0&&falt>0&&<span style={{fontSize:10,marginLeft:6,color:proy>=metaVal?"#10b981":"#f97316"}}>· Proy {proy>=metaVal?"ok":"no"}</span>}
         </div>
       </div>
-      <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-        {totales.map(t=>(
-          <div key={t.dia} style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <span style={{ fontSize:11, color:"#94a3b8", minWidth:60 }}>D{t.dia} {t.dow}</span>
-            <div style={{ flex:1, height:8, background:"#f1f5f9", borderRadius:4, overflow:"hidden" }}>
-              <div style={{ width:`${(t.val/maxVal)*100}%`, height:"100%", background:color, borderRadius:4 }} />
-            </div>
-            <span style={{ fontSize:12, fontWeight:700, color, minWidth:90, textAlign:"right" }}>{usd(t.val,0)}</span>
-          </div>
-        ))}
+      <div style={{height:8,background:"#f1f5f9",borderRadius:4,overflow:"hidden"}}>
+        <div style={{width:p+"%",height:"100%",background:color,borderRadius:4,transition:"width 0.5s"}} />
       </div>
-      {diasSin.length>0&&<div style={{ marginTop:10, padding:"8px 12px", background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:8 }}>
-        <span style={{ fontSize:11, color:"#c2410c", fontWeight:600 }}>Sin registro: {diasSin.map(d=>`D${d}`).join(", ")}</span>
-      </div>}
-    </Card>
+    </div>
   );
 }
 
-// ── BLOQUE OPERATIVO ──────────────────────────────────────────────────────────
+// ── BLOQUE OPERATIVO ───────────────────────────────────────────────────────────
 function BloqueOperativo() {
   const hora=new Date().getHours(), dow=new Date().getDay();
   const activo=dow>=1&&dow<=6&&hora>=8&&hora<20, domingo=dow===0;
   return (
-    <div style={{ background:activo?"#f0fdf4":"#fafafa", border:`1px solid ${activo?"#a7f3d0":"#e2e8f0"}`, borderRadius:12, padding:"11px 18px", display:"flex", alignItems:"center", gap:14 }}>
-      <span style={{ fontSize:20 }}>{activo?"🟢":domingo?"😴":"🌙"}</span>
-      <div style={{ flex:1 }}>
-        <div style={{ fontSize:12, fontWeight:700, color:activo?"#059669":"#64748b" }}>{activo?"Ventana de operación activa":domingo?"Domingo — Solo seguimiento":hora<8?"Antes de horario (empieza 8:00 a.m.)":"Fuera de horario (cierra 8:00 p.m.)"}</div>
-        <div style={{ fontSize:11, color:"#94a3b8", marginTop:2 }}>Lun–Sáb · 8:00 a.m. – 8:00 p.m. · 70% del revenue ocurre aquí</div>
+    <div style={{background:activo?"#f0fdf4":"#fafafa",border:"1px solid "+(activo?"#a7f3d0":"#e2e8f0"),borderRadius:12,padding:"10px 16px",display:"flex",alignItems:"center",gap:12}}>
+      <span style={{fontSize:18}}>{activo?"🟢":domingo?"😴":"🌙"}</span>
+      <div style={{flex:1}}>
+        <div style={{fontSize:12,fontWeight:700,color:activo?"#059669":"#64748b"}}>{activo?"Ventana de operacion activa":domingo?"Domingo — Solo seguimiento":hora<8?"Antes de horario (8:00 a.m.)":"Fuera de horario (cierra 8:00 p.m.)"}</div>
+        <div style={{fontSize:10,color:"#94a3b8"}}>Lun-Sab 8:00 - 20:00 h</div>
       </div>
-      <span style={{ fontSize:13, fontWeight:700, color:"#94a3b8" }}>{hora}:00 h</span>
+      <span style={{fontSize:12,fontWeight:700,color:"#94a3b8"}}>{hora}:00 h</span>
     </div>
   );
 }
 
-// ── COMISIONES ────────────────────────────────────────────────────────────────
-function ComisionesPanel({ acum, proy, color, label }) {
+// ── COMISIONES ─────────────────────────────────────────────────────────────────
+function ComisionesPanel({acum,proy,color,label,comisionPct}) {
+  const pct = comisionPct/100;
   return (
     <Card>
-      <SLabel>💰 Comisiones — {label}</SLabel>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-        {[{pct:"8%",mult:0.08,meta:"Meta base"},{pct:"10%",mult:0.10,meta:"Meta alta"}].map(r=>(
-          <div key={r.pct} style={{ background:`${color}08`, border:`1px solid ${color}22`, borderRadius:10, padding:"12px 16px" }}>
-            <div style={{ fontSize:10, color:"#94a3b8", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:6 }}>Comisión {r.pct} · {r.meta}</div>
-            <div style={{ display:"flex", gap:14, alignItems:"flex-end" }}>
-              <div><div style={{ fontSize:10, color:"#94a3b8" }}>Actual</div><div style={{ fontSize:20, fontWeight:800, color }}>{usd(acum*r.mult,0)}</div></div>
-              <div style={{ paddingBottom:2 }}><div style={{ fontSize:10, color:"#94a3b8" }}>Proyectada</div><div style={{ fontSize:14, fontWeight:700, color:"#64748b" }}>{usd(proy*r.mult,0)}</div></div>
-            </div>
+      <SLabel>Comisiones — {label} ({comisionPct}%)</SLabel>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        {[{t:"Comision actual",v:acum*pct},{t:"Comision proyectada",v:proy*pct}].map(r=>(
+          <div key={r.t} style={{background:color+"08",border:"1px solid "+color+"22",borderRadius:10,padding:"12px 16px"}}>
+            <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>{r.t}</div>
+            <div style={{fontSize:20,fontWeight:800,color:color}}>{usd(r.v,0)}</div>
           </div>
         ))}
       </div>
@@ -377,206 +328,299 @@ function ComisionesPanel({ acum, proy, color, label }) {
   );
 }
 
-// ── ADVISOR TAB ───────────────────────────────────────────────────────────────
-const iStyle={ height:40, border:"1px solid #e2e8f0", borderRadius:8, padding:"0 12px", fontSize:13, color:"#1e293b", background:"#f8fafc", outline:"none", width:"100%", fontFamily:"'Sora',sans-serif" };
-const btnS=(c)=>({ height:40, background:c, color:"#fff", border:"none", borderRadius:8, padding:"0 16px", fontWeight:700, fontSize:13, cursor:"pointer", whiteSpace:"nowrap" });
-const icoBtn=(c)=>({ width:28, height:28, border:`1px solid ${c}33`, borderRadius:6, background:`${c}0d`, color:c, cursor:"pointer", fontSize:12, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, flexShrink:0 });
-
-function AdvisorTab({ name, color, data, onChange }) {
-  const [dia, setDia]       = useState(DIA_HOY);
-  const [form, setForm]     = useState({ orden:"", valor:"", plan:"" });
-  const [editId, setEditId] = useState(null);
-  const [status, setStatus] = useState(null); // null | 'saving' | 'ok' | 'sheets_ok' | 'sheets_err'
-
-  const allRows = Object.values(data).flat();
-  const acum    = sumR(allRows);
-  const diasCon = Object.keys(data).filter(d=>data[d]?.length>0).length;
-  const promDia = diasCon>0?acum/diasCon:0;
-  const proy    = acum+promDia*DIAS_REST;
-  const rowsHoy = data[dia]||[];
-  const totHoy  = sumR(rowsHoy);
-
-  const saveRow = async () => {
-    if (!form.valor) return;
-    setStatus("saving");
-    const day = data[dia]||[];
-    const newRow = { id:uid(), ...form, ts:Date.now() };
-    const updated = editId ? day.map(r=>r.id===editId?{...r,...form}:r) : [...day,newRow];
-    onChange({ ...data, [dia]:updated });
-    setForm({ orden:"", valor:"", plan:"" });
-    setEditId(null);
-    // Intentar guardar en Sheets (en GitHub Pages sí funciona)
-    const ok = await enviarASheets(name, dia, editId ? {...form} : newRow);
-    setStatus(ok?"sheets_ok":"sheets_err");
-    setTimeout(()=>setStatus(null), 3000);
-  };
-
-  const delRow   = (id) => onChange({ ...data, [dia]:(data[dia]||[]).filter(r=>r.id!==id) });
-  const startEdit = (r) => { setForm({orden:r.orden,valor:r.valor,plan:r.plan}); setEditId(r.id); };
-
+// ── PANEL PRESION ──────────────────────────────────────────────────────────────
+function PanelPresion({acum,promDia,proy,name,mesId,metaInd}) {
+  const mesInfo  = getMesInfo(mesId);
+  const diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
+  const diasRest = Math.max(1,mesInfo.dias-diaHoy);
+  const necBase  = acum<metaInd?(metaInd-acum)/diasRest:0;
+  const ritmoOk  = promDia>=necBase;
+  const pctBajo  = necBase>0?Math.max(0,(necBase-promDia)/necBase*100):0;
+  let ec,el,m1;
+  if (acum>=metaInd)       { ec="#10b981"; el="Meta lograda"; m1="Meta superada, "+name+"! Comision activada."; }
+  else if (ritmoOk)        { ec="#10b981"; el="En ritmo";    m1="Vas bien. Proyectas "+usd(proy,0)+" al cierre."; }
+  else if (pctBajo<30)     { ec="#f59e0b"; el="Ajustar ritmo"; m1=pc(pctBajo)+" bajo el ritmo. Necesitas "+usd(necBase)+"/dia."; }
+  else                     { ec="#ef4444"; el="Ritmo bajo";  m1="Vas "+pc(pctBajo)+" bajo. Necesitas "+usd(necBase)+"/dia urgente."; }
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-      <BloqueOperativo />
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10 }}>
-        <StatCard label="Revenue Acumulado" value={usd(acum,0)} accent={color} large />
-        <StatCard label="Promedio / Día" value={usd(promDia,0)} sub={`${diasCon} días con ventas`} />
-        <StatCard label="Proyección Cierre" value={usd(proy,0)} sub={`${DIAS_REST} días restantes`} />
-        <StatCard label="Faltante meta alta" value={acum>=META_ALTA_IND?"✓ Logrado":usd(META_ALTA_IND-acum,0)} accent={acum>=META_ALTA_IND?"#10b981":"#ef4444"} />
+    <div style={{background:"#fff",borderRadius:12,padding:"14px 18px",border:"1px solid "+ec+"33",borderLeft:"4px solid "+ec}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div style={{flex:1}}>
+          <div style={{fontSize:11,color:"#94a3b8",textTransform:"uppercase",fontWeight:700,marginBottom:4}}>Analisis — {name}</div>
+          <div style={{fontSize:13,fontWeight:700,color:"#1e293b"}}>{m1}</div>
+        </div>
+        <Pill color={ec} bg={ec+"12"} size={11}>{el}</Pill>
       </div>
-      <PanelPresion acum={acum} promDia={promDia} proy={proy} name={name} />
-      <Card><SLabel>🎯 Metas Individuales de {name}</SLabel>{METAS_IND.map(m=><MetaBar key={m.label} acum={acum} meta={m} proy={proy} />)}</Card>
-      <ComisionesPanel acum={acum} proy={proy} color={color} label={name} />
-      <EscenariosPanel acum={acum} />
-      <InsightsPanel data={data} />
-
-      <Card>
-        <SLabel>📅 Registro por Día — {name}</SLabel>
-        <div style={{ display:"flex", flexWrap:"wrap", gap:5, marginBottom:14 }}>
-          {Array.from({length:DIAS},(_,i)=>i+1).map(d=>{
-            const tiene=(data[d]||[]).length>0, sel=d===dia, esHoy=d===DIA_HOY;
-            return (
-              <button key={d} onClick={()=>setDia(d)} style={{ width:36, height:36, borderRadius:8, cursor:"pointer", border:sel?`2px solid ${color}`:esHoy?`2px dashed ${color}88`:"1px solid #e2e8f0", background:sel?color:tiene?"#ecfdf5":"#f8fafc", color:sel?"#fff":tiene?"#059669":d>DIA_HOY?"#cbd5e1":"#64748b", fontWeight:sel||tiene?700:400, fontSize:12, position:"relative" }}>
-                {d}
-                {tiene&&!sel&&<span style={{ position:"absolute", top:2, right:3, width:5, height:5, background:"#10b981", borderRadius:"50%" }} />}
-              </button>
-            );
-          })}
+      {necBase>0&&(
+        <div style={{marginTop:10,background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"8px 14px",display:"inline-block"}}>
+          <div style={{fontSize:10,color:"#3b82f6",fontWeight:700,textTransform:"uppercase"}}>Necesitas/dia para meta</div>
+          <div style={{fontSize:20,fontWeight:800,color:"#1d4ed8"}}>{usd(necBase,0)}</div>
         </div>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:8, padding:"10px 14px", marginBottom:12 }}>
-          <span style={{ fontSize:13, color:"#64748b" }}>{dia===DIA_HOY?"HOY · ":""}Día {dia} ({dowDia(dia)}) — {rowsHoy.length} registro{rowsHoy.length!==1?"s":""}</span>
-          <span style={{ fontSize:20, fontWeight:800, color }}>{usd(totHoy)}</span>
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 110px 1fr auto", gap:8, marginBottom:10 }}>
-          <input value={form.orden} onChange={e=>setForm({...form,orden:e.target.value})} placeholder="Orden / cliente" style={iStyle} />
-          <input value={form.valor} onChange={e=>setForm({...form,valor:e.target.value})} type="number" min="0" step="0.01" placeholder="USD" style={iStyle} />
-          <input value={form.plan} onChange={e=>setForm({...form,plan:e.target.value})} placeholder="Plan" style={iStyle} onKeyDown={e=>e.key==="Enter"&&saveRow()} />
-          <button onClick={saveRow} style={btnS(editId?"#6366f1":color)} disabled={status==="saving"}>{status==="saving"?"⏳...":editId?"✓ OK":"+ Guardar"}</button>
-        </div>
-        {status&&status!=="saving"&&(
-          <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:10, padding:"7px 12px", borderRadius:8, background:status==="sheets_ok"?"#f0fdf4":status==="sheets_err"?"#fffbeb":"#f0fdf4", border:`1px solid ${status==="sheets_ok"?"#a7f3d0":status==="sheets_err"?"#fde68a":"#a7f3d0"}`, animation:"fadeIn 0.2s ease" }}>
-            <span style={{ fontSize:13 }}>{status==="sheets_ok"?"✅":status==="sheets_err"?"⚠️":"✅"}</span>
-            <span style={{ fontSize:12, fontWeight:600, color:status==="sheets_ok"?"#059669":status==="sheets_err"?"#92400e":"#059669" }}>
-              {status==="sheets_ok"?"Guardado en dashboard y Google Sheets ✓":status==="sheets_err"?"Guardado en dashboard ✓ · Verifica la conexión a Sheets":"Guardado ✓"}
-            </span>
-          </div>
-        )}
-        {rowsHoy.length>0?(
-          <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
-            {rowsHoy.map(r=>(
-              <div key={r.id} style={{ display:"flex", alignItems:"center", gap:10, background:"#fff", border:"1px solid #e2e8f0", borderRadius:8, padding:"9px 14px" }}>
-                <span style={{ flex:1, fontSize:13, color:"#334155", fontWeight:600 }}>{r.orden||"—"}</span>
-                <span style={{ fontSize:12, color:"#94a3b8", minWidth:80 }}>{r.plan||"—"}</span>
-                <span style={{ fontSize:16, fontWeight:800, color, minWidth:90, textAlign:"right" }}>{usd(r.valor)}</span>
-                <button onClick={()=>startEdit(r)} style={icoBtn("#6366f1")}>✎</button>
-                <button onClick={()=>delRow(r.id)} style={icoBtn("#ef4444")}>✕</button>
-              </div>
-            ))}
-            <div style={{ textAlign:"right", fontSize:14, fontWeight:800, color, padding:"6px 14px", borderTop:"1px solid #f1f5f9" }}>Total: {usd(totHoy)}</div>
-          </div>
-        ):(
-          <div style={{ textAlign:"center", color:"#94a3b8", fontSize:13, padding:"18px 0" }}>Sin registros para el día {dia}. Agrega tu primera venta ↑</div>
-        )}
-      </Card>
-      <HistorialPanel data={data} color={color} />
+      )}
     </div>
   );
 }
 
-// ── GLOBAL TAB ────────────────────────────────────────────────────────────────
-function GlobalTab({ gData, cData }) {
-  const gRows=Object.values(gData).flat(), cRows=Object.values(cData).flat();
-  const gAcum=sumR(gRows), cAcum=sumR(cRows), total=gAcum+cAcum;
-  const gDias=Object.keys(gData).filter(d=>gData[d]?.length>0).length;
-  const cDias=Object.keys(cData).filter(d=>cData[d]?.length>0).length;
-  const gProm=gDias>0?gAcum/gDias:0, cProm=cDias>0?cAcum/cDias:0;
-  const gProy=gAcum+gProm*DIAS_REST, cProy=cAcum+cProm*DIAS_REST, totProy=gProy+cProy;
-  const lider=gAcum>=cAcum?"Guillermo":"Carolina", liderC=gAcum>=cAcum?"#2563eb":"#7c3aed";
-  const diff=Math.abs(gAcum-cAcum), maxBar=Math.max(gAcum,cAcum,1);
-  const revPorDia={};
-  [gData,cData].forEach(d=>Object.entries(d).forEach(([dia,rows])=>{ revPorDia[dia]=(revPorDia[dia]||0)+sumR(rows); }));
-  const diasOrd=Object.keys(revPorDia).sort((a,b)=>+a-+b);
-  const maxDia=Math.max(...Object.values(revPorDia),1);
-  const asesores=[{name:"Guillermo",acum:gAcum,proy:gProy,prom:gProm,color:"#2563eb"},{name:"Carolina",acum:cAcum,proy:cProy,prom:cProm,color:"#7c3aed"}];
+// ── HISTORIAL ──────────────────────────────────────────────────────────────────
+function HistorialPanel({data,color,mesId}) {
+  const diasCon = Object.keys(data).filter(d=>data[d]&&data[d].length>0).sort((a,b)=>+a-+b);
+  const totales = diasCon.map(d=>({dia:+d,val:sumR(data[d]),dow:dowDia(+d,mesId)}));
+  const maxVal  = Math.max.apply(null,totales.map(t=>t.val).concat([1]));
+  if (!totales.length) return null;
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+    <Card>
+      <SLabel>Historial por Dia</SLabel>
+      <div style={{display:"flex",flexDirection:"column",gap:5}}>
+        {totales.map(t=>(
+          <div key={t.dia} style={{display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:11,color:"#94a3b8",minWidth:60}}>D{t.dia} {t.dow}</span>
+            <div style={{flex:1,height:7,background:"#f1f5f9",borderRadius:3,overflow:"hidden"}}>
+              <div style={{width:((t.val/maxVal)*100)+"%",height:"100%",background:color,borderRadius:3}} />
+            </div>
+            <span style={{fontSize:12,fontWeight:700,color:color,minWidth:80,textAlign:"right"}}>{usd(t.val,0)}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+// ── ADVISOR TAB ────────────────────────────────────────────────────────────────
+function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
+  const mesInfo   = getMesInfo(mesId);
+  const diaHoyMes = mesId===getMesActual()?getDiaHoy():1;
+  const [dia,setDia]         = useState(diaHoyMes);
+  const [form,setForm]       = useState({orden:"",valor:"",plan:"Plan Smart"});
+  const [editId,setEditId]   = useState(null);
+  const [status,setStatus]   = useState(null);
+  const [confirmDel,setConfirmDel] = useState(null);
+
+  useEffect(()=>{ setDia(mesId===getMesActual()?getDiaHoy():1); },[mesId]);
+
+  const data    = getMonthData(store,mesId,asesor);
+  const cfg     = getConfig(store,mesId);
+  const metaInd = cfg.meta/2;
+
+  const allRows   = Object.values(data).reduce((a,b)=>a.concat(b),[]);
+  const acum      = sumR(allRows);
+  const totalVtas = allRows.length;
+  const diasCon   = Object.keys(data).filter(d=>data[d]&&data[d].length>0).length;
+  const promDia   = diasCon>0?acum/diasCon:0;
+  const diaHoy    = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
+  const diasRest  = Math.max(1,mesInfo.dias-diaHoy);
+  const proy      = acum+promDia*diasRest;
+  const rowsHoy   = data[dia]||[];
+  const totHoy    = sumR(rowsHoy);
+
+  const saveRow = async () => {
+    if (!form.valor) return;
+    setStatus("saving");
+    const day    = data[dia]||[];
+    const newRow = {id:uid(),orden:form.orden,valor:form.valor,plan:form.plan,ts:Date.now()};
+    const updated = editId ? day.map(r=>r.id===editId?Object.assign({},r,form):r) : day.concat([newRow]);
+    const newData = Object.assign({},data,{[dia]:updated});
+    onUpdate(setMonthData(store,mesId,asesor,newData));
+    setForm({orden:"",valor:"",plan:"Plan Smart"}); setEditId(null);
+    setStatus("ok"); setTimeout(()=>setStatus(null),3000);
+  };
+
+  const requestDelete = (r) => setConfirmDel(Object.assign({},r,{asesor:asesor,dia:dia}));
+
+  const confirmDelete = async () => {
+    if (!confirmDel) return;
+    const updated    = (data[confirmDel.dia]||[]).filter(r=>r.id!==confirmDel.id);
+    const newData    = Object.assign({},data,{[confirmDel.dia]:updated});
+    const deletedFila = Object.assign({},confirmDel,{deletedAt:new Date().toISOString()});
+    let newStore = setMonthData(store,mesId,asesor,newData);
+    newStore     = pushDeleted(newStore,deletedFila);
+    onUpdate(newStore);
+    await enviarEliminacion(deletedFila,mesId);
+    setConfirmDel(null);
+  };
+
+  const startEdit = (r) => { setForm({orden:r.orden,valor:r.valor,plan:r.plan||"Plan Smart"}); setEditId(r.id); };
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {confirmDel&&<ModalConfirmDelete fila={confirmDel} onConfirm={confirmDelete} onCancel={()=>setConfirmDel(null)} />}
       <BloqueOperativo />
-      <div style={{ background:`${liderC}08`, border:`1.5px solid ${liderC}33`, borderRadius:12, padding:"14px 20px", display:"flex", alignItems:"center", gap:16 }}>
-        <span style={{ fontSize:28 }}>🏆</span>
-        <div style={{ flex:1 }}>
-          <div style={{ fontSize:15, fontWeight:800, color:liderC }}>{lider} lidera por {usd(diff,0)}</div>
-          <div style={{ fontSize:12, color:"#64748b", marginTop:3 }}>G: {usd(gAcum,0)} ({pc(total>0?gAcum/total*100:0)}) · C: {usd(cAcum,0)} ({pc(total>0?cAcum/total*100:0)})</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+        <StatCard label="Revenue Acumulado" value={usd(acum,0)} accent={color} large />
+        <StatCard label="Ventas realizadas" value={totalVtas+" ventas"} sub={diasCon+" dias con ventas"} accent={color} />
+        <StatCard label="Proyeccion Cierre" value={usd(proy,0)} sub={diasRest+" dias restantes"} />
+        <StatCard label="Faltante meta" value={acum>=metaInd?"Logrado":usd(metaInd-acum,0)} accent={acum>=metaInd?"#10b981":"#ef4444"} />
+      </div>
+      <PanelPresion acum={acum} promDia={promDia} proy={proy} name={name} mesId={mesId} metaInd={metaInd} />
+      <Card>
+        <SLabel>Meta Individual — {name}</SLabel>
+        <MetaBar acum={acum} metaVal={metaInd} label={"Meta del mes ("+cfg.comision+"%)"} color={color} bg={color+"12"} proy={proy} />
+      </Card>
+      <ComisionesPanel acum={acum} proy={proy} color={color} label={name} comisionPct={cfg.comision} />
+      <Card>
+        <SLabel>Registro Diario — {name}</SLabel>
+        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:14}}>
+          {Array.from({length:mesInfo.dias},(_,i)=>i+1).map(d=>{
+            const tiene=(data[d]||[]).length>0, sel=d===dia, esHoy=d===diaHoyMes;
+            return (
+              <button key={d} onClick={()=>setDia(d)} style={{width:33,height:33,borderRadius:7,cursor:"pointer",
+                border:sel?"2px solid "+color:esHoy?"2px dashed "+color+"88":"1px solid #e2e8f0",
+                background:sel?color:tiene?"#ecfdf5":"#f8fafc",
+                color:sel?"#fff":tiene?"#059669":(d>diaHoyMes&&mesId===getMesActual())?"#cbd5e1":"#64748b",
+                fontWeight:(sel||tiene)?700:400,fontSize:11,position:"relative"}}>
+                {d}
+                {tiene&&!sel&&<span style={{position:"absolute",top:2,right:2,width:4,height:4,background:"#10b981",borderRadius:"50%"}} />}
+              </button>
+            );
+          })}
         </div>
-        <div style={{ textAlign:"right" }}>
-          <div style={{ fontSize:11, color:"#94a3b8" }}>Proyección equipo</div>
-          <div style={{ fontSize:22, fontWeight:800, color:"#6366f1" }}>{usd(totProy,0)}</div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"9px 14px",marginBottom:12}}>
+          <span style={{fontSize:13,color:"#64748b"}}>{(dia===diaHoyMes&&mesId===getMesActual())?"HOY · ":""}Dia {dia} ({dowDia(dia,mesId)}) — {rowsHoy.length} registro{rowsHoy.length!==1?"s":""}</span>
+          <span style={{fontSize:18,fontWeight:800,color:color}}>{usd(totHoy)}</span>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 100px 1fr auto",gap:8,marginBottom:10}}>
+          <input value={form.orden} onChange={e=>setForm(Object.assign({},form,{orden:e.target.value}))} placeholder="Orden / cliente" style={iStyle} />
+          <input value={form.valor} onChange={e=>setForm(Object.assign({},form,{valor:e.target.value}))} type="number" min="0" step="0.01" placeholder="USD" style={iStyle} />
+          <select value={form.plan} onChange={e=>setForm(Object.assign({},form,{plan:e.target.value}))} style={iStyle}>
+            {PLANES.map(p=><option key={p} value={p}>{p}</option>)}
+          </select>
+          <button onClick={saveRow} style={btnS(editId?"#6366f1":color)} disabled={status==="saving"}>
+            {status==="saving"?"Guardando...":editId?"Actualizar":"+ Guardar"}
+          </button>
+        </div>
+        {status&&status!=="saving"&&(
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,padding:"7px 12px",borderRadius:8,background:"#f0fdf4",border:"1px solid #a7f3d0",animation:"fadeIn 0.2s ease"}}>
+            <span>✅</span><span style={{fontSize:12,fontWeight:600,color:"#059669"}}>Guardado correctamente</span>
+          </div>
+        )}
+        {rowsHoy.length>0?(
+          <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            {rowsHoy.map(r=>(
+              <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,background:"#fff",border:"1px solid #e2e8f0",borderRadius:8,padding:"8px 12px"}}>
+                <span style={{flex:1,fontSize:13,color:"#334155",fontWeight:600}}>{r.orden||"-"}</span>
+                <span style={{fontSize:11,color:"#94a3b8",minWidth:110}}>{r.plan||"-"}</span>
+                <span style={{fontSize:15,fontWeight:800,color:color,minWidth:80,textAlign:"right"}}>{usd(r.valor)}</span>
+                <button onClick={()=>startEdit(r)}     style={icoBtn("#6366f1")}>✎</button>
+                <button onClick={()=>requestDelete(r)} style={icoBtn("#ef4444")}>✕</button>
+              </div>
+            ))}
+            <div style={{textAlign:"right",fontSize:14,fontWeight:800,color:color,padding:"6px 12px",borderTop:"1px solid #f1f5f9"}}>Total: {usd(totHoy)}</div>
+          </div>
+        ):(
+          <div style={{textAlign:"center",color:"#94a3b8",fontSize:13,padding:"18px 0"}}>Sin registros para el dia {dia}. Agrega tu primera venta</div>
+        )}
+      </Card>
+      <HistorialPanel data={data} color={color} mesId={mesId} />
+    </div>
+  );
+}
+
+// ── GLOBAL TAB ─────────────────────────────────────────────────────────────────
+function GlobalTab({store,mesId}) {
+  const mesInfo  = getMesInfo(mesId);
+  const cfg      = getConfig(store,mesId);
+  const diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
+  const diasRest = Math.max(1,mesInfo.dias-diaHoy);
+  const gData    = getMonthData(store,mesId,"guillermo");
+  const cData    = getMonthData(store,mesId,"carolina");
+  const gRows    = Object.values(gData).reduce((a,b)=>a.concat(b),[]);
+  const cRows    = Object.values(cData).reduce((a,b)=>a.concat(b),[]);
+  const gAcum    = sumR(gRows), cAcum = sumR(cRows), total = gAcum+cAcum;
+  const gVentas  = gRows.length, cVentas = cRows.length;
+  const gDias    = Object.keys(gData).filter(d=>gData[d]&&gData[d].length>0).length;
+  const cDias    = Object.keys(cData).filter(d=>cData[d]&&cData[d].length>0).length;
+  const gProm    = gDias>0?gAcum/gDias:0, cProm = cDias>0?cAcum/cDias:0;
+  const gProy    = gAcum+gProm*diasRest, cProy = cAcum+cProm*diasRest, totProy = gProy+cProy;
+  const metaEq   = cfg.meta, metaInd = cfg.meta/2, comPct = cfg.comision/100;
+  const maxBar   = Math.max(gAcum,cAcum,1);
+  const lider    = gAcum>=cAcum?"Guillermo":"Carolina";
+  const liderC   = gAcum>=cAcum?"#2563eb":"#7c3aed";
+  const revPorDia = {};
+  [gData,cData].forEach(d=>Object.entries(d).forEach(function(e){ revPorDia[e[0]]=(revPorDia[e[0]]||0)+sumR(e[1]); }));
+  const diasOrd = Object.keys(revPorDia).sort((a,b)=>+a-+b);
+  const maxDia  = Math.max.apply(null,Object.values(revPorDia).concat([1]));
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <BloqueOperativo />
+      <div style={{background:liderC+"08",border:"1.5px solid "+liderC+"33",borderRadius:12,padding:"14px 20px",display:"flex",alignItems:"center",gap:16}}>
+        <span style={{fontSize:26}}>🏆</span>
+        <div style={{flex:1}}>
+          <div style={{fontSize:14,fontWeight:800,color:liderC}}>{lider} lidera por {usd(Math.abs(gAcum-cAcum),0)}</div>
+          <div style={{fontSize:12,color:"#64748b",marginTop:3}}>G: {usd(gAcum,0)} ({gVentas} ventas) · C: {usd(cAcum,0)} ({cVentas} ventas)</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:11,color:"#94a3b8"}}>Proyeccion equipo</div>
+          <div style={{fontSize:20,fontWeight:800,color:"#6366f1"}}>{usd(totProy,0)}</div>
         </div>
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10 }}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
         <StatCard label="Revenue Equipo" value={usd(total,0)} accent="#6366f1" large />
-        <StatCard label="Proyección Total" value={usd(totProy,0)} sub={`+${usd(totProy-total,0)} potencial`} />
-        <StatCard label="Faltante meta alta" value={total>=META_ALTA_EQ?"✓ Logrado":usd(META_ALTA_EQ-total,0)} accent={total>=META_ALTA_EQ?"#10b981":"#ef4444"} />
-        <StatCard label="Días restantes" value={DIAS_REST} sub={`de ${DIAS} días totales`} />
+        <StatCard label="Proyeccion Total" value={usd(totProy,0)} sub={"+"+(usd(totProy-total,0))+" potencial"} />
+        <StatCard label="Faltante meta equipo" value={total>=metaEq?"Logrado":usd(metaEq-total,0)} accent={total>=metaEq?"#10b981":"#ef4444"} />
+        <StatCard label="Dias restantes" value={diasRest} sub={"de "+mesInfo.dias+" dias totales"} />
       </div>
       <Card>
-        <SLabel>👥 Comparativa de Asesores</SLabel>
-        {asesores.map(a=>(
-          <div key={a.name} style={{ marginBottom:18 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                <div style={{ width:34, height:34, borderRadius:"50%", background:`${a.color}18`, border:`2px solid ${a.color}55`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, fontWeight:800, color:a.color }}>{a.name[0]}</div>
+        <SLabel>Comparativa de Asesores</SLabel>
+        {[{name:"Guillermo",acum:gAcum,proy:gProy,prom:gProm,color:"#2563eb",ventas:gVentas},{name:"Carolina",acum:cAcum,proy:cProy,prom:cProm,color:"#7c3aed",ventas:cVentas}].map(a=>(
+          <div key={a.name} style={{marginBottom:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:32,height:32,borderRadius:"50%",background:a.color+"18",border:"2px solid "+a.color+"55",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:a.color}}>{a.name[0]}</div>
                 <div>
-                  <div style={{ fontSize:13, fontWeight:700, color:"#1e293b" }}>{a.name}</div>
-                  <div style={{ fontSize:11, color:"#94a3b8" }}>Prom {usd(a.prom,0)}/día · Proy {usd(a.proy,0)} · {pc(total>0?a.acum/total*100:0)} del equipo</div>
+                  <div style={{fontSize:13,fontWeight:700,color:"#1e293b"}}>{a.name}</div>
+                  <div style={{fontSize:11,color:"#94a3b8"}}>{a.ventas} ventas · Prom {usd(a.prom,0)}/dia · {pc(total>0?a.acum/total*100:0)} del equipo</div>
                 </div>
               </div>
-              <div style={{ textAlign:"right" }}>
-                <div style={{ fontSize:22, fontWeight:800, color:a.color }}>{usd(a.acum,0)}</div>
-                <Pill color={a.proy>=META_ALTA_IND?"#10b981":a.proy>=META_BASE_IND?"#3b82f6":"#f97316"} bg={a.proy>=META_ALTA_IND?"#ecfdf5":a.proy>=META_BASE_IND?"#eff6ff":"#fff7ed"}>{a.proy>=META_ALTA_IND?"Proy: Meta alta ✓":a.proy>=META_BASE_IND?"Proy: Meta base ✓":"Proy: Sin meta ✗"}</Pill>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:20,fontWeight:800,color:a.color}}>{usd(a.acum,0)}</div>
+                <Pill color={a.proy>=metaInd?"#10b981":"#f97316"} bg={a.proy>=metaInd?"#ecfdf5":"#fff7ed"}>{a.proy>=metaInd?"Proy: Meta ok":"Proy: Sin meta"}</Pill>
               </div>
             </div>
-            <div style={{ height:9, background:"#f1f5f9", borderRadius:4, overflow:"hidden" }}>
-              <div style={{ width:`${(a.acum/maxBar)*100}%`, height:"100%", background:a.color, borderRadius:4, transition:"width 0.5s" }} />
+            <div style={{height:8,background:"#f1f5f9",borderRadius:4,overflow:"hidden"}}>
+              <div style={{width:((a.acum/maxBar)*100)+"%",height:"100%",background:a.color,borderRadius:4,transition:"width 0.5s"}} />
             </div>
           </div>
         ))}
       </Card>
-      <Card><SLabel>🎯 Metas del Equipo</SLabel>{METAS_EQ.map(m=><MetaBar key={m.value} acum={total} meta={m} proy={totProy} />)}</Card>
       <Card>
-        <SLabel>💰 Comisiones Proyectadas al Cierre</SLabel>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:10 }}>
-          {[{l:"G · 8%",v:gProy*0.08,c:"#2563eb"},{l:"G · 10%",v:gProy*0.10,c:"#2563eb"},{l:"C · 8%",v:cProy*0.08,c:"#7c3aed"},{l:"C · 10%",v:cProy*0.10,c:"#7c3aed"}].map(x=>(
-            <div key={x.l} style={{ background:`${x.c}08`, border:`1px solid ${x.c}22`, borderRadius:10, padding:"12px 14px" }}>
-              <div style={{ fontSize:10, color:"#94a3b8", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:4 }}>{x.l}</div>
-              <div style={{ fontSize:18, fontWeight:800, color:x.c }}>{usd(x.v,0)}</div>
+        <SLabel>Meta del Equipo — {cfg.comision}%</SLabel>
+        <MetaBar acum={total} metaVal={metaEq} label="Meta mensual equipo" color="#6366f1" bg="#f0f0ff" proy={totProy} />
+      </Card>
+      <Card>
+        <SLabel>Comisiones Proyectadas al Cierre ({cfg.comision}%)</SLabel>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:10}}>
+          {[{l:"G actual",v:gAcum*comPct,c:"#2563eb"},{l:"G proyectada",v:gProy*comPct,c:"#2563eb"},
+            {l:"C actual",v:cAcum*comPct,c:"#7c3aed"},{l:"C proyectada",v:cProy*comPct,c:"#7c3aed"}].map(x=>(
+            <div key={x.l} style={{background:x.c+"08",border:"1px solid "+x.c+"22",borderRadius:10,padding:"12px 14px"}}>
+              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>{x.l}</div>
+              <div style={{fontSize:18,fontWeight:800,color:x.c}}>{usd(x.v,0)}</div>
             </div>
           ))}
         </div>
-        <div style={{ padding:"10px 14px", background:"#ecfdf5", border:"1px solid #a7f3d0", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <span style={{ fontSize:12, fontWeight:700, color:"#059669" }}>Total comisiones equipo (10%) al cierre</span>
-          <span style={{ fontSize:18, fontWeight:800, color:"#059669" }}>{usd((gProy+cProy)*0.10,0)}</span>
+        <div style={{padding:"10px 14px",background:"#ecfdf5",border:"1px solid #a7f3d0",borderRadius:8,display:"flex",justifyContent:"space-between"}}>
+          <span style={{fontSize:12,fontWeight:700,color:"#059669"}}>Total comisiones equipo proyectadas</span>
+          <span style={{fontSize:17,fontWeight:800,color:"#059669"}}>{usd((gProy+cProy)*comPct,0)}</span>
         </div>
       </Card>
       {diasOrd.length>0&&(
         <Card>
-          <SLabel>📅 Revenue por Día — Equipo</SLabel>
-          <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+          <SLabel>Revenue por Dia — Equipo</SLabel>
+          <div style={{display:"flex",flexDirection:"column",gap:5}}>
             {diasOrd.map(d=>{
               const gV=sumR(gData[d]||[]), cV=sumR(cData[d]||[]);
               return (
-                <div key={d} style={{ display:"flex", alignItems:"center", gap:10 }}>
-                  <span style={{ fontSize:11, color:"#94a3b8", minWidth:60 }}>D{d} {dowDia(+d)}</span>
-                  <div style={{ flex:1, height:8, background:"#f1f5f9", borderRadius:4, overflow:"hidden", display:"flex" }}>
-                    <div style={{ width:`${(gV/maxDia)*100}%`, height:"100%", background:"#2563eb" }} />
-                    <div style={{ width:`${(cV/maxDia)*100}%`, height:"100%", background:"#7c3aed" }} />
+                <div key={d} style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:11,color:"#94a3b8",minWidth:60}}>D{d} {dowDia(+d,mesId)}</span>
+                  <div style={{flex:1,height:7,background:"#f1f5f9",borderRadius:3,overflow:"hidden",display:"flex"}}>
+                    <div style={{width:((gV/maxDia)*100)+"%",height:"100%",background:"#2563eb"}} />
+                    <div style={{width:((cV/maxDia)*100)+"%",height:"100%",background:"#7c3aed"}} />
                   </div>
-                  <span style={{ fontSize:12, fontWeight:700, color:"#334155", minWidth:90, textAlign:"right" }}>{usd(gV+cV,0)}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:"#334155",minWidth:80,textAlign:"right"}}>{usd(gV+cV,0)}</span>
                 </div>
               );
             })}
           </div>
-          <div style={{ display:"flex", gap:16, marginTop:10, fontSize:11, color:"#64748b" }}>
-            <span><span style={{ color:"#2563eb", fontWeight:700 }}>■</span> Guillermo</span>
-            <span><span style={{ color:"#7c3aed", fontWeight:700 }}>■</span> Carolina</span>
+          <div style={{display:"flex",gap:16,marginTop:10,fontSize:11,color:"#64748b"}}>
+            <span><span style={{color:"#2563eb",fontWeight:700}}>■</span> Guillermo</span>
+            <span><span style={{color:"#7c3aed",fontWeight:700}}>■</span> Carolina</span>
           </div>
         </Card>
       )}
@@ -584,72 +628,187 @@ function GlobalTab({ gData, cData }) {
   );
 }
 
-// ── MAIN APP ──────────────────────────────────────────────────────────────────
-const TABS = [
-  { id:"global",    label:"🌐 Global",     color:"#6366f1" },
-  { id:"guillermo", label:"G · Guillermo", color:"#2563eb" },
-  { id:"carolina",  label:"C · Carolina",  color:"#7c3aed" },
+// ── TRACKER ────────────────────────────────────────────────────────────────────
+function TrackerTab({store}) {
+  const mesesConDatos = MESES.filter(m=>ASESORES.some(a=>{
+    const d=getMonthData(store,m.id,a);
+    return Object.values(d).reduce((a,b)=>a.concat(b),[]).length>0;
+  }));
+  if (!mesesConDatos.length) return (
+    <div style={{textAlign:"center",padding:"60px 20px",color:"#94a3b8"}}>
+      <div style={{fontSize:40,marginBottom:12}}>📊</div>
+      <div style={{fontSize:16,fontWeight:700,color:"#64748b"}}>Sin datos historicos aun</div>
+      <div style={{fontSize:13,marginTop:6}}>Comienza registrando ventas en los meses activos</div>
+    </div>
+  );
+  const resumen = mesesConDatos.map(m=>{
+    const gData=getMonthData(store,m.id,"guillermo");
+    const cData=getMonthData(store,m.id,"carolina");
+    const gRows=Object.values(gData).reduce((a,b)=>a.concat(b),[]);
+    const cRows=Object.values(cData).reduce((a,b)=>a.concat(b),[]);
+    const gAcum=sumR(gRows), cAcum=sumR(cRows), total=gAcum+cAcum;
+    const cfg=getConfig(store,m.id);
+    const cumplimiento=cfg.meta>0?(total/cfg.meta)*100:0;
+    return Object.assign({},m,{gAcum,cAcum,total,gVentas:gRows.length,cVentas:cRows.length,cfg,cumplimiento});
+  });
+  const totalHistorico = resumen.reduce((s,r)=>s+r.total,0);
+  const maxTotal = Math.max.apply(null,resumen.map(r=>r.total).concat([1]));
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+        <StatCard label="Revenue Total Historico" value={usd(totalHistorico,0)} accent="#6366f1" large />
+        <StatCard label="Meses con datos" value={mesesConDatos.length} sub="meses registrados" />
+        <StatCard label="Promedio mensual" value={usd(totalHistorico/(mesesConDatos.length||1),0)} sub="por mes" />
+      </div>
+      <Card>
+        <SLabel>Evolucion Mensual — Revenue Total</SLabel>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {resumen.map(r=>(
+            <div key={r.id} style={{display:"flex",alignItems:"center",gap:12}}>
+              <span style={{fontSize:12,fontWeight:700,color:"#64748b",minWidth:80}}>{r.label}</span>
+              <div style={{flex:1,height:22,background:"#f1f5f9",borderRadius:6,overflow:"hidden",position:"relative"}}>
+                <div style={{width:((r.gAcum/maxTotal)*100)+"%",height:"100%",background:"#2563eb",position:"absolute",left:0}} />
+                <div style={{width:((r.cAcum/maxTotal)*100)+"%",height:"100%",background:"#7c3aed66",position:"absolute",left:((r.gAcum/maxTotal)*100)+"%"}} />
+              </div>
+              <span style={{fontSize:13,fontWeight:800,color:"#1e293b",minWidth:90,textAlign:"right"}}>{usd(r.total,0)}</span>
+              <Pill color={r.cumplimiento>=100?"#10b981":r.cumplimiento>=80?"#3b82f6":"#f97316"}
+                    bg={r.cumplimiento>=100?"#ecfdf5":r.cumplimiento>=80?"#eff6ff":"#fff7ed"} size={10}>{pc(r.cumplimiento)}</Pill>
+            </div>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:16,marginTop:10,fontSize:11,color:"#64748b"}}>
+          <span><span style={{color:"#2563eb",fontWeight:700}}>■</span> Guillermo</span>
+          <span><span style={{color:"#7c3aed",fontWeight:700}}>■</span> Carolina</span>
+        </div>
+      </Card>
+      <Card>
+        <SLabel>Comparativo Mensual Detallado</SLabel>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead>
+              <tr style={{borderBottom:"2px solid #f1f5f9"}}>
+                {["Mes","Meta","% Com","Guillermo","G Vtas","Carolina","C Vtas","Total","Cumpl."].map(h=>(
+                  <th key={h} style={{padding:"8px 10px",color:"#94a3b8",fontWeight:700,textTransform:"uppercase",fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {resumen.map((r,i)=>(
+                <tr key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2===0?"#fff":"#fafafa"}}>
+                  <td style={{padding:"9px 10px",fontWeight:700,color:"#1e293b",textAlign:"left"}}>{r.label}</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",color:"#64748b"}}>{usd(r.cfg.meta,0)}</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",color:"#64748b"}}>{r.cfg.comision}%</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",color:"#2563eb",fontWeight:700}}>{usd(r.gAcum,0)}</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8"}}>{r.gVentas}</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",color:"#7c3aed",fontWeight:700}}>{usd(r.cAcum,0)}</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8"}}>{r.cVentas}</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",fontWeight:800,color:"#1e293b"}}>{usd(r.total,0)}</td>
+                  <td style={{padding:"9px 10px",textAlign:"right"}}>
+                    <Pill color={r.cumplimiento>=100?"#10b981":r.cumplimiento>=80?"#3b82f6":"#f97316"}
+                          bg={r.cumplimiento>=100?"#ecfdf5":r.cumplimiento>=80?"#eff6ff":"#fff7ed"} size={10}>{pc(r.cumplimiento)}</Pill>
+                  </td>
+                </tr>
+              ))}
+              <tr style={{borderTop:"2px solid #e2e8f0",background:"#f8fafc"}}>
+                <td style={{padding:"9px 10px",fontWeight:800,color:"#6366f1",textAlign:"left"}} colSpan={3}>TOTAL HISTORICO</td>
+                <td style={{padding:"9px 10px",textAlign:"right",color:"#2563eb",fontWeight:800}}>{usd(resumen.reduce((s,r)=>s+r.gAcum,0),0)}</td>
+                <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8",fontWeight:700}}>{resumen.reduce((s,r)=>s+r.gVentas,0)}</td>
+                <td style={{padding:"9px 10px",textAlign:"right",color:"#7c3aed",fontWeight:800}}>{usd(resumen.reduce((s,r)=>s+r.cAcum,0),0)}</td>
+                <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8",fontWeight:700}}>{resumen.reduce((s,r)=>s+r.cVentas,0)}</td>
+                <td style={{padding:"9px 10px",textAlign:"right",fontWeight:800,color:"#6366f1",fontSize:14}}>{usd(totalHistorico,0)}</td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ── MAIN APP ───────────────────────────────────────────────────────────────────
+const MAIN_TABS = [
+  { id:"global",    label:"Equipo",     color:"#6366f1" },
+  { id:"guillermo", label:"Guillermo",  color:"#2563eb" },
+  { id:"carolina",  label:"Carolina",   color:"#7c3aed" },
+  { id:"tracker",   label:"Tracker",    color:"#0f766e" },
 ];
 
 function App() {
-  const [tab, setTab]     = useState("global");
-  const [store, setStore] = useState(() => loadStore());
-  const storeRef          = useRef(store);
+  const [tab,    setTab]    = useState("global");
+  const [mesId,  setMesId]  = useState(getMesActual);
+  const [store,  setStore]  = useState(loadStore);
+  const [showPin,setShowPin] = useState(false);
+  const storeRef = useRef(store);
 
-  const update = useCallback((who, data) => {
-    const next = { ...storeRef.current, [who]: data };
-    storeRef.current = next;
-    setStore(next);
-    saveStore(next);
-  }, []);
+  const onUpdate = useCallback(function(newStore) {
+    storeRef.current = newStore;
+    setStore(newStore);
+  },[]);
 
-  const gData = store.guillermo || {};
-  const cData = store.carolina  || {};
+  const onSaveConfig = useCallback(function(cfg) {
+    const next = setConfigStore(storeRef.current, mesId, cfg);
+    onUpdate(next);
+  },[mesId]);
+
+  const handleSync = () => setShowPin(true);
+  const onPinSuccess = async () => {
+    setShowPin(false);
+    await sincronizarConSheets(storeRef.current, mesId, false);
+  };
+
+  const cfg      = getConfig(store,mesId);
+  const mesInfo  = getMesInfo(mesId);
+  const diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
+  const diasRest = Math.max(1,mesInfo.dias-diaHoy);
 
   return (
-    <div style={{ fontFamily:"'Sora',system-ui,sans-serif", background:"#f0f4f8", minHeight:"100vh", color:"#1e293b" }}>
-
-      {/* Header */}
-      <div style={{ background:"#fff", borderBottom:"1px solid #e2e8f0", padding:"0 24px", display:"flex", alignItems:"center", gap:16, height:56, position:"sticky", top:0, zIndex:50, boxShadow:"0 1px 4px rgba(0,0,0,0.05)" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <div style={{ width:34, height:34, borderRadius:9, background:"linear-gradient(135deg,#6366f1,#2563eb)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17 }}>✈️</div>
+    <div style={{fontFamily:"'Sora',system-ui,sans-serif",background:"#f0f4f8",minHeight:"100vh",color:"#1e293b"}}>
+      {showPin&&<ModalPin onSuccess={onPinSuccess} onCancel={()=>setShowPin(false)} />}
+      <div style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"0 18px",display:"flex",alignItems:"center",gap:10,height:56,position:"sticky",top:0,zIndex:50,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+          <div style={{width:30,height:30,borderRadius:8,background:"linear-gradient(135deg,#6366f1,#2563eb)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>✈️</div>
           <div>
-            <div style={{ fontSize:15, fontWeight:800, color:"#1e293b", lineHeight:1.1 }}>SegurosFlyCRM</div>
-            <div style={{ fontSize:10, color:"#94a3b8", fontWeight:600 }}>Mayo 2026 · Revenue Tracker</div>
+            <div style={{fontSize:13,fontWeight:800,color:"#1e293b",lineHeight:1.1}}>SegurosFlyCRM</div>
+            <div style={{fontSize:9,color:"#94a3b8",fontWeight:600}}>Dashboard 2026</div>
           </div>
         </div>
-        <div style={{ display:"flex", gap:4, flex:1, justifyContent:"center" }}>
-          {TABS.map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)} style={{ background:tab===t.id?t.color:"transparent", color:tab===t.id?"#fff":"#64748b", border:`1px solid ${tab===t.id?t.color:"#e2e8f0"}`, borderRadius:8, padding:"7px 20px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
-              {t.label}
+        <select value={mesId} onChange={e=>setMesId(e.target.value)}
+          style={{height:32,border:"1px solid #e2e8f0",borderRadius:8,padding:"0 28px 0 10px",fontSize:12,color:"#1e293b",background:"#f8fafc",fontWeight:700,width:120,flexShrink:0,fontFamily:"'Sora',sans-serif",backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",backgroundRepeat:"no-repeat",backgroundPosition:"right 8px center",appearance:"none",WebkitAppearance:"none"}}>
+          {MESES.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}
+        </select>
+        <div style={{display:"flex",gap:3,flex:1,justifyContent:"center",overflowX:"auto"}}>
+          {MAIN_TABS.map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{background:tab===t.id?t.color:"transparent",color:tab===t.id?"#fff":"#64748b",border:"1px solid "+(tab===t.id?t.color:"#e2e8f0"),borderRadius:7,padding:"5px 14px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+              {t.id==="global"?"🌐 "+t.label:t.id==="guillermo"?"G · "+t.label:t.id==="carolina"?"C · "+t.label:"📊 "+t.label}
             </button>
           ))}
         </div>
-        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-          <button onClick={()=>{ descargarCSV(storeRef.current); sincronizarConSheets(storeRef.current, true); }} style={{ display:"flex", alignItems:"center", gap:5, background:"#f0fdf4", border:"1px solid #a7f3d0", borderRadius:8, padding:"6px 12px", fontSize:11, fontWeight:700, color:"#059669", cursor:"pointer" }}>
-            ⬇️ Descargar CSV
+        <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+          <ConfigMes config={cfg} onSave={onSaveConfig} />
+          <button onClick={()=>descargarCSV(storeRef.current,mesId)} style={{display:"flex",alignItems:"center",gap:4,background:"#f0fdf4",border:"1px solid #a7f3d0",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:700,color:"#059669"}}>
+            ⬇️ CSV
           </button>
-          <button onClick={()=>sincronizarConSheets(storeRef.current)} style={{ display:"flex", alignItems:"center", gap:5, background:"#eff6ff", border:"1px solid #93c5fd", borderRadius:8, padding:"6px 12px", fontSize:11, fontWeight:700, color:"#2563eb", cursor:"pointer" }}>
-            ☁️ Sync Sheets
+          <button onClick={handleSync} style={{display:"flex",alignItems:"center",gap:4,background:"#eff6ff",border:"1px solid #93c5fd",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:700,color:"#2563eb"}}>
+            ☁️ Sync
           </button>
-          <div style={{ fontSize:11, color:"#94a3b8", textAlign:"right", lineHeight:1.5 }}>
-            <div style={{ fontWeight:600 }}>Día {DIA_HOY} / {DIAS}</div>
-            <div style={{ color:"#6366f1", fontWeight:700 }}>{DIAS_REST} días restantes</div>
+          <div style={{fontSize:11,color:"#94a3b8",textAlign:"right",lineHeight:1.4}}>
+            <div style={{fontWeight:600}}>D{diaHoy}/{mesInfo.dias}</div>
+            <div style={{color:"#6366f1",fontWeight:700}}>{diasRest}d</div>
           </div>
         </div>
       </div>
-
-      {/* Content */}
-      <div style={{ maxWidth:1100, margin:"0 auto", padding:"18px 20px 48px" }}>
-        {tab==="global"    && <GlobalTab gData={gData} cData={cData} />}
-        {tab==="guillermo" && <AdvisorTab name="Guillermo" color="#2563eb" data={gData} onChange={d=>update("guillermo",d)} />}
-        {tab==="carolina"  && <AdvisorTab name="Carolina"  color="#7c3aed" data={cData} onChange={d=>update("carolina",d)} />}
+      <div style={{maxWidth:1100,margin:"0 auto",padding:"16px 18px 48px"}}>
+        {tab==="global"    &&<GlobalTab store={store} mesId={mesId} />}
+        {tab==="guillermo" &&<AdvisorTab name="Guillermo" asesor="guillermo" color="#2563eb" store={store} mesId={mesId} onUpdate={onUpdate} />}
+        {tab==="carolina"  &&<AdvisorTab name="Carolina"  asesor="carolina"  color="#7c3aed" store={store} mesId={mesId} onUpdate={onUpdate} />}
+        {tab==="tracker"   &&<TrackerTab store={store} />}
       </div>
     </div>
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
 </body>
 </html>
