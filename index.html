@@ -32,7 +32,8 @@ const { useState, useEffect, useCallback, useRef, useMemo } = React;
 // ── CONSTANTS ──────────────────────────────────────────────────────────────────
 const DOW      = ["Dom","Lun","Mar","Mie","Jue","Vie","Sab"];
 const ASESORES = ["guillermo","carolina"];
-const SYNC_PIN = "1234";
+// CAMBIO #10: PIN actualizado a 2187
+const SYNC_PIN = "2187";
 const SHEETS_URL = "https://script.google.com/macros/s/AKfycby2NkWxPbvu08G5HTev1Jqj7_cbmNZr0kmusQ6MDT22jeK5diDm5X5AUnb-q3w3uhk/exec";
 
 const PLANES = [
@@ -73,7 +74,19 @@ const loadStore = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY
 const saveStore = (d) => { try { localStorage.setItem(STORE_KEY, JSON.stringify(d)); } catch {} };
 
 const getMonthData = (store, mesId, asesor) => (store[mesId] && store[mesId][asesor]) ? store[mesId][asesor] : {};
-const getConfig    = (store, mesId) => (store.config && store.config[mesId]) ? store.config[mesId] : { meta: 12500, comision: 10 };
+
+// CAMBIO #3: getConfig ahora soporta metaBase y metaSfly
+const getConfig = (store, mesId) => {
+  const stored = store.config && store.config[mesId] ? store.config[mesId] : {};
+  return {
+    meta:      stored.meta      !== undefined ? stored.meta      : 12500,
+    comision:  stored.comision  !== undefined ? stored.comision  : 10,
+    metaBase:  stored.metaBase  !== undefined ? stored.metaBase  : 12500,
+    pctBase:   stored.pctBase   !== undefined ? stored.pctBase   : 10,
+    metaSfly:  stored.metaSfly  !== undefined ? stored.metaSfly  : 18000,
+    pctSfly:   stored.pctSfly   !== undefined ? stored.pctSfly   : 15,
+  };
+};
 
 const setMonthData = (store, mesId, asesor, data) => {
   const next = Object.assign({}, store, { [mesId]: Object.assign({}, store[mesId]||{}, { [asesor]: data }) });
@@ -99,37 +112,78 @@ const uid  = () => Math.random().toString(36).slice(2,9);
 const sumR = (rows) => (rows||[]).reduce((s,r) => s+(parseFloat(r.valor)||0), 0);
 const cap  = (s) => s.charAt(0).toUpperCase()+s.slice(1);
 
+// ── LOGO SVG (Seguros Fly – colores azul navy + naranja) ────────────────────────
+const LogoSVG = ({size=32, dark=false}) => (
+  <svg width={size} height={size} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    {/* ala */}
+    <path d="M15 75 Q25 45 50 20 Q60 15 65 25 Q55 35 45 55 Q40 65 35 75 Z"
+          fill={dark?"#fff":"#1e3a5f"} />
+    <path d="M28 75 Q38 50 58 30 Q66 25 70 33 Q60 43 52 60 Q46 70 42 78 Z"
+          fill={dark?"rgba(255,255,255,0.6)":"#2c5282"} />
+    <path d="M42 78 Q50 55 68 36 Q75 30 78 38 Q68 48 62 64 Q57 74 54 82 Z"
+          fill={dark?"rgba(255,255,255,0.35)":"#3b82c4"} />
+    {/* órbita naranja */}
+    <ellipse cx="50" cy="72" rx="38" ry="10" fill="none"
+             stroke="#F59E0B" strokeWidth="3.5"
+             strokeDasharray="60 40" transform="rotate(-15 50 72)" />
+    <circle cx="82" cy="65" r="4" fill="#F59E0B"/>
+  </svg>
+);
+
 // ── SHEETS SYNC ────────────────────────────────────────────────────────────────
-const sincronizarConSheets = async (store, mesId, silent) => {
+// CAMBIO #1: Sync ahora guarda TODOS los meses
+const sincronizarConSheets = async (store, silent) => {
   const rows  = [];
   const ts    = new Date().toISOString();
   const fecha = new Date().toLocaleDateString("es-CO");
-  const mesLabel = getMesInfo(mesId).label;
-  ASESORES.forEach(asesor => {
-    const data = getMonthData(store, mesId, asesor);
-    Object.entries(data).forEach(function(entry) {
-      var dia = entry[0]; var ventas = entry[1];
-      (ventas||[]).forEach(v => {
-        rows.push([fecha, mesLabel, cap(asesor), "Dia "+dia, dowDia(+dia,mesId), v.orden||"-", v.plan||"-", parseFloat(v.valor)||0, ts]);
+
+  MESES.forEach(mes => {
+    const mesLabel = mes.label;
+    ASESORES.forEach(asesor => {
+      const data = getMonthData(store, mes.id, asesor);
+      Object.entries(data).forEach(function(entry) {
+        var dia = entry[0]; var ventas = entry[1];
+        (ventas||[]).forEach(v => {
+          rows.push([fecha, mesLabel, cap(asesor), "Dia "+dia, dowDia(+dia,mes.id), v.orden||"-", v.plan||"-", parseFloat(v.valor)||0, ts]);
+        });
       });
     });
   });
-  if (!rows.length) { if (!silent) alert("Sin datos para sincronizar en este mes."); return false; }
+
+  if (!rows.length) { if (!silent) alert("Sin datos para sincronizar."); return false; }
   try {
-    const params = new URLSearchParams({ bulk: JSON.stringify(rows), mes: mesLabel });
+    const params = new URLSearchParams({ bulk: JSON.stringify(rows), sheet: "Sync Sheets" });
     await fetch(SHEETS_URL+"?"+params.toString(), { method:"GET", mode:"no-cors" });
-    if (!silent) alert("Sincronizadas "+rows.length+" filas en Google Sheets (hoja RealTime)");
+    if (!silent) alert("✅ Sincronizadas "+rows.length+" filas en hoja 'Sync Sheets' (todos los meses)");
     return true;
   } catch(e) { if (!silent) alert("Error al sincronizar."); return false; }
 };
 
+// CAMBIO #2: guardar en RealTime al hacer save en pestaña asesor
+const enviarRealTime = async (row, mesId, asesor) => {
+  try {
+    const mesLabel = getMesInfo(mesId).label;
+    const ts = new Date().toISOString();
+    const fecha = new Date().toLocaleDateString("es-CO");
+    const params = new URLSearchParams({
+      accion:"guardar", sheet:"RealTime",
+      fecha, mes:mesLabel, asesor:cap(asesor),
+      dia:String(row.dia||""), orden:row.orden||"-",
+      plan:row.plan||"-", valor:String(parseFloat(row.valor)||0), ts
+    });
+    await fetch(SHEETS_URL+"?"+params.toString(), { method:"GET", mode:"no-cors" });
+  } catch(e) {}
+};
+
+// CAMBIO #2: eliminar en RealTime escribe "eliminado de real" en columna I
 const enviarEliminacion = async (fila, mesId) => {
   try {
     const params = new URLSearchParams({
-      accion:"eliminar", mes:getMesInfo(mesId).label, asesor:cap(fila.asesor||""),
+      accion:"eliminar", sheet:"RealTime",
+      mes:getMesInfo(mesId).label, asesor:cap(fila.asesor||""),
       dia:String(fila.dia||""), orden:fila.orden||"-", plan:fila.plan||"-",
       valor:String(parseFloat(fila.valor)||0), deletedAt:fila.deletedAt||new Date().toISOString(),
-      nota:"Dato eliminado del Real-Time"
+      nota:"eliminado de real"
     });
     await fetch(SHEETS_URL+"?"+params.toString(), { method:"GET", mode:"no-cors" });
   } catch(e) {}
@@ -195,17 +249,17 @@ function ModalPin({onSuccess,onCancel}) {
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:16,padding:"28px 32px",width:320,textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.15)"}}>
-        <div style={{fontSize:32,marginBottom:8}}>🔒</div>
-        <div style={{fontSize:16,fontWeight:800,color:"#1e293b",marginBottom:6}}>Sync protegido</div>
-        <div style={{fontSize:13,color:"#64748b",marginBottom:20}}>Ingresa el PIN de 4 digitos para sincronizar</div>
-        <input type="password" maxLength={4} value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,""))}
+        <LogoSVG size={48} />
+        <div style={{fontSize:16,fontWeight:800,color:"#1e293b",marginBottom:6,marginTop:8}}>Sync protegido</div>
+        <div style={{fontSize:13,color:"#64748b",marginBottom:20}}>Ingresa el PIN para sincronizar todos los meses</div>
+        <input type="password" maxLength={6} value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,""))}
           onKeyDown={e=>e.key==="Enter"&&check()} placeholder="* * * *"
           style={Object.assign({},iStyle,{textAlign:"center",fontSize:22,letterSpacing:8,marginBottom:12,
             border:"2px solid "+(err?"#ef4444":"#e2e8f0"),background:err?"#fef2f2":"#f8fafc"})} autoFocus />
         {err&&<div style={{color:"#ef4444",fontSize:12,fontWeight:700,marginBottom:8}}>PIN incorrecto</div>}
         <div style={{display:"flex",gap:10,justifyContent:"center"}}>
           <button onClick={onCancel} style={Object.assign({},btnS("#94a3b8"),{height:36})}>Cancelar</button>
-          <button onClick={check}   style={Object.assign({},btnS("#6366f1"),{height:36})}>Confirmar</button>
+          <button onClick={check}   style={Object.assign({},btnS("#1e3a5f"),{height:36})}>Confirmar</button>
         </div>
       </div>
     </div>
@@ -225,7 +279,7 @@ function ModalConfirmDelete({fila,onConfirm,onCancel}) {
           <div style={{fontSize:12,color:"#64748b"}}>{fila.plan||"-"} · {usd(fila.valor)}</div>
         </div>
         <div style={{fontSize:12,color:"#94a3b8",marginBottom:18,textAlign:"center"}}>
-          Se marcara en Google Sheets como <strong style={{color:"#ef4444"}}>Dato eliminado del Real-Time</strong>
+          Se marcara en Google Sheets como <strong style={{color:"#ef4444"}}>eliminado de real</strong> en columna I
         </div>
         <div style={{display:"flex",gap:10,justifyContent:"center"}}>
           <button onClick={onCancel}  style={Object.assign({},btnS("#94a3b8"),{height:36})}>Cancelar</button>
@@ -236,32 +290,72 @@ function ModalConfirmDelete({fila,onConfirm,onCancel}) {
   );
 }
 
-// ── CONFIG MES ─────────────────────────────────────────────────────────────────
+// ── CONFIG MES (CAMBIO #3: 2 metas — Base y SegurosFly) ──────────────────────
 function ConfigMes({config,onSave}) {
-  const [meta,setMeta] = useState(String(config.meta));
-  const [com,setCom]   = useState(String(config.comision));
+  const [metaBase, setMetaBase] = useState(String(config.metaBase||12500));
+  const [pctBase,  setPctBase]  = useState(String(config.pctBase||10));
+  const [metaSfly, setMetaSfly] = useState(String(config.metaSfly||18000));
+  const [pctSfly,  setPctSfly]  = useState(String(config.pctSfly||15));
   const [open,setOpen] = useState(false);
-  useEffect(()=>{ setMeta(String(config.meta)); setCom(String(config.comision)); },[config.meta,config.comision]);
-  const save = () => { onSave({meta:parseFloat(meta)||12500,comision:parseFloat(com)||10}); setOpen(false); };
+
+  useEffect(()=>{
+    setMetaBase(String(config.metaBase||12500));
+    setPctBase(String(config.pctBase||10));
+    setMetaSfly(String(config.metaSfly||18000));
+    setPctSfly(String(config.pctSfly||15));
+  },[config.metaBase,config.pctBase,config.metaSfly,config.pctSfly]);
+
+  const save = () => {
+    const mb = parseFloat(metaBase)||12500;
+    const pb = parseFloat(pctBase)||10;
+    const ms = parseFloat(metaSfly)||18000;
+    const ps = parseFloat(pctSfly)||15;
+    onSave({ meta: mb, comision: pb, metaBase: mb, pctBase: pb, metaSfly: ms, pctSfly: ps });
+    setOpen(false);
+  };
+
   return (
     <div style={{position:"relative"}}>
       <button onClick={()=>setOpen(!open)} style={{display:"flex",alignItems:"center",gap:5,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"5px 11px",fontSize:11,fontWeight:700,color:"#64748b"}}>
         ⚙️ Meta &amp; %
       </button>
       {open&&(
-        <div style={{position:"absolute",right:0,top:38,background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"16px 18px",zIndex:200,boxShadow:"0 10px 40px rgba(0,0,0,0.12)",width:250}}>
-          <div style={{fontSize:12,fontWeight:800,color:"#1e293b",marginBottom:12}}>Configuracion del Mes</div>
-          <div style={{marginBottom:10}}>
-            <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:4}}>META EQUIPO (USD)</div>
-            <input value={meta} onChange={e=>setMeta(e.target.value)} type="number" style={Object.assign({},iStyle,{height:34})} />
+        <div style={{position:"absolute",right:0,top:38,background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"16px 18px",zIndex:200,boxShadow:"0 10px 40px rgba(0,0,0,0.12)",width:290}}>
+          <div style={{fontSize:12,fontWeight:800,color:"#1e293b",marginBottom:14}}>Configuracion del Mes</div>
+
+          {/* META BASE */}
+          <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"10px 12px",marginBottom:10}}>
+            <div style={{fontSize:10,color:"#2563eb",fontWeight:800,textTransform:"uppercase",marginBottom:8}}>🎯 Meta Base</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 80px",gap:6}}>
+              <div>
+                <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:3}}>MONTO (USD)</div>
+                <input value={metaBase} onChange={e=>setMetaBase(e.target.value)} type="number" style={Object.assign({},iStyle,{height:32,fontSize:12})} />
+              </div>
+              <div>
+                <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:3}}>COMISION %</div>
+                <input value={pctBase} onChange={e=>setPctBase(e.target.value)} type="number" min="0" max="100" step="0.5" style={Object.assign({},iStyle,{height:32,fontSize:12})} />
+              </div>
+            </div>
           </div>
-          <div style={{marginBottom:14}}>
-            <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:4}}>% COMISION</div>
-            <input value={com} onChange={e=>setCom(e.target.value)} type="number" min="0" max="100" step="0.5" style={Object.assign({},iStyle,{height:34})} />
+
+          {/* META SEGUROSFLY */}
+          <div style={{background:"#fefce8",border:"1px solid #fde68a",borderRadius:8,padding:"10px 12px",marginBottom:14}}>
+            <div style={{fontSize:10,color:"#d97706",fontWeight:800,textTransform:"uppercase",marginBottom:8}}>✈️ Meta SegurosFly</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 80px",gap:6}}>
+              <div>
+                <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:3}}>MONTO (USD)</div>
+                <input value={metaSfly} onChange={e=>setMetaSfly(e.target.value)} type="number" style={Object.assign({},iStyle,{height:32,fontSize:12})} />
+              </div>
+              <div>
+                <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:3}}>COMISION %</div>
+                <input value={pctSfly} onChange={e=>setPctSfly(e.target.value)} type="number" min="0" max="100" step="0.5" style={Object.assign({},iStyle,{height:32,fontSize:12})} />
+              </div>
+            </div>
           </div>
+
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>setOpen(false)} style={Object.assign({},btnS("#94a3b8",true),{flex:1})}>Cancelar</button>
-            <button onClick={save}               style={Object.assign({},btnS("#6366f1",true),{flex:1})}>Guardar</button>
+            <button onClick={save}               style={Object.assign({},btnS("#1e3a5f",true),{flex:1})}>Guardar</button>
           </div>
         </div>
       )}
@@ -361,24 +455,233 @@ function PanelPresion({acum,promDia,proy,name,mesId,metaInd}) {
 }
 
 // ── HISTORIAL ──────────────────────────────────────────────────────────────────
+// CAMBIO #8: Días sin registro se muestran en naranja con alerta
 function HistorialPanel({data,color,mesId}) {
-  const diasCon = Object.keys(data).filter(d=>data[d]&&data[d].length>0).sort((a,b)=>+a-+b);
-  const totales = diasCon.map(d=>({dia:+d,val:sumR(data[d]),dow:dowDia(+d,mesId)}));
-  const maxVal  = Math.max.apply(null,totales.map(t=>t.val).concat([1]));
-  if (!totales.length) return null;
+  const mesInfo  = getMesInfo(mesId);
+  const diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
+
+  const diasCon  = Object.keys(data).filter(d=>data[d]&&data[d].length>0).sort((a,b)=>+a-+b);
+  const totales  = diasCon.map(d=>({dia:+d,val:sumR(data[d]),dow:dowDia(+d,mesId)}));
+
+  // días sin registros hasta hoy (incluido)
+  const diasSin = [];
+  for (let d=1; d<=diaHoy; d++) {
+    if (!data[d] || !data[d].length) diasSin.push(d);
+  }
+
+  const maxVal = Math.max.apply(null,totales.map(t=>t.val).concat([1]));
+
   return (
     <Card>
-      <SLabel>Historial por Dia</SLabel>
-      <div style={{display:"flex",flexDirection:"column",gap:5}}>
-        {totales.map(t=>(
-          <div key={t.dia} style={{display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontSize:11,color:"#94a3b8",minWidth:60}}>D{t.dia} {t.dow}</span>
-            <div style={{flex:1,height:7,background:"#f1f5f9",borderRadius:3,overflow:"hidden"}}>
-              <div style={{width:((t.val/maxVal)*100)+"%",height:"100%",background:color,borderRadius:3}} />
+      <SLabel>📅 Registro por Día</SLabel>
+
+      {diasSin.length>0&&(
+        <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:8,padding:"10px 14px",marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:800,color:"#ea580c",marginBottom:6}}>
+            ⚠️ Sin registros — {diasSin.length} día{diasSin.length>1?"s":""} sin venta cargada
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+            {diasSin.map(d=>(
+              <span key={d} style={{background:"#fdba74",color:"#7c2d12",fontWeight:700,fontSize:11,borderRadius:6,padding:"3px 8px"}}>
+                D{d} {dowDia(d,mesId)}
+              </span>
+            ))}
+          </div>
+          <div style={{fontSize:10,color:"#c2410c",marginTop:6,fontWeight:600}}>
+            ¡ Verifica si tienes ventas sin cargar en esos días
+          </div>
+        </div>
+      )}
+
+      {totales.length>0?(
+        <div style={{display:"flex",flexDirection:"column",gap:5}}>
+          {totales.map(t=>(
+            <div key={t.dia} style={{display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:11,color:"#94a3b8",minWidth:60}}>D{t.dia} {t.dow}</span>
+              <div style={{flex:1,height:7,background:"#f1f5f9",borderRadius:3,overflow:"hidden"}}>
+                <div style={{width:((t.val/maxVal)*100)+"%",height:"100%",background:color,borderRadius:3}} />
+              </div>
+              <span style={{fontSize:12,fontWeight:700,color:color,minWidth:80,textAlign:"right"}}>{usd(t.val,0)}</span>
             </div>
-            <span style={{fontSize:12,fontWeight:700,color:color,minWidth:80,textAlign:"right"}}>{usd(t.val,0)}</span>
+          ))}
+        </div>
+      ):(
+        <div style={{textAlign:"center",color:"#94a3b8",fontSize:13,padding:"18px 0"}}>Sin ventas registradas este mes</div>
+      )}
+    </Card>
+  );
+}
+
+// ── ANÁLISIS AUTOMÁTICO (CAMBIO #5) ───────────────────────────────────────────
+function AnalisisAutomatico({acum,proy,promDia,name,mesId,metaBase,metaSfly,color}) {
+  const mesInfo  = getMesInfo(mesId);
+  const diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
+  const diasRest = Math.max(1,mesInfo.dias-diaHoy);
+
+  const necParaBase = acum<metaBase?(metaBase-acum)/diasRest:0;
+  const necParaSfly = acum<metaSfly?(metaSfly-acum)/diasRest:0;
+
+  const lineas = [];
+  if (necParaBase>0 && promDia>0) {
+    const diff = necParaBase-promDia;
+    if (diff>0) lineas.push({ icon:"⬆️", txt:`Necesitas subir de ${usd(promDia,0)} a ${usd(necParaBase,0)}/día para alcanzar la Meta Base.`, color:"#ef4444" });
+    else lineas.push({ icon:"✅", txt:`Tu ritmo actual (${usd(promDia,0)}/día) es suficiente para la Meta Base.`, color:"#10b981" });
+  }
+  if (necParaSfly>0 && promDia>0) {
+    const diff2 = necParaSfly-promDia;
+    if (diff2>0) lineas.push({ icon:"🚀", txt:`Para Meta SegurosFly, necesitas ${usd(necParaSfly,0)}/día — falta subir ${usd(diff2,0)}/día.`, color:"#d97706" });
+    else lineas.push({ icon:"✈️", txt:`¡Vas camino a Meta SegurosFly con ${usd(promDia,0)}/día!`, color:"#059669" });
+  }
+  lineas.push({ icon:"📊", txt:`Sin cambios en ritmo, proyectas ${usd(proy,0)} al cierre de mes.`, color:"#6366f1" });
+
+  return (
+    <Card accent={color}>
+      <SLabel>🧠 Análisis Automático — {name}</SLabel>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {lineas.map((l,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,background:l.color+"0a",border:"1px solid "+l.color+"22",borderRadius:8,padding:"9px 12px"}}>
+            <span style={{fontSize:16,flexShrink:0}}>{l.icon}</span>
+            <span style={{fontSize:12,fontWeight:600,color:"#334155",lineHeight:1.5}}>{l.txt}</span>
           </div>
         ))}
+      </div>
+    </Card>
+  );
+}
+
+// ── PROGRESO A METAS (CAMBIO #6) ──────────────────────────────────────────────
+function ProgresoMetas({acum,proy,mesId,metaBase,metaSfly,color}) {
+  const metaMin = proy; // Meta Mínima = proyección actual
+
+  const metas = [
+    { label:"Meta Mínima",    val:metaMin, note:"(proyección al ritmo actual)", c:"#6366f1" },
+    { label:"Meta Base",      val:metaBase, note:"", c:"#2563eb" },
+    { label:"Meta SegurosFly",val:metaSfly, note:"", c:"#d97706" },
+  ];
+
+  return (
+    <Card>
+      <SLabel>🎯 Progreso a Metas</SLabel>
+      {metas.map(m=>{
+        const p = Math.min(100,(acum/m.val)*100);
+        const falt = Math.max(0,m.val-acum);
+        return (
+          <div key={m.label} style={{marginBottom:14}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+              <div>
+                <span style={{fontSize:12,fontWeight:700,color:"#1e293b"}}>{m.label}</span>
+                {m.note&&<span style={{fontSize:10,color:"#94a3b8",marginLeft:6}}>{m.note}</span>}
+              </div>
+              <div style={{textAlign:"right"}}>
+                <span style={{fontSize:12,fontWeight:800,color:falt===0?"#10b981":m.c}}>
+                  {falt===0?"✅ LOGRADO":"Falta "+usd(falt,0)}
+                </span>
+                <span style={{fontSize:10,color:"#94a3b8",marginLeft:6}}>{pc(p)}</span>
+              </div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{flex:1,height:8,background:"#f1f5f9",borderRadius:4,overflow:"hidden"}}>
+                <div style={{width:p+"%",height:"100%",background:m.c,borderRadius:4,transition:"width 0.5s"}} />
+              </div>
+              <span style={{fontSize:10,color:"#94a3b8",minWidth:52,textAlign:"right"}}>{usd(m.val,0)}</span>
+            </div>
+          </div>
+        );
+      })}
+    </Card>
+  );
+}
+
+// ── ¿QUÉ PASA SI? (CAMBIO #7) ─────────────────────────────────────────────────
+function QueParaSi({acum,mesId,metaBase,metaSfly,color}) {
+  const mesInfo  = getMesInfo(mesId);
+  const diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
+  const diasRest = Math.max(1,mesInfo.dias-diaHoy);
+
+  const necBase = acum<metaBase?(metaBase-acum)/diasRest:0;
+  const necSfly = acum<metaSfly?(metaSfly-acum)/diasRest:0;
+
+  const escenarios = [
+    {
+      icon:"😐", label:"Sin cambio de ritmo",
+      diario: acum/Math.max(1,diaHoy),
+      proyFin: acum + (acum/Math.max(1,diaHoy))*diasRest,
+      desc:"Manteniendo el ritmo actual",
+      c:"#64748b"
+    },
+    {
+      icon:"🎯", label:"Para Meta Base",
+      diario: Math.max(necBase, acum/Math.max(1,diaHoy)),
+      proyFin: metaBase,
+      desc:"Necesitas este ritmo diario",
+      c:"#2563eb"
+    },
+    {
+      icon:"✈️", label:"Para Meta SegurosFly",
+      diario: Math.max(necSfly, acum/Math.max(1,diaHoy)),
+      proyFin: metaSfly,
+      desc:"Cambia el juego con este ritmo",
+      c:"#d97706"
+    },
+  ];
+
+  return (
+    <Card>
+      <SLabel>📈 ¿Qué pasa si mantienes este ritmo?</SLabel>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+        {escenarios.map((e,i)=>(
+          <div key={i} style={{background:e.c+"08",border:"1px solid "+e.c+"33",borderRadius:10,padding:"12px 14px",textAlign:"center"}}>
+            <div style={{fontSize:22,marginBottom:4}}>{e.icon}</div>
+            <div style={{fontSize:10,color:e.c,fontWeight:800,textTransform:"uppercase",marginBottom:6,lineHeight:1.3}}>{e.label}</div>
+            <div style={{fontSize:18,fontWeight:800,color:e.c}}>{usd(e.diario,0)}<span style={{fontSize:10,fontWeight:600,color:"#94a3b8"}}>/día</span></div>
+            <div style={{fontSize:10,color:"#94a3b8",marginTop:4}}>Cierre estimado</div>
+            <div style={{fontSize:13,fontWeight:700,color:"#1e293b"}}>{usd(e.proyFin,0)}</div>
+            <div style={{fontSize:9,color:"#94a3b8",marginTop:2}}>{e.desc}</div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+// ── METAS GLOBALES (CAMBIO #4) ─────────────────────────────────────────────────
+function MetasGlobales({store,mesId,total,proy}) {
+  const cfg = getConfig(store, mesId);
+  const metaMin = proy;
+  const metaBase = cfg.metaBase;
+  const metaSfly = cfg.metaSfly;
+
+  const metas = [
+    { label:"Meta Mínima",     val:metaMin, note:"Proyección al ritmo actual", c:"#6366f1", icon:"📉" },
+    { label:"Meta Base",       val:metaBase, note:`${usd(metaBase,0)} equipo · ${cfg.pctBase}% com.`, c:"#2563eb", icon:"🎯" },
+    { label:"Meta SegurosFly", val:metaSfly, note:`${usd(metaSfly,0)} equipo · ${cfg.pctSfly}% com.`, c:"#d97706", icon:"✈️" },
+  ];
+
+  return (
+    <Card accent="#6366f1">
+      <SLabel>🎯 Metas Globales del Equipo</SLabel>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+        {metas.map(m=>{
+          const p = Math.min(100,(total/m.val)*100);
+          const falt = Math.max(0,m.val-total);
+          return (
+            <div key={m.label} style={{background:m.c+"08",border:"1px solid "+m.c+"33",borderRadius:10,padding:"14px"}}>
+              <div style={{fontSize:18,marginBottom:4}}>{m.icon}</div>
+              <div style={{fontSize:10,color:m.c,fontWeight:800,textTransform:"uppercase",marginBottom:6}}>{m.label}</div>
+              <div style={{fontSize:16,fontWeight:800,color:m.c}}>{usd(m.val,0)}</div>
+              <div style={{fontSize:10,color:"#94a3b8",margin:"4px 0 8px"}}>{m.note}</div>
+              <div style={{height:6,background:"#f1f5f9",borderRadius:3,overflow:"hidden",marginBottom:4}}>
+                <div style={{width:p+"%",height:"100%",background:m.c,borderRadius:3,transition:"width 0.5s"}} />
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:10}}>
+                <span style={{color:m.c,fontWeight:700}}>{pc(p)}</span>
+                <span style={{color:falt===0?"#10b981":"#94a3b8",fontWeight:700}}>
+                  {falt===0?"✅ Logrado":"Falta "+usd(falt,0)}
+                </span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </Card>
   );
@@ -398,19 +701,22 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
 
   const data    = getMonthData(store,mesId,asesor);
   const cfg     = getConfig(store,mesId);
-  const metaInd = cfg.meta/2;
+  const metaInd = cfg.metaBase/2;
+  const metaBaseSolo = cfg.metaBase/2;
+  const metaSlySolo  = cfg.metaSfly/2;
 
   const allRows   = Object.values(data).reduce((a,b)=>a.concat(b),[]);
   const acum      = sumR(allRows);
   const totalVtas = allRows.length;
   const diasCon   = Object.keys(data).filter(d=>data[d]&&data[d].length>0).length;
-  const promDia   = diasCon>0?acum/diasCon:0;
   const diaHoy    = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
   const diasRest  = Math.max(1,mesInfo.dias-diaHoy);
+  const promDia   = diasCon>0?acum/diasCon:0;
   const proy      = acum+promDia*diasRest;
   const rowsHoy   = data[dia]||[];
   const totHoy    = sumR(rowsHoy);
 
+  // CAMBIO #2: guardar también envía a RealTime
   const saveRow = async () => {
     if (!form.valor) return;
     setStatus("saving");
@@ -420,6 +726,8 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
     const newData = Object.assign({},data,{[dia]:updated});
     onUpdate(setMonthData(store,mesId,asesor,newData));
     setForm({orden:"",valor:"",plan:"Plan Smart"}); setEditId(null);
+    // Enviar a RealTime
+    await enviarRealTime(Object.assign({},newRow,{dia}), mesId, asesor);
     setStatus("ok"); setTimeout(()=>setStatus(null),3000);
   };
 
@@ -443,31 +751,56 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       {confirmDel&&<ModalConfirmDelete fila={confirmDel} onConfirm={confirmDelete} onCancel={()=>setConfirmDel(null)} />}
       <BloqueOperativo />
+
+      {/* CABECERA CON LOGO */}
+      <div style={{display:"flex",alignItems:"center",gap:12,background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"12px 18px"}}>
+        <LogoSVG size={38} />
+        <div>
+          <div style={{fontSize:14,fontWeight:800,color:"#1e3a5f"}}>Seguros Fly · {name}</div>
+          <div style={{fontSize:11,color:"#94a3b8"}}>Panel de rendimiento — {getMesInfo(mesId).label} 2026</div>
+        </div>
+      </div>
+
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
         <StatCard label="Revenue Acumulado" value={usd(acum,0)} accent={color} large />
         <StatCard label="Ventas realizadas" value={totalVtas+" ventas"} sub={diasCon+" dias con ventas"} accent={color} />
         <StatCard label="Proyeccion Cierre" value={usd(proy,0)} sub={diasRest+" dias restantes"} />
         <StatCard label="Faltante meta" value={acum>=metaInd?"Logrado":usd(metaInd-acum,0)} accent={acum>=metaInd?"#10b981":"#ef4444"} />
       </div>
+
+      {/* CAMBIO #5: Análisis automático */}
+      <AnalisisAutomatico acum={acum} proy={proy} promDia={promDia} name={name} mesId={mesId} metaBase={metaBaseSolo} metaSfly={metaSlySolo} color={color} />
+
+      {/* CAMBIO #6: Progreso a metas */}
+      <ProgresoMetas acum={acum} proy={proy} mesId={mesId} metaBase={metaBaseSolo} metaSfly={metaSlySolo} color={color} />
+
+      {/* CAMBIO #7: Qué pasa si */}
+      <QueParaSi acum={acum} mesId={mesId} metaBase={metaBaseSolo} metaSfly={metaSlySolo} color={color} />
+
       <PanelPresion acum={acum} promDia={promDia} proy={proy} name={name} mesId={mesId} metaInd={metaInd} />
       <Card>
         <SLabel>Meta Individual — {name}</SLabel>
-        <MetaBar acum={acum} metaVal={metaInd} label={"Meta del mes ("+cfg.comision+"%)"} color={color} bg={color+"12"} proy={proy} />
+        <MetaBar acum={acum} metaVal={metaBaseSolo} label={"Meta Base ("+cfg.pctBase+"%)"} color="#2563eb" bg="#eff6ff" proy={proy} />
+        <MetaBar acum={acum} metaVal={metaSlySolo}  label={"Meta SegurosFly ("+cfg.pctSfly+"%)"} color="#d97706" bg="#fefce8" proy={proy} />
       </Card>
-      <ComisionesPanel acum={acum} proy={proy} color={color} label={name} comisionPct={cfg.comision} />
+      <ComisionesPanel acum={acum} proy={proy} color={color} label={name} comisionPct={cfg.pctBase} />
+
+      {/* CAMBIO #8: Registro Diario con alertas días sin registro */}
       <Card>
-        <SLabel>Registro Diario — {name}</SLabel>
+        <SLabel>📅 Registro Diario — {name}</SLabel>
         <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:14}}>
           {Array.from({length:mesInfo.dias},(_,i)=>i+1).map(d=>{
             const tiene=(data[d]||[]).length>0, sel=d===dia, esHoy=d===diaHoyMes;
+            const sinRegistro = d<=diaHoy && !tiene;
             return (
               <button key={d} onClick={()=>setDia(d)} style={{width:33,height:33,borderRadius:7,cursor:"pointer",
-                border:sel?"2px solid "+color:esHoy?"2px dashed "+color+"88":"1px solid #e2e8f0",
-                background:sel?color:tiene?"#ecfdf5":"#f8fafc",
-                color:sel?"#fff":tiene?"#059669":(d>diaHoyMes&&mesId===getMesActual())?"#cbd5e1":"#64748b",
-                fontWeight:(sel||tiene)?700:400,fontSize:11,position:"relative"}}>
+                border:sel?"2px solid "+color:esHoy?"2px dashed "+color+"88":sinRegistro?"1.5px solid #fb923c":"1px solid #e2e8f0",
+                background:sel?color:tiene?"#ecfdf5":sinRegistro?"#fff7ed":"#f8fafc",
+                color:sel?"#fff":tiene?"#059669":sinRegistro?"#ea580c":(d>diaHoyMes&&mesId===getMesActual())?"#cbd5e1":"#64748b",
+                fontWeight:(sel||tiene||sinRegistro)?700:400,fontSize:11,position:"relative"}}>
                 {d}
                 {tiene&&!sel&&<span style={{position:"absolute",top:2,right:2,width:4,height:4,background:"#10b981",borderRadius:"50%"}} />}
+                {sinRegistro&&!sel&&<span style={{position:"absolute",top:1,right:1,width:5,height:5,background:"#fb923c",borderRadius:"50%",fontSize:8,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:900}}>!</span>}
               </button>
             );
           })}
@@ -488,7 +821,7 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
         </div>
         {status&&status!=="saving"&&(
           <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,padding:"7px 12px",borderRadius:8,background:"#f0fdf4",border:"1px solid #a7f3d0",animation:"fadeIn 0.2s ease"}}>
-            <span>✅</span><span style={{fontSize:12,fontWeight:600,color:"#059669"}}>Guardado correctamente</span>
+            <span>✅</span><span style={{fontSize:12,fontWeight:600,color:"#059669"}}>Guardado correctamente · Enviado a RealTime</span>
           </div>
         )}
         {rowsHoy.length>0?(
@@ -508,6 +841,8 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
           <div style={{textAlign:"center",color:"#94a3b8",fontSize:13,padding:"18px 0"}}>Sin registros para el dia {dia}. Agrega tu primera venta</div>
         )}
       </Card>
+
+      {/* CAMBIO #8: HistorialPanel ya incluye alertas naranja */}
       <HistorialPanel data={data} color={color} mesId={mesId} />
     </div>
   );
@@ -529,7 +864,7 @@ function GlobalTab({store,mesId}) {
   const cDias    = Object.keys(cData).filter(d=>cData[d]&&cData[d].length>0).length;
   const gProm    = gDias>0?gAcum/gDias:0, cProm = cDias>0?cAcum/cDias:0;
   const gProy    = gAcum+gProm*diasRest, cProy = cAcum+cProm*diasRest, totProy = gProy+cProy;
-  const metaEq   = cfg.meta, metaInd = cfg.meta/2, comPct = cfg.comision/100;
+  const metaEq   = cfg.metaBase, metaInd = cfg.metaBase/2, comPct = cfg.pctBase/100;
   const maxBar   = Math.max(gAcum,cAcum,1);
   const lider    = gAcum>=cAcum?"Guillermo":"Carolina";
   const liderC   = gAcum>=cAcum?"#2563eb":"#7c3aed";
@@ -537,9 +872,27 @@ function GlobalTab({store,mesId}) {
   [gData,cData].forEach(d=>Object.entries(d).forEach(function(e){ revPorDia[e[0]]=(revPorDia[e[0]]||0)+sumR(e[1]); }));
   const diasOrd = Object.keys(revPorDia).sort((a,b)=>+a-+b);
   const maxDia  = Math.max.apply(null,Object.values(revPorDia).concat([1]));
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       <BloqueOperativo />
+
+      {/* CABECERA LOGO GLOBAL */}
+      <div style={{background:"linear-gradient(135deg,#1e3a5f,#2c5282)",borderRadius:14,padding:"18px 24px",display:"flex",alignItems:"center",gap:16}}>
+        <LogoSVG size={48} dark />
+        <div>
+          <div style={{fontSize:18,fontWeight:800,color:"#fff"}}>Seguros Fly · Dashboard Equipo</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.65)"}}>{getMesInfo(mesId).label} 2026</div>
+        </div>
+        <div style={{marginLeft:"auto",textAlign:"right"}}>
+          <div style={{fontSize:10,color:"rgba(255,255,255,0.5)",fontWeight:700,textTransform:"uppercase"}}>Revenue equipo</div>
+          <div style={{fontSize:26,fontWeight:800,color:"#F59E0B"}}>{usd(total,0)}</div>
+        </div>
+      </div>
+
+      {/* CAMBIO #4: Metas Globales */}
+      <MetasGlobales store={store} mesId={mesId} total={total} proy={totProy} />
+
       <div style={{background:liderC+"08",border:"1.5px solid "+liderC+"33",borderRadius:12,padding:"14px 20px",display:"flex",alignItems:"center",gap:16}}>
         <span style={{fontSize:26}}>🏆</span>
         <div style={{flex:1}}>
@@ -581,11 +934,12 @@ function GlobalTab({store,mesId}) {
         ))}
       </Card>
       <Card>
-        <SLabel>Meta del Equipo — {cfg.comision}%</SLabel>
-        <MetaBar acum={total} metaVal={metaEq} label="Meta mensual equipo" color="#6366f1" bg="#f0f0ff" proy={totProy} />
+        <SLabel>Metas del Equipo</SLabel>
+        <MetaBar acum={total} metaVal={cfg.metaBase} label="Meta Base equipo" color="#2563eb" bg="#eff6ff" proy={totProy} />
+        <MetaBar acum={total} metaVal={cfg.metaSfly}  label="Meta SegurosFly equipo" color="#d97706" bg="#fefce8" proy={totProy} />
       </Card>
       <Card>
-        <SLabel>Comisiones Proyectadas al Cierre ({cfg.comision}%)</SLabel>
+        <SLabel>Comisiones Proyectadas al Cierre ({cfg.pctBase}% Base / {cfg.pctSfly}% SFly)</SLabel>
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:10}}>
           {[{l:"G actual",v:gAcum*comPct,c:"#2563eb"},{l:"G proyectada",v:gProy*comPct,c:"#2563eb"},
             {l:"C actual",v:cAcum*comPct,c:"#7c3aed"},{l:"C proyectada",v:cProy*comPct,c:"#7c3aed"}].map(x=>(
@@ -636,8 +990,8 @@ function TrackerTab({store}) {
   }));
   if (!mesesConDatos.length) return (
     <div style={{textAlign:"center",padding:"60px 20px",color:"#94a3b8"}}>
-      <div style={{fontSize:40,marginBottom:12}}>📊</div>
-      <div style={{fontSize:16,fontWeight:700,color:"#64748b"}}>Sin datos historicos aun</div>
+      <LogoSVG size={60} />
+      <div style={{fontSize:16,fontWeight:700,color:"#64748b",marginTop:16}}>Sin datos historicos aun</div>
       <div style={{fontSize:13,marginTop:6}}>Comienza registrando ventas en los meses activos</div>
     </div>
   );
@@ -648,7 +1002,7 @@ function TrackerTab({store}) {
     const cRows=Object.values(cData).reduce((a,b)=>a.concat(b),[]);
     const gAcum=sumR(gRows), cAcum=sumR(cRows), total=gAcum+cAcum;
     const cfg=getConfig(store,m.id);
-    const cumplimiento=cfg.meta>0?(total/cfg.meta)*100:0;
+    const cumplimiento=cfg.metaBase>0?(total/cfg.metaBase)*100:0;
     return Object.assign({},m,{gAcum,cAcum,total,gVentas:gRows.length,cVentas:cRows.length,cfg,cumplimiento});
   });
   const totalHistorico = resumen.reduce((s,r)=>s+r.total,0);
@@ -687,7 +1041,7 @@ function TrackerTab({store}) {
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <thead>
               <tr style={{borderBottom:"2px solid #f1f5f9"}}>
-                {["Mes","Meta","% Com","Guillermo","G Vtas","Carolina","C Vtas","Total","Cumpl."].map(h=>(
+                {["Mes","Meta Base","Meta SFly","% Com","Guillermo","G Vtas","Carolina","C Vtas","Total","Cumpl."].map(h=>(
                   <th key={h} style={{padding:"8px 10px",color:"#94a3b8",fontWeight:700,textTransform:"uppercase",fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr>
@@ -696,8 +1050,9 @@ function TrackerTab({store}) {
               {resumen.map((r,i)=>(
                 <tr key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2===0?"#fff":"#fafafa"}}>
                   <td style={{padding:"9px 10px",fontWeight:700,color:"#1e293b",textAlign:"left"}}>{r.label}</td>
-                  <td style={{padding:"9px 10px",textAlign:"right",color:"#64748b"}}>{usd(r.cfg.meta,0)}</td>
-                  <td style={{padding:"9px 10px",textAlign:"right",color:"#64748b"}}>{r.cfg.comision}%</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",color:"#2563eb"}}>{usd(r.cfg.metaBase,0)}</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",color:"#d97706"}}>{usd(r.cfg.metaSfly,0)}</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",color:"#64748b"}}>{r.cfg.pctBase}%</td>
                   <td style={{padding:"9px 10px",textAlign:"right",color:"#2563eb",fontWeight:700}}>{usd(r.gAcum,0)}</td>
                   <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8"}}>{r.gVentas}</td>
                   <td style={{padding:"9px 10px",textAlign:"right",color:"#7c3aed",fontWeight:700}}>{usd(r.cAcum,0)}</td>
@@ -710,7 +1065,7 @@ function TrackerTab({store}) {
                 </tr>
               ))}
               <tr style={{borderTop:"2px solid #e2e8f0",background:"#f8fafc"}}>
-                <td style={{padding:"9px 10px",fontWeight:800,color:"#6366f1",textAlign:"left"}} colSpan={3}>TOTAL HISTORICO</td>
+                <td style={{padding:"9px 10px",fontWeight:800,color:"#6366f1",textAlign:"left"}} colSpan={4}>TOTAL HISTORICO</td>
                 <td style={{padding:"9px 10px",textAlign:"right",color:"#2563eb",fontWeight:800}}>{usd(resumen.reduce((s,r)=>s+r.gAcum,0),0)}</td>
                 <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8",fontWeight:700}}>{resumen.reduce((s,r)=>s+r.gVentas,0)}</td>
                 <td style={{padding:"9px 10px",textAlign:"right",color:"#7c3aed",fontWeight:800}}>{usd(resumen.reduce((s,r)=>s+r.cAcum,0),0)}</td>
@@ -728,7 +1083,7 @@ function TrackerTab({store}) {
 
 // ── MAIN APP ───────────────────────────────────────────────────────────────────
 const MAIN_TABS = [
-  { id:"global",    label:"Equipo",     color:"#6366f1" },
+  { id:"global",    label:"Equipo",     color:"#1e3a5f" },
   { id:"guillermo", label:"Guillermo",  color:"#2563eb" },
   { id:"carolina",  label:"Carolina",   color:"#7c3aed" },
   { id:"tracker",   label:"Tracker",    color:"#0f766e" },
@@ -752,9 +1107,10 @@ function App() {
   },[mesId]);
 
   const handleSync = () => setShowPin(true);
+  // CAMBIO #1: sincroniza todos los meses
   const onPinSuccess = async () => {
     setShowPin(false);
-    await sincronizarConSheets(storeRef.current, mesId, false);
+    await sincronizarConSheets(storeRef.current, false);
   };
 
   const cfg      = getConfig(store,mesId);
@@ -765,11 +1121,12 @@ function App() {
   return (
     <div style={{fontFamily:"'Sora',system-ui,sans-serif",background:"#f0f4f8",minHeight:"100vh",color:"#1e293b"}}>
       {showPin&&<ModalPin onSuccess={onPinSuccess} onCancel={()=>setShowPin(false)} />}
+      {/* NAVBAR con LOGO */}
       <div style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"0 18px",display:"flex",alignItems:"center",gap:10,height:56,position:"sticky",top:0,zIndex:50,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-          <div style={{width:30,height:30,borderRadius:8,background:"linear-gradient(135deg,#6366f1,#2563eb)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>✈️</div>
+          <LogoSVG size={32} />
           <div>
-            <div style={{fontSize:13,fontWeight:800,color:"#1e293b",lineHeight:1.1}}>SegurosFlyCRM</div>
+            <div style={{fontSize:13,fontWeight:800,color:"#1e3a5f",lineHeight:1.1}}>Seguros<span style={{color:"#F59E0B"}}>Fly</span> CRM</div>
             <div style={{fontSize:9,color:"#94a3b8",fontWeight:600}}>Dashboard 2026</div>
           </div>
         </div>
@@ -794,7 +1151,7 @@ function App() {
           </button>
           <div style={{fontSize:11,color:"#94a3b8",textAlign:"right",lineHeight:1.4}}>
             <div style={{fontWeight:600}}>D{diaHoy}/{mesInfo.dias}</div>
-            <div style={{color:"#6366f1",fontWeight:700}}>{diasRest}d</div>
+            <div style={{color:"#1e3a5f",fontWeight:700}}>{diasRest}d</div>
           </div>
         </div>
       </div>
