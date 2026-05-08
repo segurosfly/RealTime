@@ -150,7 +150,7 @@ const sincronizarConSheets = async (store, silent) => {
   try {
     const params = new URLSearchParams({ bulk: JSON.stringify(rows), sheet: "Sync", accion: "sync_bulk" });
     await fetch(SHEETS_URL+"?"+params.toString(), { method:"GET", mode:"no-cors" });
-    if (!silent) alert("✅ Sincronizadas "+rows.length+" filas en hoja 'Sync' (todos los meses)\nLos datos de Guardar van a RealTime · Los datos de Sync van a Sync");
+    if (!silent) alert("✅ Sincronizadas "+rows.length+" filas → hoja 'Sync' (todos los meses)\n\n📌 Guardar individual → RealTime\n☁️ Sync masivo → Sync");
     return true;
   } catch(e) { if (!silent) alert("Error al sincronizar."); return false; }
 };
@@ -292,7 +292,10 @@ function ConfigMes({config,onSave}) {
   const [pctBase,  setPctBase]  = useState(String(config.pctBase||10));
   const [metaSfly, setMetaSfly] = useState(String(config.metaSfly||18000));
   const [pctSfly,  setPctSfly]  = useState(String(config.pctSfly||15));
-  const [open,setOpen] = useState(false);
+  const [open,setOpen]           = useState(false);
+  const [pinMode,setPinMode]     = useState(false);
+  const [pin,setPin]             = useState("");
+  const [pinErr,setPinErr]       = useState(false);
 
   useEffect(()=>{
     setMetaBase(String(config.metaBase||12500));
@@ -300,6 +303,12 @@ function ConfigMes({config,onSave}) {
     setMetaSfly(String(config.metaSfly||18000));
     setPctSfly(String(config.pctSfly||15));
   },[config.metaBase,config.pctBase,config.metaSfly,config.pctSfly]);
+
+  const openWithPin = () => { setPinMode(true); setPin(""); setPinErr(false); };
+  const checkPin = () => {
+    if (pin===SYNC_PIN) { setPinMode(false); setOpen(true); }
+    else { setPinErr(true); setPin(""); setTimeout(()=>setPinErr(false),1200); }
+  };
 
   const save = () => {
     const mb = parseFloat(metaBase)||12500;
@@ -312,7 +321,26 @@ function ConfigMes({config,onSave}) {
 
   return (
     <div style={{position:"relative"}}>
-      <button onClick={()=>setOpen(!open)} style={{display:"flex",alignItems:"center",gap:5,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"5px 11px",fontSize:11,fontWeight:700,color:"#64748b"}}>
+      {/* PIN MODAL para Meta&% */}
+      {pinMode&&(
+        <div className="modal-overlay" onClick={()=>setPinMode(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:16,padding:"24px 28px",width:300,textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.15)"}}>
+            <div style={{fontSize:22,marginBottom:6}}>🔐</div>
+            <div style={{fontSize:14,fontWeight:800,color:"#1e293b",marginBottom:4}}>Configuración protegida</div>
+            <div style={{fontSize:12,color:"#64748b",marginBottom:16}}>Ingresa el PIN para editar metas y comisiones</div>
+            <input type="password" maxLength={6} value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,""))}
+              onKeyDown={e=>e.key==="Enter"&&checkPin()} placeholder="* * * *"
+              style={Object.assign({},iStyle,{textAlign:"center",fontSize:20,letterSpacing:6,marginBottom:12,
+                border:"2px solid "+(pinErr?"#ef4444":"#e2e8f0"),background:pinErr?"#fef2f2":"#f8fafc"})} autoFocus />
+            {pinErr&&<div style={{color:"#ef4444",fontSize:11,fontWeight:700,marginBottom:8}}>PIN incorrecto</div>}
+            <div style={{display:"flex",gap:8,justifyContent:"center"}}>
+              <button onClick={()=>setPinMode(false)} style={Object.assign({},btnS("#94a3b8"),{height:34,fontSize:12})}>Cancelar</button>
+              <button onClick={checkPin} style={Object.assign({},btnS("#1e3a5f"),{height:34,fontSize:12})}>Ingresar</button>
+            </div>
+          </div>
+        </div>
+      )}
+      <button onClick={openWithPin} style={{display:"flex",alignItems:"center",gap:5,background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"5px 11px",fontSize:11,fontWeight:700,color:"#64748b"}}>
         ⚙️ Meta &amp; %
       </button>
       {open&&(
@@ -653,22 +681,25 @@ function AnalisisAutomatico({acum,proy,promDia,name,mesId,metaBase,metaSfly,colo
   const mesInfo  = getMesInfo(mesId);
   const diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
   const diasRest = Math.max(1,mesInfo.dias-diaHoy);
+  const dowHoy   = mesId===getMesActual()?dowDia(diaHoy,mesId):"";
 
   const necParaBase = acum<metaBase?(metaBase-acum)/diasRest:0;
   const necParaSfly = acum<metaSfly?(metaSfly-acum)/diasRest:0;
 
   const lineas = [];
+  // Línea 0: contexto de día
+  lineas.push({ icon:"📅", txt:`Hoy es el día ${diaHoy} de ${mesInfo.dias} (${dowHoy}) — quedan ${diasRest} día${diasRest!==1?"s":""} hábiles del mes.`, color:"#64748b" });
   if (necParaBase>0 && promDia>0) {
     const diff = necParaBase-promDia;
-    if (diff>0) lineas.push({ icon:"⬆️", txt:`Necesitas subir de ${usd(promDia,0)} a ${usd(necParaBase,0)}/día para alcanzar la Meta Base.`, color:"#ef4444" });
-    else lineas.push({ icon:"✅", txt:`Tu ritmo actual (${usd(promDia,0)}/día) es suficiente para la Meta Base.`, color:"#10b981" });
+    if (diff>0) lineas.push({ icon:"⬆️", txt:`Necesitas subir de ${usd(promDia,0)} a ${usd(necParaBase,0)}/día para alcanzar la Meta Base en ${diasRest} días.`, color:"#ef4444" });
+    else lineas.push({ icon:"✅", txt:`Tu ritmo actual (${usd(promDia,0)}/día) es suficiente para la Meta Base. ¡Mantén el paso!`, color:"#10b981" });
   }
   if (necParaSfly>0 && promDia>0) {
     const diff2 = necParaSfly-promDia;
-    if (diff2>0) lineas.push({ icon:"🚀", txt:`Para Meta SegurosFly, necesitas ${usd(necParaSfly,0)}/día — falta subir ${usd(diff2,0)}/día.`, color:"#d97706" });
-    else lineas.push({ icon:"✈️", txt:`¡Vas camino a Meta SegurosFly con ${usd(promDia,0)}/día!`, color:"#059669" });
+    if (diff2>0) lineas.push({ icon:"🚀", txt:`Para Meta SegurosFly necesitas ${usd(necParaSfly,0)}/día en los ${diasRest} días restantes — sube ${usd(diff2,0)}/día más.`, color:"#d97706" });
+    else lineas.push({ icon:"✈️", txt:`¡Vas camino a Meta SegurosFly con ${usd(promDia,0)}/día en ${diasRest} días restantes!`, color:"#059669" });
   }
-  lineas.push({ icon:"📊", txt:`Sin cambios en ritmo, proyectas ${usd(proy,0)} al cierre de mes.`, color:"#6366f1" });
+  lineas.push({ icon:"📊", txt:`Sin cambios en ritmo, proyectas ${usd(proy,0)} al cierre (en ${diasRest} días).`, color:"#6366f1" });
 
   return (
     <Card accent={color}>
@@ -687,10 +718,11 @@ function AnalisisAutomatico({acum,proy,promDia,name,mesId,metaBase,metaSfly,colo
 
 // ── PROGRESO A METAS (CAMBIO #6) ──────────────────────────────────────────────
 function ProgresoMetas({acum,proy,mesId,metaBase,metaSfly,color}) {
-  const metaMin = proy; // Meta Mínima = proyección actual
+  const proyFin = proy; // Proyección al ritmo actual
+  const proyBajoMetas = proyFin < metaBase && proyFin < metaSfly; // ← flag comisión 5%
 
   const metas = [
-    { label:"Meta Mínima",    val:metaMin, note:"(proyección al ritmo actual)", c:"#6366f1" },
+    { label:"Proyección al ritmo actual", val:proyFin, note:"Si mantienes el ritmo de hoy", c:"#6366f1" },
     { label:"Meta Base",      val:metaBase, note:"", c:"#2563eb" },
     { label:"Meta SegurosFly",val:metaSfly, note:"", c:"#d97706" },
   ];
@@ -698,6 +730,15 @@ function ProgresoMetas({acum,proy,mesId,metaBase,metaSfly,color}) {
   return (
     <Card>
       <SLabel>🎯 Progreso a Metas</SLabel>
+      {proyBajoMetas&&(
+        <div style={{background:"#fff7ed",border:"1px solid #fdba74",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:20}}>⚠️</span>
+          <div>
+            <div style={{fontSize:12,fontWeight:800,color:"#ea580c"}}>Proyección por debajo de ambas metas</div>
+            <div style={{fontSize:11,color:"#c2410c"}}>Al ritmo actual solo calificas a comisión base <strong>5%</strong>. ¡Acelera para llegar a Meta Base o SegurosFly!</div>
+          </div>
+        </div>
+      )}
       {metas.map(m=>{
         const p = Math.min(100,(acum/m.val)*100);
         const falt = Math.max(0,m.val-acum);
@@ -763,7 +804,10 @@ function QueParaSi({acum,mesId,metaBase,metaSfly,color}) {
 
   return (
     <Card>
-      <SLabel>📈 ¿Qué pasa si mantienes este ritmo?</SLabel>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <SLabel style={{marginBottom:0}}>📈 ¿Qué pasa si mantienes este ritmo?</SLabel>
+        <span style={{fontSize:10,color:"#94a3b8",fontWeight:600,background:"#f1f5f9",borderRadius:6,padding:"3px 8px"}}>Hoy: Día {diaHoy} · {diasRest}d restantes</span>
+      </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
         {escenarios.map((e,i)=>(
           <div key={i} style={{background:e.c+"08",border:"1px solid "+e.c+"33",borderRadius:10,padding:"12px 14px",textAlign:"center"}}>
@@ -783,12 +827,13 @@ function QueParaSi({acum,mesId,metaBase,metaSfly,color}) {
 // ── METAS GLOBALES (CAMBIO #4) ─────────────────────────────────────────────────
 function MetasGlobales({store,mesId,total,proy}) {
   const cfg = getConfig(store, mesId);
-  const metaMin = proy;
+  const proyFin = proy;
   const metaBase = cfg.metaBase;
   const metaSfly = cfg.metaSfly;
+  const proyBajoMetas = proyFin < metaBase && proyFin < metaSfly;
 
   const metas = [
-    { label:"Meta Mínima",     val:metaMin, note:"Proyección al ritmo actual", c:"#6366f1", icon:"📉" },
+    { label:"Proyección al ritmo actual", val:proyFin, note:"Si el equipo mantiene el ritmo actual", c:"#6366f1", icon:"📊" },
     { label:"Meta Base",       val:metaBase, note:`${usd(metaBase,0)} equipo · ${cfg.pctBase}% com.`, c:"#2563eb", icon:"🎯" },
     { label:"Meta SegurosFly", val:metaSfly, note:`${usd(metaSfly,0)} equipo · ${cfg.pctSfly}% com.`, c:"#d97706", icon:"✈️" },
   ];
@@ -796,6 +841,15 @@ function MetasGlobales({store,mesId,total,proy}) {
   return (
     <Card accent="#6366f1">
       <SLabel>🎯 Metas Globales del Equipo</SLabel>
+      {proyBajoMetas&&(
+        <div style={{background:"#fff7ed",border:"1px solid #fdba74",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:20}}>⚠️</span>
+          <div>
+            <div style={{fontSize:12,fontWeight:800,color:"#ea580c"}}>Proyección del equipo por debajo de ambas metas</div>
+            <div style={{fontSize:11,color:"#c2410c"}}>Al ritmo actual solo califica comisión <strong>5%</strong>. El equipo debe acelerar para alcanzar Meta Base o SegurosFly.</div>
+          </div>
+        </div>
+      )}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
         {metas.map(m=>{
           const p = Math.min(100,(total/m.val)*100);
@@ -1248,9 +1302,8 @@ function App() {
       {showPin&&<ModalPin onSuccess={onPinSuccess} onCancel={()=>setShowPin(false)} />}
       {/* NAVBAR con LOGO */}
       <div style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"0 18px",display:"flex",alignItems:"center",gap:10,height:56,position:"sticky",top:0,zIndex:50,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",flexShrink:0}}>
           <img src={LOGO_WEB_SRC} alt="Seguros Fly" style={{height:34,objectFit:"contain",maxWidth:140}} />
-          <div style={{fontSize:9,color:"#94a3b8",fontWeight:600,whiteSpace:"nowrap"}}>Dashboard 2026</div>
         </div>
         <select value={mesId} onChange={e=>setMesId(e.target.value)}
           style={{height:32,border:"1px solid #e2e8f0",borderRadius:8,padding:"0 28px 0 10px",fontSize:12,color:"#1e293b",background:"#f8fafc",fontWeight:700,width:120,flexShrink:0,fontFamily:"'Sora',sans-serif",backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",backgroundRepeat:"no-repeat",backgroundPosition:"right 8px center",appearance:"none",WebkitAppearance:"none"}}>
