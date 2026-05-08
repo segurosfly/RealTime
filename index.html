@@ -21,7 +21,24 @@
     @keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:9999;animation:fadeIn .15s ease;}
     th{text-align:right;}
-    th:first-child{text-align:left;}
+th:first-child{text-align:left;}
+  /* ── MOBILE RESPONSIVE ──────────────────────────────────────────── */
+  @media(max-width:640px){
+    .mob-hdr{flex-wrap:wrap!important;height:auto!important;padding:6px 10px!important;gap:6px!important;align-items:center!important;}
+    .mob-logo{flex:0 0 auto!important;}
+    .mob-sel{flex:0 0 auto!important;width:100px!important;}
+    .mob-tabs{order:10!important;width:100%!important;flex:0 0 100%!important;padding:2px 0!important;justify-content:flex-start!important;gap:4px!important;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .mob-tabs button{padding:9px 16px!important;font-size:13px!important;min-width:68px!important;flex-shrink:0!important;}
+    .mob-act{flex:0 0 auto!important;margin-left:auto!important;display:flex!important;gap:5px!important;align-items:center!important;}
+    .mob-day{display:none!important;}
+    .mob-g4{grid-template-columns:repeat(2,1fr)!important;}
+    .mob-g3{grid-template-columns:1fr!important;}
+    .mob-form{grid-template-columns:1fr!important;}
+    .mob-form>*:nth-child(2){grid-column:1!important;}
+    .mob-pad{padding:12px 8px 48px!important;}
+    .mob-asesor-hdr .mob-g4{grid-template-columns:repeat(2,1fr)!important;}
+  }
+
   </style>
 </head>
 <body>
@@ -38,7 +55,7 @@ const DOW      = ["Dom","Lun","Mar","Mie","Jue","Vie","Sab"];
 const ASESORES = ["guillermo","carolina"];
 // CAMBIO #10: PIN actualizado a 2187
 const SYNC_PIN = "2187";
-const SHEETS_URL = "https://script.google.com/macros/s/AKfycby2NkWxPbvu08G5HTev1Jqj7_cbmNZr0kmusQ6MDT22jeK5diDm5X5AUnb-q3w3uhk/exec";
+const SHEETS_URL = "https://script.google.com/macros/s/AKfycbw_gKR9rGg8xcVth5eQ1iiKBoWgdH-ly1UHyOBy_KhDrEIT7iTML4xIUaJk_Dz6q7JH/exec";
 
 const PLANES = [
   "Plan Lite","Plan Smart","Plan Plus","Plan Max",
@@ -526,7 +543,7 @@ function AsesorHeader({name, asesor, color, data, mesId, diaHoy}) {
           {name[0]}
         </div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
+      <div className="mob-g4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
         {stats.map(s=>(
           <div key={s.label} style={{background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.12)",borderRadius:10,padding:"10px 12px"}}>
             <div style={{fontSize:16,marginBottom:4}}>{s.icon}</div>
@@ -588,7 +605,7 @@ function GlobalDayStats({gData, cData, mesId, total, gVentas, cVentas, gAcum, cA
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10}}>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+      <div className="mob-g4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
         {kpis.map(k=>(
           <div key={k.label} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"12px 14px",borderTop:"3px solid "+k.c}}>
             <div style={{fontSize:20,marginBottom:4}}>{k.icon}</div>
@@ -808,7 +825,7 @@ function QueParaSi({acum,mesId,metaBase,metaSfly,color}) {
         <SLabel style={{marginBottom:0}}>📈 ¿Qué pasa si mantienes este ritmo?</SLabel>
         <span style={{fontSize:10,color:"#94a3b8",fontWeight:600,background:"#f1f5f9",borderRadius:6,padding:"3px 8px"}}>Hoy: Día {diaHoy} · {diasRest}d restantes</span>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+      <div className="mob-g3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
         {escenarios.map((e,i)=>(
           <div key={i} style={{background:e.c+"08",border:"1px solid "+e.c+"33",borderRadius:10,padding:"12px 14px",textAlign:"center"}}>
             <div style={{fontSize:22,marginBottom:4}}>{e.icon}</div>
@@ -850,7 +867,7 @@ function MetasGlobales({store,mesId,total,proy}) {
           </div>
         </div>
       )}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+      <div className="mob-g3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
         {metas.map(m=>{
           const p = Math.min(100,(total/m.val)*100);
           const falt = Math.max(0,m.val-total);
@@ -943,7 +960,7 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
       {/* CABECERA CON LOGO + STATS DEL ASESOR (reemplaza BloqueOperativo) */}
       <AsesorHeader name={name} asesor={asesor} color={color} data={data} mesId={mesId} diaHoy={diaHoy} />
 
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+      <div className="mob-g4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
         <StatCard label="Revenue Acumulado" value={usd(acum,0)} accent={color} large />
         <StatCard label="Ventas realizadas" value={totalVtas+" ventas"} sub={diasCon+" dias con ventas"} accent={color} />
         <StatCard label="Proyeccion Cierre" value={usd(proy,0)} sub={diasRest+" dias restantes"} />
@@ -987,7 +1004,7 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
           <span style={{fontSize:13,color:"#64748b"}}>{(dia===diaHoyMes&&mesId===getMesActual())?"HOY · ":""}Dia {dia} ({dowDia(dia,mesId)}) — {rowsHoy.length} registro{rowsHoy.length!==1?"s":""}</span>
           <span style={{fontSize:18,fontWeight:800,color:color}}>{usd(totHoy)}</span>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 100px 1fr auto",gap:8,marginBottom:10}}>
+        <div className="mob-form" style={{display:"grid",gridTemplateColumns:"1fr 100px 1fr auto",gap:8,marginBottom:10}}>
           <input value={form.orden} onChange={e=>setForm(Object.assign({},form,{orden:e.target.value}))} placeholder="Orden / cliente" style={iStyle} />
           <input value={form.valor} onChange={e=>setForm(Object.assign({},form,{valor:e.target.value}))} type="number" min="0" step="0.01" placeholder="USD" style={iStyle} />
           <select value={form.plan} onChange={e=>setForm(Object.assign({},form,{plan:e.target.value}))} style={iStyle}>
@@ -1083,7 +1100,7 @@ function GlobalTab({store,mesId}) {
           <div style={{fontSize:20,fontWeight:800,color:"#6366f1"}}>{usd(totProy,0)}</div>
         </div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+      <div className="mob-g4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
         <StatCard label="Revenue Equipo" value={usd(total,0)} accent="#6366f1" large />
         <StatCard label="Proyeccion Total" value={usd(totProy,0)} sub={"+"+(usd(totProy-total,0))+" potencial"} />
         <StatCard label="Faltante meta equipo" value={total>=metaEq?"Logrado":usd(metaEq-total,0)} accent={total>=metaEq?"#10b981":"#ef4444"} />
@@ -1119,7 +1136,7 @@ function GlobalTab({store,mesId}) {
       </Card>
       <Card>
         <SLabel>Comisiones Proyectadas al Cierre ({cfg.pctBase}% Base / {cfg.pctSfly}% SFly)</SLabel>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:10}}>
+        <div className="mob-g4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:10}}>
           {[{l:"G actual",v:gAcum*comPct,c:"#2563eb"},{l:"G proyectada",v:gProy*comPct,c:"#2563eb"},
             {l:"C actual",v:cAcum*comPct,c:"#7c3aed"},{l:"C proyectada",v:cProy*comPct,c:"#7c3aed"}].map(x=>(
             <div key={x.l} style={{background:x.c+"08",border:"1px solid "+x.c+"22",borderRadius:10,padding:"12px 14px"}}>
@@ -1188,7 +1205,7 @@ function TrackerTab({store}) {
   const maxTotal = Math.max.apply(null,resumen.map(r=>r.total).concat([1]));
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+      <div className="mob-g3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
         <StatCard label="Revenue Total Historico" value={usd(totalHistorico,0)} accent="#6366f1" large />
         <StatCard label="Meses con datos" value={mesesConDatos.length} sub="meses registrados" />
         <StatCard label="Promedio mensual" value={usd(totalHistorico/(mesesConDatos.length||1),0)} sub="por mes" />
@@ -1301,22 +1318,22 @@ function App() {
     <div style={{fontFamily:"'Sora',system-ui,sans-serif",background:"#f0f4f8",minHeight:"100vh",color:"#1e293b"}}>
       {showPin&&<ModalPin onSuccess={onPinSuccess} onCancel={()=>setShowPin(false)} />}
       {/* NAVBAR con LOGO */}
-      <div style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"0 18px",display:"flex",alignItems:"center",gap:10,height:56,position:"sticky",top:0,zIndex:50,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
-        <div style={{display:"flex",alignItems:"center",flexShrink:0}}>
+      <div className="mob-hdr" style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"0 18px",display:"flex",alignItems:"center",gap:10,height:56,position:"sticky",top:0,zIndex:50,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
+        <div className="mob-logo" style={{display:"flex",alignItems:"center",flexShrink:0}}>
           <img src={LOGO_WEB_SRC} alt="Seguros Fly" style={{height:34,objectFit:"contain",maxWidth:140}} />
         </div>
-        <select value={mesId} onChange={e=>setMesId(e.target.value)}
+        <select className="mob-sel" value={mesId} onChange={e=>setMesId(e.target.value)}
           style={{height:32,border:"1px solid #e2e8f0",borderRadius:8,padding:"0 28px 0 10px",fontSize:12,color:"#1e293b",background:"#f8fafc",fontWeight:700,width:120,flexShrink:0,fontFamily:"'Sora',sans-serif",backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")",backgroundRepeat:"no-repeat",backgroundPosition:"right 8px center",appearance:"none",WebkitAppearance:"none"}}>
           {MESES.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}
         </select>
-        <div style={{display:"flex",gap:3,flex:1,justifyContent:"center",overflowX:"auto"}}>
+        <div className="mob-tabs" style={{display:"flex",gap:3,flex:1,justifyContent:"center",overflowX:"auto"}}>
           {MAIN_TABS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} style={{background:tab===t.id?t.color:"transparent",color:tab===t.id?"#fff":"#64748b",border:"1px solid "+(tab===t.id?t.color:"#e2e8f0"),borderRadius:7,padding:"5px 14px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
               {t.id==="global"?"✈️ "+t.label:t.id==="guillermo"?"G · "+t.label:t.id==="carolina"?"C · "+t.label:"📊 "+t.label}
             </button>
           ))}
         </div>
-        <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+        <div className="mob-act" style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
           <ConfigMes config={cfg} onSave={onSaveConfig} />
           <button onClick={()=>descargarCSV(storeRef.current,mesId)} style={{display:"flex",alignItems:"center",gap:4,background:"#f0fdf4",border:"1px solid #a7f3d0",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:700,color:"#059669"}}>
             ⬇️ CSV
@@ -1324,13 +1341,13 @@ function App() {
           <button onClick={handleSync} style={{display:"flex",alignItems:"center",gap:4,background:"#eff6ff",border:"1px solid #93c5fd",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:700,color:"#2563eb"}}>
             ☁️ Sync
           </button>
-          <div style={{fontSize:11,color:"#94a3b8",textAlign:"right",lineHeight:1.4}}>
+          <div className="mob-day" style={{fontSize:11,color:"#94a3b8",textAlign:"right",lineHeight:1.4}}>
             <div style={{fontWeight:600}}>D{diaHoy}/{mesInfo.dias}</div>
             <div style={{color:"#1e3a5f",fontWeight:700}}>{diasRest}d</div>
           </div>
         </div>
       </div>
-      <div style={{maxWidth:1100,margin:"0 auto",padding:"16px 18px 48px"}}>
+      <div className="mob-pad" style={{maxWidth:1100,margin:"0 auto",padding:"16px 18px 48px"}}>
         {tab==="global"    &&<GlobalTab store={store} mesId={mesId} />}
         {tab==="guillermo" &&<AdvisorTab name="Guillermo" asesor="guillermo" color="#2563eb" store={store} mesId={mesId} onUpdate={onUpdate} />}
         {tab==="carolina"  &&<AdvisorTab name="Carolina"  asesor="carolina"  color="#7c3aed" store={store} mesId={mesId} onUpdate={onUpdate} />}
