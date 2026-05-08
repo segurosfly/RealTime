@@ -48,7 +48,7 @@ const METAS_EQ = [
 
 // ── SHEETS CONFIG ─────────────────────────────────────────────────────────────
 // ⚠️ Si cambias el script, actualiza esta URL:
-const SHEETS_URL = "https://script.google.com/macros/s/AKfycbw9Muf3CdtzuFGcq9t6aLLyQIejs-KIYpmuKmlchgeFG3d5SLz4G5xZ9DuhkQBt8BRJ/exec";
+const SHEETS_URL = "https://script.google.com/macros/s/AKfycby2NkWxPbvu08G5HTev1Jqj7_cbmNZr0kmusQ6MDT22jeK5diDm5X5AUnb-q3w3uhk/exec";
 
 const enviarASheets = async (asesor, dia, fila) => {
   try {
@@ -97,6 +97,39 @@ const descargarCSV = (store) => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+};
+
+// ── SYNC TO GOOGLE SHEETS (bulk) ──────────────────────────────────────────────
+const sincronizarConSheets = async (store, silent = false) => {
+  const fecha = new Date().toLocaleDateString("es-CO");
+  const ts    = new Date().toISOString();
+  const rows  = [];
+  ["guillermo","carolina"].forEach(asesor => {
+    const data = store[asesor] || {};
+    Object.entries(data).forEach(([dia, ventas]) => {
+      (ventas || []).forEach(v => {
+        const dow = DOW[(4 + +dia) % 7];
+        rows.push([
+          fecha,
+          asesor.charAt(0).toUpperCase()+asesor.slice(1),
+          `Día ${dia}`, dow,
+          v.orden||"—", v.plan||"—",
+          parseFloat(v.valor)||0,
+          ts
+        ]);
+      });
+    });
+  });
+  if (rows.length === 0) { if (!silent) alert("No hay datos para sincronizar aún."); return false; }
+  try {
+    const params = new URLSearchParams({ bulk: JSON.stringify(rows) });
+    await fetch(`${SHEETS_URL}?${params.toString()}`, { method: "GET", mode: "no-cors" });
+    if (!silent) alert(`✅ ${rows.length} filas sincronizadas en Google Sheets (hoja RealTime)`);
+    return true;
+  } catch (e) {
+    if (!silent) alert("❌ Error al sincronizar. Revisa la URL del Apps Script.");
+    return false;
+  }
 };
 
 // ── UTILS ─────────────────────────────────────────────────────────────────────
@@ -593,8 +626,11 @@ function App() {
           ))}
         </div>
         <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-          <button onClick={()=>descargarCSV(storeRef.current)} style={{ display:"flex", alignItems:"center", gap:5, background:"#f0fdf4", border:"1px solid #a7f3d0", borderRadius:8, padding:"6px 12px", fontSize:11, fontWeight:700, color:"#059669", cursor:"pointer" }}>
+          <button onClick={()=>{ descargarCSV(storeRef.current); sincronizarConSheets(storeRef.current, true); }} style={{ display:"flex", alignItems:"center", gap:5, background:"#f0fdf4", border:"1px solid #a7f3d0", borderRadius:8, padding:"6px 12px", fontSize:11, fontWeight:700, color:"#059669", cursor:"pointer" }}>
             ⬇️ Descargar CSV
+          </button>
+          <button onClick={()=>sincronizarConSheets(storeRef.current)} style={{ display:"flex", alignItems:"center", gap:5, background:"#eff6ff", border:"1px solid #93c5fd", borderRadius:8, padding:"6px 12px", fontSize:11, fontWeight:700, color:"#2563eb", cursor:"pointer" }}>
+            ☁️ Sync Sheets
           </button>
           <div style={{ fontSize:11, color:"#94a3b8", textAlign:"right", lineHeight:1.5 }}>
             <div style={{ fontWeight:600 }}>Día {DIA_HOY} / {DIAS}</div>
