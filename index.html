@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SegurosFlyCRM · Revenue Tracker Mayo 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f0f4f8; font-family: 'Sora', system-ui, sans-serif; color: #1e293b; }
+    input:focus { border-color: #6366f1 !important; outline: none; box-shadow: 0 0 0 3px #6366f118; }
+    button { transition: opacity 0.15s; cursor: pointer; }
+    button:hover { opacity: 0.85; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+const DIAS         = 31;
+const DIA_HOY      = new Date().getDate();
+const DIAS_REST    = Math.max(1, DIAS - DIA_HOY);
+const DOW          = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+const META_BASE_IND = 6250;
+const META_ALTA_IND = 7500;
+const META_BASE_EQ  = 12500;
+const META_ALTA_EQ  = 15000;
+const METAS_IND = [
+  { label: "Ritmo actual",    value: null,           color: "#64748b", bg: "#f8fafc" },
+  { label: "Meta base (8%)",  value: META_BASE_IND,  color: "#3b82f6", bg: "#eff6ff" },
+  { label: "Meta alta (10%)", value: META_ALTA_IND,  color: "#10b981", bg: "#ecfdf5" },
+];
+const METAS_EQ = [
+  { label: "Meta base (8%)",  value: META_BASE_EQ,   color: "#3b82f6", bg: "#eff6ff" },
+  { label: "Meta alta (10%)", value: META_ALTA_EQ,   color: "#10b981", bg: "#ecfdf5" },
+];
+
+// ── SHEETS CONFIG ─────────────────────────────────────────────────────────────
+// ⚠️ Si cambias el script, actualiza esta URL:
+const SHEETS_URL = "https://script.google.com/macros/s/AKfycbw9Muf3CdtzuFGcq9t6aLLyQIejs-KIYpmuKmlchgeFG3d5SLz4G5xZ9DuhkQBt8BRJ/exec";
+
+const enviarASheets = async (asesor, dia, fila) => {
+  try {
+    const ahora = new Date();
+    const params = new URLSearchParams({
+      fecha:  ahora.toLocaleDateString("es-CO"),
+      hora:   ahora.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
+      asesor, dia: String(dia),
+      orden:  fila.orden || "—",
+      plan:   fila.plan  || "—",
+      valor:  String(parseFloat(fila.valor) || 0),
+    });
+    await fetch(`${SHEETS_URL}?${params.toString()}`, { method: "GET", mode: "no-cors" });
+    return true;
+  } catch { return false; }
+};
+
+// ── STORAGE (localStorage — funciona en GitHub Pages) ─────────────────────────
+const STORE_KEY = "sfly_mayo2026";
+const loadStore = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } };
+const saveStore = (d) => { try { localStorage.setItem(STORE_KEY, JSON.stringify(d)); } catch {} };
+
+// ── CSV DOWNLOAD ──────────────────────────────────────────────────────────────
+const descargarCSV = (store) => {
+  const header = "Fecha export,Asesor,Día,Día semana,Orden,Plan,Valor USD";
+  const rows = [];
+  const fecha = new Date().toLocaleDateString("es-CO");
+  ["guillermo","carolina"].forEach(asesor => {
+    const data = store[asesor] || {};
+    Object.entries(data).forEach(([dia, ventas]) => {
+      (ventas || []).forEach(v => {
+        const dow = DOW[(4 + +dia) % 7];
+        rows.push([fecha, asesor.charAt(0).toUpperCase()+asesor.slice(1),
+          `Día ${dia}`, dow, v.orden||"—", v.plan||"—", parseFloat(v.valor)||0].join(","));
+      });
+    });
+  });
+  if (rows.length === 0) { alert("No hay datos para exportar aún."); return; }
+  const csv = [header, ...rows].join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url;
+  a.download = `SegurosFlyCRM_Mayo2026_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+const usd    = (n, d=2) => `$${Number(n||0).toLocaleString("es-CO",{minimumFractionDigits:d,maximumFractionDigits:d})}`;
+const pc     = (n) => `${Number(n||0).toFixed(1)}%`;
+const uid    = () => Math.random().toString(36).slice(2,8);
+const sumR   = (rows) => rows.reduce((s,r) => s+(parseFloat(r.valor)||0), 0);
+const dowDia = (d) => DOW[(4+d)%7];
+
+// ── UI ATOMS ──────────────────────────────────────────────────────────────────
+function Pill({ color, bg, children, size=11 }) {
+  return <span style={{ display:"inline-block", padding:"2px 10px", borderRadius:20, fontSize:size, fontWeight:700, letterSpacing:"0.04em", background:bg, color, border:`1px solid ${color}44` }}>{children}</span>;
+}
+function Card({ children, accent, style:st={} }) {
+  return <div style={{ background:"#fff", border:"1px solid #e2e8f0", borderRadius:12, borderTop:accent?`3px solid ${accent}`:undefined, padding:"16px 20px", ...st }}>{children}</div>;
+}
+function SLabel({ children }) {
+  return <div style={{ fontSize:11, color:"#94a3b8", textTransform:"uppercase", letterSpacing:"0.09em", fontWeight:700, marginBottom:14 }}>{children}</div>;
+}
+function StatCard({ label, value, sub, accent, large }) {
+  return (
+    <Card accent={accent}>
+      <div style={{ fontSize:11, color:"#94a3b8", textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:600, marginBottom:4 }}>{label}</div>
+      <div style={{ fontSize:large?26:21, fontWeight:800, color:accent||"#1e293b", lineHeight:1.1, fontFamily:"'Sora',sans-serif" }}>{value}</div>
+      {sub && <div style={{ fontSize:11, color:"#64748b", marginTop:4 }}>{sub}</div>}
+    </Card>
+  );
+}
+
+// ── META BAR ──────────────────────────────────────────────────────────────────
+function MetaBar({ acum, meta, proy }) {
+  const val  = meta.value;
+  const p    = val ? Math.min(100,(acum/val)*100) : 0;
+  const falt = val ? Math.max(0,val-acum) : 0;
+  if (!val) return (
+    <div style={{ marginBottom:14 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5 }}>
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <span style={{ fontSize:12, fontWeight:700, color:"#1e293b" }}>{meta.label}</span>
+          <Pill color={meta.color} bg={meta.bg}>{usd(proy,0)}</Pill>
+        </div>
+        <span style={{ fontSize:11, color:"#64748b" }}>Proyección con ritmo actual</span>
+      </div>
+      <div style={{ height:8, background:"#f1f5f9", borderRadius:4, overflow:"hidden" }}>
+        <div style={{ width:`${Math.min(100,(proy/META_ALTA_IND)*100)}%`, height:"100%", background:meta.color, borderRadius:4, transition:"width 0.5s" }} />
+      </div>
+    </div>
+  );
+  return (
+    <div style={{ marginBottom:14 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5 }}>
+        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+          <span style={{ fontSize:12, fontWeight:700, color:"#1e293b" }}>{meta.label}</span>
+          <Pill color={meta.color} bg={meta.bg}>{usd(val,0)}</Pill>
+        </div>
+        <div style={{ textAlign:"right" }}>
+          <span style={{ fontSize:13, fontWeight:800, color:falt===0?"#10b981":meta.color }}>{falt===0?"✓ LOGRADO":`Falta ${usd(falt,0)}`}</span>
+          <span style={{ fontSize:11, color:"#94a3b8", marginLeft:8 }}>{pc(p)}</span>
+          {proy>0&&falt>0&&<span style={{ fontSize:10, marginLeft:6, color:proy>=val?"#10b981":"#f97316" }}>· Proy {proy>=val?"✓":"✗"}</span>}
+        </div>
+      </div>
+      <div style={{ height:8, background:"#f1f5f9", borderRadius:4, overflow:"hidden" }}>
+        <div style={{ width:`${p}%`, height:"100%", background:meta.color, borderRadius:4, transition:"width 0.5s" }} />
+      </div>
+    </div>
+  );
+}
+
+// ── PANEL PRESIÓN ─────────────────────────────────────────────────────────────
+function PanelPresion({ acum, promDia, proy, name }) {
+  const necBase = acum<META_BASE_IND?(META_BASE_IND-acum)/DIAS_REST:0;
+  const necAlta = acum<META_ALTA_IND?(META_ALTA_IND-acum)/DIAS_REST:0;
+  const ritmoOk = promDia>=necBase;
+  const pctBajo = necBase>0?Math.max(0,(necBase-promDia)/necBase*100):0;
+  let ec,el,m1,m2;
+  if (acum>=META_ALTA_IND) { ec="#10b981";el="🏆 Meta alta lograda";m1=`Superaste la meta alta, ${name}. Comisión al 10% activada.`;m2="Cada dólar extra suma directo a tu bolsillo. Sigue."; }
+  else if (acum>=META_BASE_IND) { ec="#3b82f6";el="✅ Meta base lograda";m1=`Meta base lista. Te faltan ${usd(META_ALTA_IND-acum,0)} para el 10%.`;m2=`Necesitas ${usd(necAlta)}/día para la meta alta.`; }
+  else if (ritmoOk) { ec="#10b981";el="En ritmo ✓";m1=`Vas bien. Con ${usd(promDia,0)}/día proyectas ${usd(proy,0)} al cierre.`;m2=proy>=META_BASE_IND?"Proyección alcanza meta base. Apunta más alto.":"Mantén el ritmo — sube el ticket promedio."; }
+  else if (pctBajo<30) { ec="#f59e0b";el="⚠️ Ajustar ritmo";m1=`Estás ${pc(pctBajo)} bajo el ritmo. Necesitas ${usd(necBase)}/día para meta base.`;m2=proy>=META_BASE_IND?"Proyección aún alcanza meta base, pero está ajustada.":"Si no subes hoy, perderás la meta base."; }
+  else { ec="#ef4444";el="🔴 Ritmo bajo";m1=`Vas ${pc(pctBajo)} bajo el ritmo. Necesitas ${usd(necBase)}/día urgente.`;m2=`Con el ritmo actual proyectas ${usd(proy,0)}. Actúa HOY.`; }
+  return (
+    <div style={{ background:"#fff", borderRadius:12, padding:"16px 20px", border:`1px solid ${ec}33`, borderLeft:`4px solid ${ec}` }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:11, color:"#94a3b8", textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:700, marginBottom:4 }}>🧠 Análisis — {name}</div>
+          <div style={{ fontSize:14, fontWeight:700, color:"#1e293b", lineHeight:1.5 }}>{m1}</div>
+          <div style={{ fontSize:12, color:"#64748b", marginTop:3 }}>{m2}</div>
+        </div>
+        <Pill color={ec} bg={`${ec}12`} size={12}>{el}</Pill>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+        {necBase>0&&<div style={{ background:"#eff6ff", border:"1px solid #bfdbfe", borderRadius:8, padding:"8px 14px" }}>
+          <div style={{ fontSize:10, color:"#3b82f6", fontWeight:700, textTransform:"uppercase" }}>Necesitas hoy · Meta base</div>
+          <div style={{ fontSize:22, fontWeight:800, color:"#1d4ed8", fontFamily:"'Sora',sans-serif" }}>{usd(necBase,0)}</div>
+        </div>}
+        {necAlta>0&&<div style={{ background:"#ecfdf5", border:"1px solid #a7f3d0", borderRadius:8, padding:"8px 14px" }}>
+          <div style={{ fontSize:10, color:"#10b981", fontWeight:700, textTransform:"uppercase" }}>Necesitas hoy · Meta alta</div>
+          <div style={{ fontSize:22, fontWeight:800, color:"#059669", fontFamily:"'Sora',sans-serif" }}>{usd(necAlta,0)}</div>
+        </div>}
+      </div>
+    </div>
+  );
+}
+
+// ── INSIGHTS ──────────────────────────────────────────────────────────────────
+function InsightsPanel({ data }) {
+  const allRows = Object.values(data).flat();
+  if (allRows.length===0) return null;
+  const diasCon = Object.keys(data).filter(d=>data[d]?.length>0);
+  const totDia  = diasCon.reduce((acc,d)=>({...acc,[d]:sumR(data[d])}),{});
+  const mejorD  = diasCon.reduce((b,d)=>totDia[d]>(totDia[b]||0)?d:b, diasCon[0]);
+  const ventaMax = Math.max(...allRows.map(r=>parseFloat(r.valor)||0));
+  const rowMax   = allRows.find(r=>(parseFloat(r.valor)||0)===ventaMax);
+  const dowAcum  = {};
+  diasCon.forEach(d=>{
+    const dow=dowDia(+d);
+    if(!dowAcum[dow]) dowAcum[dow]={total:0,cnt:0};
+    dowAcum[dow].total+=totDia[d]; dowAcum[dow].cnt+=1;
+  });
+  const dowProms = Object.entries(dowAcum).map(([dow,{total,cnt}])=>({dow,prom:total/cnt})).sort((a,b)=>b.prom-a.prom);
+  const mejorDow = dowProms[0];
+  const promTotal = diasCon.length>0?Object.values(totDia).reduce((s,v)=>s+v,0)/diasCon.length:0;
+  const pctMejor  = mejorDow&&promTotal>0?((mejorDow.prom/promTotal-1)*100):0;
+  const items = [
+    mejorD&&{icon:"🏅",label:"Mejor día del mes",value:`Día ${mejorD} (${dowDia(+mejorD)})`,sub:usd(totDia[mejorD],0)},
+    ventaMax>0&&{icon:"💎",label:"Venta más alta",value:usd(ventaMax),sub:rowMax?.plan||rowMax?.orden||"—"},
+    mejorDow&&{icon:"📆",label:"Mejor día de semana",value:mejorDow.dow,sub:pctMejor>0?`+${pc(pctMejor)} vs promedio`:"Top día"},
+  ].filter(Boolean);
+  if (items.length===0) return null;
+  return (
+    <Card>
+      <SLabel>📊 Insights del Mes</SLabel>
+      <div style={{ display:"grid", gridTemplateColumns:`repeat(${items.length},1fr)`, gap:10 }}>
+        {items.map(it=>(
+          <div key={it.label} style={{ background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:10, padding:"12px 14px" }}>
+            <div style={{ fontSize:20, marginBottom:5 }}>{it.icon}</div>
+            <div style={{ fontSize:10, color:"#94a3b8", textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:700 }}>{it.label}</div>
+            <div style={{ fontSize:16, fontWeight:800, color:"#1e293b", marginTop:2 }}>{it.value}</div>
+            <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>{it.sub}</div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+// ── ESCENARIOS ────────────────────────────────────────────────────────────────
+function EscenariosPanel({ acum }) {
+  const guias=[{label:"$100/día",diario:100},{label:"$300/día",diario:300},{label:"$500/día",diario:500}];
+  return (
+    <Card>
+      <SLabel>📈 Escenarios — Si mantienes este ritmo diario</SLabel>
+      {guias.map(g=>{
+        const proy=acum+g.diario*DIAS_REST;
+        const top=proy>=META_ALTA_IND?{label:"Meta alta (10%)",color:"#10b981",bg:"#ecfdf5"}:proy>=META_BASE_IND?{label:"Meta base (8%)",color:"#3b82f6",bg:"#eff6ff"}:{label:"Sin meta",color:"#94a3b8",bg:"#f8fafc"};
+        return (
+          <div key={g.label} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:8, marginBottom:6 }}>
+            <span style={{ fontSize:13, fontWeight:800, color:"#1e293b", minWidth:90 }}>{g.label}</span>
+            <div style={{ flex:1, height:7, background:"#e2e8f0", borderRadius:3, overflow:"hidden" }}>
+              <div style={{ width:`${Math.min(100,(proy/META_ALTA_IND)*100)}%`, height:"100%", background:top.color, borderRadius:3 }} />
+            </div>
+            <span style={{ fontSize:13, fontWeight:700, color:"#334155", minWidth:90, textAlign:"right" }}>{usd(proy,0)}</span>
+            <span style={{ minWidth:110, textAlign:"right" }}><Pill color={top.color} bg={top.bg}>{top.label}</Pill></span>
+          </div>
+        );
+      })}
+    </Card>
+  );
+}
+
+// ── HISTORIAL ─────────────────────────────────────────────────────────────────
+function HistorialPanel({ data, color }) {
+  const diasCon = Object.keys(data).filter(d=>data[d]?.length>0).sort((a,b)=>+a-+b);
+  const totales = diasCon.map(d=>({dia:+d,val:sumR(data[d]),dow:dowDia(+d)}));
+  const maxVal  = Math.max(...totales.map(t=>t.val),1);
+  const diasSin = Array.from({length:DIA_HOY},(_,i)=>i+1).filter(d=>!diasCon.includes(String(d)));
+  let tendencia=null;
+  if (totales.length>=4){
+    const mid=Math.floor(totales.length/2);
+    const p1=totales.slice(0,mid).reduce((s,t)=>s+t.val,0)/mid;
+    const p2=totales.slice(mid).reduce((s,t)=>s+t.val,0)/(totales.length-mid);
+    tendencia=p2>p1*1.05?"subiendo":p2<p1*0.95?"bajando":"estable";
+  }
+  if (totales.length===0&&diasSin.length===0) return null;
+  return (
+    <Card>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+        <SLabel>📅 Historial por Día</SLabel>
+        <div style={{ display:"flex", gap:8, marginTop:-14 }}>
+          {tendencia&&<Pill color={tendencia==="subiendo"?"#10b981":tendencia==="bajando"?"#ef4444":"#64748b"} bg={tendencia==="subiendo"?"#ecfdf5":tendencia==="bajando"?"#fef2f2":"#f8fafc"}>{tendencia==="subiendo"?"↑ Subiendo":tendencia==="bajando"?"↓ Bajando":"→ Estable"}</Pill>}
+          {diasSin.length>0&&<Pill color="#f97316" bg="#fff7ed">{diasSin.length} día{diasSin.length>1?"s":""} sin ventas</Pill>}
+        </div>
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+        {totales.map(t=>(
+          <div key={t.dia} style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <span style={{ fontSize:11, color:"#94a3b8", minWidth:60 }}>D{t.dia} {t.dow}</span>
+            <div style={{ flex:1, height:8, background:"#f1f5f9", borderRadius:4, overflow:"hidden" }}>
+              <div style={{ width:`${(t.val/maxVal)*100}%`, height:"100%", background:color, borderRadius:4 }} />
+            </div>
+            <span style={{ fontSize:12, fontWeight:700, color, minWidth:90, textAlign:"right" }}>{usd(t.val,0)}</span>
+          </div>
+        ))}
+      </div>
+      {diasSin.length>0&&<div style={{ marginTop:10, padding:"8px 12px", background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:8 }}>
+        <span style={{ fontSize:11, color:"#c2410c", fontWeight:600 }}>Sin registro: {diasSin.map(d=>`D${d}`).join(", ")}</span>
+      </div>}
+    </Card>
+  );
+}
+
+// ── BLOQUE OPERATIVO ──────────────────────────────────────────────────────────
+function BloqueOperativo() {
+  const hora=new Date().getHours(), dow=new Date().getDay();
+  const activo=dow>=1&&dow<=6&&hora>=8&&hora<20, domingo=dow===0;
+  return (
+    <div style={{ background:activo?"#f0fdf4":"#fafafa", border:`1px solid ${activo?"#a7f3d0":"#e2e8f0"}`, borderRadius:12, padding:"11px 18px", display:"flex", alignItems:"center", gap:14 }}>
+      <span style={{ fontSize:20 }}>{activo?"🟢":domingo?"😴":"🌙"}</span>
+      <div style={{ flex:1 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:activo?"#059669":"#64748b" }}>{activo?"Ventana de operación activa":domingo?"Domingo — Solo seguimiento":hora<8?"Antes de horario (empieza 8:00 a.m.)":"Fuera de horario (cierra 8:00 p.m.)"}</div>
+        <div style={{ fontSize:11, color:"#94a3b8", marginTop:2 }}>Lun–Sáb · 8:00 a.m. – 8:00 p.m. · 70% del revenue ocurre aquí</div>
+      </div>
+      <span style={{ fontSize:13, fontWeight:700, color:"#94a3b8" }}>{hora}:00 h</span>
+    </div>
+  );
+}
+
+// ── COMISIONES ────────────────────────────────────────────────────────────────
+function ComisionesPanel({ acum, proy, color, label }) {
+  return (
+    <Card>
+      <SLabel>💰 Comisiones — {label}</SLabel>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+        {[{pct:"8%",mult:0.08,meta:"Meta base"},{pct:"10%",mult:0.10,meta:"Meta alta"}].map(r=>(
+          <div key={r.pct} style={{ background:`${color}08`, border:`1px solid ${color}22`, borderRadius:10, padding:"12px 16px" }}>
+            <div style={{ fontSize:10, color:"#94a3b8", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:6 }}>Comisión {r.pct} · {r.meta}</div>
+            <div style={{ display:"flex", gap:14, alignItems:"flex-end" }}>
+              <div><div style={{ fontSize:10, color:"#94a3b8" }}>Actual</div><div style={{ fontSize:20, fontWeight:800, color }}>{usd(acum*r.mult,0)}</div></div>
+              <div style={{ paddingBottom:2 }}><div style={{ fontSize:10, color:"#94a3b8" }}>Proyectada</div><div style={{ fontSize:14, fontWeight:700, color:"#64748b" }}>{usd(proy*r.mult,0)}</div></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+// ── ADVISOR TAB ───────────────────────────────────────────────────────────────
+const iStyle={ height:40, border:"1px solid #e2e8f0", borderRadius:8, padding:"0 12px", fontSize:13, color:"#1e293b", background:"#f8fafc", outline:"none", width:"100%", fontFamily:"'Sora',sans-serif" };
+const btnS=(c)=>({ height:40, background:c, color:"#fff", border:"none", borderRadius:8, padding:"0 16px", fontWeight:700, fontSize:13, cursor:"pointer", whiteSpace:"nowrap" });
+const icoBtn=(c)=>({ width:28, height:28, border:`1px solid ${c}33`, borderRadius:6, background:`${c}0d`, color:c, cursor:"pointer", fontSize:12, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, flexShrink:0 });
+
+function AdvisorTab({ name, color, data, onChange }) {
+  const [dia, setDia]       = useState(DIA_HOY);
+  const [form, setForm]     = useState({ orden:"", valor:"", plan:"" });
+  const [editId, setEditId] = useState(null);
+  const [status, setStatus] = useState(null); // null | 'saving' | 'ok' | 'sheets_ok' | 'sheets_err'
+
+  const allRows = Object.values(data).flat();
+  const acum    = sumR(allRows);
+  const diasCon = Object.keys(data).filter(d=>data[d]?.length>0).length;
+  const promDia = diasCon>0?acum/diasCon:0;
+  const proy    = acum+promDia*DIAS_REST;
+  const rowsHoy = data[dia]||[];
+  const totHoy  = sumR(rowsHoy);
+
+  const saveRow = async () => {
+    if (!form.valor) return;
+    setStatus("saving");
+    const day = data[dia]||[];
+    const newRow = { id:uid(), ...form, ts:Date.now() };
+    const updated = editId ? day.map(r=>r.id===editId?{...r,...form}:r) : [...day,newRow];
+    onChange({ ...data, [dia]:updated });
+    setForm({ orden:"", valor:"", plan:"" });
+    setEditId(null);
+    // Intentar guardar en Sheets (en GitHub Pages sí funciona)
+    const ok = await enviarASheets(name, dia, editId ? {...form} : newRow);
+    setStatus(ok?"sheets_ok":"sheets_err");
+    setTimeout(()=>setStatus(null), 3000);
+  };
+
+  const delRow   = (id) => onChange({ ...data, [dia]:(data[dia]||[]).filter(r=>r.id!==id) });
+  const startEdit = (r) => { setForm({orden:r.orden,valor:r.valor,plan:r.plan}); setEditId(r.id); };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+      <BloqueOperativo />
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10 }}>
+        <StatCard label="Revenue Acumulado" value={usd(acum,0)} accent={color} large />
+        <StatCard label="Promedio / Día" value={usd(promDia,0)} sub={`${diasCon} días con ventas`} />
+        <StatCard label="Proyección Cierre" value={usd(proy,0)} sub={`${DIAS_REST} días restantes`} />
+        <StatCard label="Faltante meta alta" value={acum>=META_ALTA_IND?"✓ Logrado":usd(META_ALTA_IND-acum,0)} accent={acum>=META_ALTA_IND?"#10b981":"#ef4444"} />
+      </div>
+      <PanelPresion acum={acum} promDia={promDia} proy={proy} name={name} />
+      <Card><SLabel>🎯 Metas Individuales de {name}</SLabel>{METAS_IND.map(m=><MetaBar key={m.label} acum={acum} meta={m} proy={proy} />)}</Card>
+      <ComisionesPanel acum={acum} proy={proy} color={color} label={name} />
+      <EscenariosPanel acum={acum} />
+      <InsightsPanel data={data} />
+
+      <Card>
+        <SLabel>📅 Registro por Día — {name}</SLabel>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:5, marginBottom:14 }}>
+          {Array.from({length:DIAS},(_,i)=>i+1).map(d=>{
+            const tiene=(data[d]||[]).length>0, sel=d===dia, esHoy=d===DIA_HOY;
+            return (
+              <button key={d} onClick={()=>setDia(d)} style={{ width:36, height:36, borderRadius:8, cursor:"pointer", border:sel?`2px solid ${color}`:esHoy?`2px dashed ${color}88`:"1px solid #e2e8f0", background:sel?color:tiene?"#ecfdf5":"#f8fafc", color:sel?"#fff":tiene?"#059669":d>DIA_HOY?"#cbd5e1":"#64748b", fontWeight:sel||tiene?700:400, fontSize:12, position:"relative" }}>
+                {d}
+                {tiene&&!sel&&<span style={{ position:"absolute", top:2, right:3, width:5, height:5, background:"#10b981", borderRadius:"50%" }} />}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:"#f8fafc", border:"1px solid #e2e8f0", borderRadius:8, padding:"10px 14px", marginBottom:12 }}>
+          <span style={{ fontSize:13, color:"#64748b" }}>{dia===DIA_HOY?"HOY · ":""}Día {dia} ({dowDia(dia)}) — {rowsHoy.length} registro{rowsHoy.length!==1?"s":""}</span>
+          <span style={{ fontSize:20, fontWeight:800, color }}>{usd(totHoy)}</span>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 110px 1fr auto", gap:8, marginBottom:10 }}>
+          <input value={form.orden} onChange={e=>setForm({...form,orden:e.target.value})} placeholder="Orden / cliente" style={iStyle} />
+          <input value={form.valor} onChange={e=>setForm({...form,valor:e.target.value})} type="number" min="0" step="0.01" placeholder="USD" style={iStyle} />
+          <input value={form.plan} onChange={e=>setForm({...form,plan:e.target.value})} placeholder="Plan" style={iStyle} onKeyDown={e=>e.key==="Enter"&&saveRow()} />
+          <button onClick={saveRow} style={btnS(editId?"#6366f1":color)} disabled={status==="saving"}>{status==="saving"?"⏳...":editId?"✓ OK":"+ Guardar"}</button>
+        </div>
+        {status&&status!=="saving"&&(
+          <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:10, padding:"7px 12px", borderRadius:8, background:status==="sheets_ok"?"#f0fdf4":status==="sheets_err"?"#fffbeb":"#f0fdf4", border:`1px solid ${status==="sheets_ok"?"#a7f3d0":status==="sheets_err"?"#fde68a":"#a7f3d0"}`, animation:"fadeIn 0.2s ease" }}>
+            <span style={{ fontSize:13 }}>{status==="sheets_ok"?"✅":status==="sheets_err"?"⚠️":"✅"}</span>
+            <span style={{ fontSize:12, fontWeight:600, color:status==="sheets_ok"?"#059669":status==="sheets_err"?"#92400e":"#059669" }}>
+              {status==="sheets_ok"?"Guardado en dashboard y Google Sheets ✓":status==="sheets_err"?"Guardado en dashboard ✓ · Verifica la conexión a Sheets":"Guardado ✓"}
+            </span>
+          </div>
+        )}
+        {rowsHoy.length>0?(
+          <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+            {rowsHoy.map(r=>(
+              <div key={r.id} style={{ display:"flex", alignItems:"center", gap:10, background:"#fff", border:"1px solid #e2e8f0", borderRadius:8, padding:"9px 14px" }}>
+                <span style={{ flex:1, fontSize:13, color:"#334155", fontWeight:600 }}>{r.orden||"—"}</span>
+                <span style={{ fontSize:12, color:"#94a3b8", minWidth:80 }}>{r.plan||"—"}</span>
+                <span style={{ fontSize:16, fontWeight:800, color, minWidth:90, textAlign:"right" }}>{usd(r.valor)}</span>
+                <button onClick={()=>startEdit(r)} style={icoBtn("#6366f1")}>✎</button>
+                <button onClick={()=>delRow(r.id)} style={icoBtn("#ef4444")}>✕</button>
+              </div>
+            ))}
+            <div style={{ textAlign:"right", fontSize:14, fontWeight:800, color, padding:"6px 14px", borderTop:"1px solid #f1f5f9" }}>Total: {usd(totHoy)}</div>
+          </div>
+        ):(
+          <div style={{ textAlign:"center", color:"#94a3b8", fontSize:13, padding:"18px 0" }}>Sin registros para el día {dia}. Agrega tu primera venta ↑</div>
+        )}
+      </Card>
+      <HistorialPanel data={data} color={color} />
+    </div>
+  );
+}
+
+// ── GLOBAL TAB ────────────────────────────────────────────────────────────────
+function GlobalTab({ gData, cData }) {
+  const gRows=Object.values(gData).flat(), cRows=Object.values(cData).flat();
+  const gAcum=sumR(gRows), cAcum=sumR(cRows), total=gAcum+cAcum;
+  const gDias=Object.keys(gData).filter(d=>gData[d]?.length>0).length;
+  const cDias=Object.keys(cData).filter(d=>cData[d]?.length>0).length;
+  const gProm=gDias>0?gAcum/gDias:0, cProm=cDias>0?cAcum/cDias:0;
+  const gProy=gAcum+gProm*DIAS_REST, cProy=cAcum+cProm*DIAS_REST, totProy=gProy+cProy;
+  const lider=gAcum>=cAcum?"Guillermo":"Carolina", liderC=gAcum>=cAcum?"#2563eb":"#7c3aed";
+  const diff=Math.abs(gAcum-cAcum), maxBar=Math.max(gAcum,cAcum,1);
+  const revPorDia={};
+  [gData,cData].forEach(d=>Object.entries(d).forEach(([dia,rows])=>{ revPorDia[dia]=(revPorDia[dia]||0)+sumR(rows); }));
+  const diasOrd=Object.keys(revPorDia).sort((a,b)=>+a-+b);
+  const maxDia=Math.max(...Object.values(revPorDia),1);
+  const asesores=[{name:"Guillermo",acum:gAcum,proy:gProy,prom:gProm,color:"#2563eb"},{name:"Carolina",acum:cAcum,proy:cProy,prom:cProm,color:"#7c3aed"}];
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+      <BloqueOperativo />
+      <div style={{ background:`${liderC}08`, border:`1.5px solid ${liderC}33`, borderRadius:12, padding:"14px 20px", display:"flex", alignItems:"center", gap:16 }}>
+        <span style={{ fontSize:28 }}>🏆</span>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:15, fontWeight:800, color:liderC }}>{lider} lidera por {usd(diff,0)}</div>
+          <div style={{ fontSize:12, color:"#64748b", marginTop:3 }}>G: {usd(gAcum,0)} ({pc(total>0?gAcum/total*100:0)}) · C: {usd(cAcum,0)} ({pc(total>0?cAcum/total*100:0)})</div>
+        </div>
+        <div style={{ textAlign:"right" }}>
+          <div style={{ fontSize:11, color:"#94a3b8" }}>Proyección equipo</div>
+          <div style={{ fontSize:22, fontWeight:800, color:"#6366f1" }}>{usd(totProy,0)}</div>
+        </div>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10 }}>
+        <StatCard label="Revenue Equipo" value={usd(total,0)} accent="#6366f1" large />
+        <StatCard label="Proyección Total" value={usd(totProy,0)} sub={`+${usd(totProy-total,0)} potencial`} />
+        <StatCard label="Faltante meta alta" value={total>=META_ALTA_EQ?"✓ Logrado":usd(META_ALTA_EQ-total,0)} accent={total>=META_ALTA_EQ?"#10b981":"#ef4444"} />
+        <StatCard label="Días restantes" value={DIAS_REST} sub={`de ${DIAS} días totales`} />
+      </div>
+      <Card>
+        <SLabel>👥 Comparativa de Asesores</SLabel>
+        {asesores.map(a=>(
+          <div key={a.name} style={{ marginBottom:18 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ width:34, height:34, borderRadius:"50%", background:`${a.color}18`, border:`2px solid ${a.color}55`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, fontWeight:800, color:a.color }}>{a.name[0]}</div>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:700, color:"#1e293b" }}>{a.name}</div>
+                  <div style={{ fontSize:11, color:"#94a3b8" }}>Prom {usd(a.prom,0)}/día · Proy {usd(a.proy,0)} · {pc(total>0?a.acum/total*100:0)} del equipo</div>
+                </div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <div style={{ fontSize:22, fontWeight:800, color:a.color }}>{usd(a.acum,0)}</div>
+                <Pill color={a.proy>=META_ALTA_IND?"#10b981":a.proy>=META_BASE_IND?"#3b82f6":"#f97316"} bg={a.proy>=META_ALTA_IND?"#ecfdf5":a.proy>=META_BASE_IND?"#eff6ff":"#fff7ed"}>{a.proy>=META_ALTA_IND?"Proy: Meta alta ✓":a.proy>=META_BASE_IND?"Proy: Meta base ✓":"Proy: Sin meta ✗"}</Pill>
+              </div>
+            </div>
+            <div style={{ height:9, background:"#f1f5f9", borderRadius:4, overflow:"hidden" }}>
+              <div style={{ width:`${(a.acum/maxBar)*100}%`, height:"100%", background:a.color, borderRadius:4, transition:"width 0.5s" }} />
+            </div>
+          </div>
+        ))}
+      </Card>
+      <Card><SLabel>🎯 Metas del Equipo</SLabel>{METAS_EQ.map(m=><MetaBar key={m.value} acum={total} meta={m} proy={totProy} />)}</Card>
+      <Card>
+        <SLabel>💰 Comisiones Proyectadas al Cierre</SLabel>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:10 }}>
+          {[{l:"G · 8%",v:gProy*0.08,c:"#2563eb"},{l:"G · 10%",v:gProy*0.10,c:"#2563eb"},{l:"C · 8%",v:cProy*0.08,c:"#7c3aed"},{l:"C · 10%",v:cProy*0.10,c:"#7c3aed"}].map(x=>(
+            <div key={x.l} style={{ background:`${x.c}08`, border:`1px solid ${x.c}22`, borderRadius:10, padding:"12px 14px" }}>
+              <div style={{ fontSize:10, color:"#94a3b8", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:4 }}>{x.l}</div>
+              <div style={{ fontSize:18, fontWeight:800, color:x.c }}>{usd(x.v,0)}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ padding:"10px 14px", background:"#ecfdf5", border:"1px solid #a7f3d0", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span style={{ fontSize:12, fontWeight:700, color:"#059669" }}>Total comisiones equipo (10%) al cierre</span>
+          <span style={{ fontSize:18, fontWeight:800, color:"#059669" }}>{usd((gProy+cProy)*0.10,0)}</span>
+        </div>
+      </Card>
+      {diasOrd.length>0&&(
+        <Card>
+          <SLabel>📅 Revenue por Día — Equipo</SLabel>
+          <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+            {diasOrd.map(d=>{
+              const gV=sumR(gData[d]||[]), cV=sumR(cData[d]||[]);
+              return (
+                <div key={d} style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <span style={{ fontSize:11, color:"#94a3b8", minWidth:60 }}>D{d} {dowDia(+d)}</span>
+                  <div style={{ flex:1, height:8, background:"#f1f5f9", borderRadius:4, overflow:"hidden", display:"flex" }}>
+                    <div style={{ width:`${(gV/maxDia)*100}%`, height:"100%", background:"#2563eb" }} />
+                    <div style={{ width:`${(cV/maxDia)*100}%`, height:"100%", background:"#7c3aed" }} />
+                  </div>
+                  <span style={{ fontSize:12, fontWeight:700, color:"#334155", minWidth:90, textAlign:"right" }}>{usd(gV+cV,0)}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display:"flex", gap:16, marginTop:10, fontSize:11, color:"#64748b" }}>
+            <span><span style={{ color:"#2563eb", fontWeight:700 }}>■</span> Guillermo</span>
+            <span><span style={{ color:"#7c3aed", fontWeight:700 }}>■</span> Carolina</span>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ── MAIN APP ──────────────────────────────────────────────────────────────────
+const TABS = [
+  { id:"global",    label:"🌐 Global",     color:"#6366f1" },
+  { id:"guillermo", label:"G · Guillermo", color:"#2563eb" },
+  { id:"carolina",  label:"C · Carolina",  color:"#7c3aed" },
+];
+
+function App() {
+  const [tab, setTab]     = useState("global");
+  const [store, setStore] = useState(() => loadStore());
+  const storeRef          = useRef(store);
+
+  const update = useCallback((who, data) => {
+    const next = { ...storeRef.current, [who]: data };
+    storeRef.current = next;
+    setStore(next);
+    saveStore(next);
+  }, []);
+
+  const gData = store.guillermo || {};
+  const cData = store.carolina  || {};
+
+  return (
+    <div style={{ fontFamily:"'Sora',system-ui,sans-serif", background:"#f0f4f8", minHeight:"100vh", color:"#1e293b" }}>
+
+      {/* Header */}
+      <div style={{ background:"#fff", borderBottom:"1px solid #e2e8f0", padding:"0 24px", display:"flex", alignItems:"center", gap:16, height:56, position:"sticky", top:0, zIndex:50, boxShadow:"0 1px 4px rgba(0,0,0,0.05)" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ width:34, height:34, borderRadius:9, background:"linear-gradient(135deg,#6366f1,#2563eb)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17 }}>✈️</div>
+          <div>
+            <div style={{ fontSize:15, fontWeight:800, color:"#1e293b", lineHeight:1.1 }}>SegurosFlyCRM</div>
+            <div style={{ fontSize:10, color:"#94a3b8", fontWeight:600 }}>Mayo 2026 · Revenue Tracker</div>
+          </div>
+        </div>
+        <div style={{ display:"flex", gap:4, flex:1, justifyContent:"center" }}>
+          {TABS.map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{ background:tab===t.id?t.color:"transparent", color:tab===t.id?"#fff":"#64748b", border:`1px solid ${tab===t.id?t.color:"#e2e8f0"}`, borderRadius:8, padding:"7px 20px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+          <button onClick={()=>descargarCSV(storeRef.current)} style={{ display:"flex", alignItems:"center", gap:5, background:"#f0fdf4", border:"1px solid #a7f3d0", borderRadius:8, padding:"6px 12px", fontSize:11, fontWeight:700, color:"#059669", cursor:"pointer" }}>
+            ⬇️ Descargar CSV
+          </button>
+          <div style={{ fontSize:11, color:"#94a3b8", textAlign:"right", lineHeight:1.5 }}>
+            <div style={{ fontWeight:600 }}>Día {DIA_HOY} / {DIAS}</div>
+            <div style={{ color:"#6366f1", fontWeight:700 }}>{DIAS_REST} días restantes</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ maxWidth:1100, margin:"0 auto", padding:"18px 20px 48px" }}>
+        {tab==="global"    && <GlobalTab gData={gData} cData={cData} />}
+        {tab==="guillermo" && <AdvisorTab name="Guillermo" color="#2563eb" data={gData} onChange={d=>update("guillermo",d)} />}
+        {tab==="carolina"  && <AdvisorTab name="Carolina"  color="#7c3aed" data={cData} onChange={d=>update("carolina",d)} />}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
