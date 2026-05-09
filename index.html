@@ -1328,18 +1328,24 @@ function App() {
         var nota = (r.nota || "").toString().toLowerCase();
         if (nota.indexOf("eliminado") !== -1) return;
         var mesId = null;
-        if (r.fecha) {
-          var d = new Date(r.fecha);
-          if (!isNaN(d.getTime())) {
-            mesId = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
-          }
-        }
-        if (!mesId && r.mes) {
+        // FIX SYNC: priorizar campo "mes" (refleja la pestaña en que se guardó)
+        // sobre "fecha" (que es la fecha de creación, no la fecha de la venta)
+        if (r.mes) {
           var k = String(r.mes).toLowerCase().trim();
           var n = MES_NUM[k];
           if (n) {
-            var y = (new Date()).getFullYear();
-            mesId = y + "-" + String(n).padStart(2,"0");
+            var yBase = (new Date()).getFullYear();
+            if (r.fecha) {
+              var dRef = new Date(r.fecha);
+              if (!isNaN(dRef.getTime())) yBase = dRef.getFullYear();
+            }
+            mesId = yBase + "-" + String(n).padStart(2,"0");
+          }
+        }
+        if (!mesId && r.fecha) {
+          var d = new Date(r.fecha);
+          if (!isNaN(d.getTime())) {
+            mesId = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
           }
         }
         if (!mesId) return;
@@ -1364,7 +1370,25 @@ function App() {
         Object.keys(mesPrev).forEach(function(k) {
           if (ASESORES.indexOf(k) === -1) {
             next[mesId][k] = mesPrev[k];
+            return;
           }
+          // FIX SYNC: mergear ventas locales que aún no llegaron a la respuesta remota
+          var asesorPrev = mesPrev[k] || {};
+          var asesorNext = next[mesId][k] || {};
+          Object.keys(asesorPrev).forEach(function(dia) {
+            var prevVentas = asesorPrev[dia] || [];
+            var nextVentas = asesorNext[dia] || [];
+            var merged = nextVentas.slice();
+            prevVentas.forEach(function(pv) {
+              var key = (pv.orden||"-") + "|" + (pv.plan||"-") + "|" + String(parseFloat(pv.valor)||0);
+              var existe = nextVentas.some(function(nv){
+                return ((nv.orden||"-") + "|" + (nv.plan||"-") + "|" + String(parseFloat(nv.valor)||0)) === key;
+              });
+              if (!existe) merged.push(pv);
+            });
+            asesorNext[dia] = merged;
+          });
+          next[mesId][k] = asesorNext;
         });
       });
       return next;
@@ -1391,14 +1415,19 @@ function App() {
     };
 
     cargarYRefrescar();
-    const id = setInterval(cargarYRefrescar, 10000);
-    return function() { cancelled = true; clearInterval(id); };
+    const id = setInterval(cargarYRefrescar, 4000);
+    // FIX SYNC: exponer refresh manual para que onUpdate dispare lectura inmediata
+    window.__SF_refreshNow = function(){ try { lastSig = ""; cargarYRefrescar(); } catch(e){} };
+    return function() { cancelled = true; clearInterval(id); window.__SF_refreshNow = null; };
   }, []);
 
 
   const onUpdate = useCallback(function(newStore) {
     storeRef.current = newStore;
     setStore(newStore);
+    // FIX SYNC: tras una mutación local, reintentar refresh remoto en 1.5s y 5s
+    try { setTimeout(function(){ if (window.__SF_refreshNow) window.__SF_refreshNow(); }, 1500); } catch(e){}
+    try { setTimeout(function(){ if (window.__SF_refreshNow) window.__SF_refreshNow(); }, 5000); } catch(e){}
   },[]);
 
   const onSaveConfig = useCallback(function(cfg) {
