@@ -202,6 +202,25 @@ const enviarEliminacion = async (fila, mesId) => {
   } catch(e) {}
 };
 
+// CAMBIO METAS: enviar config (metas) al backend para sync entre navegadores
+const enviarConfigRT = async (cfg, mesId, who) => {
+  try {
+    const params = new URLSearchParams({
+      accion: "save_config",
+      mesId: String(mesId||""),
+      meta: String(cfg.meta||0),
+      comision: String(cfg.comision||0),
+      metaBase: String(cfg.metaBase||0),
+      pctBase: String(cfg.pctBase||0),
+      metaSfly: String(cfg.metaSfly||0),
+      pctSfly: String(cfg.pctSfly||0),
+      updatedAt: new Date().toISOString(),
+      updatedBy: who || ""
+    });
+    await fetch(SHEETS_URL+"?"+params.toString(), { method:"GET", mode:"no-cors" });
+  } catch(e) {}
+};
+
 const descargarCSV = (store, mesId) => {
   const mesLabel = getMesInfo(mesId).label;
   const header   = "Mes,Asesor,Dia,Dia semana,Orden,Plan,Valor USD";
@@ -1301,6 +1320,8 @@ function App() {
     const buildStoreFromRows = function(rows) {
       var prev = storeRef.current || {};
       var next = {};
+      // CAMBIO METAS: preservar configs locales mientras llegan las remotas
+      if (prev.config) next.config = Object.assign({}, prev.config);
       var MES_NUM = {"enero":1,"febrero":2,"marzo":3,"abril":4,"mayo":5,"junio":6,"julio":7,"agosto":8,"septiembre":9,"octubre":10,"noviembre":11,"diciembre":12};
       (rows || []).forEach(function(r) {
         if (!r) return;
@@ -1356,6 +1377,10 @@ function App() {
         if (cancelled) return;
         if (!data || !data.ok || !Array.isArray(data.rows)) return;
         const newStore = buildStoreFromRows(data.rows);
+        // CAMBIO METAS: incorporar las configs remotas (metas por mes) al store
+        if (data.configs && typeof data.configs === "object") {
+          newStore.config = Object.assign({}, newStore.config || {}, data.configs);
+        }
         const sig = JSON.stringify(newStore);
         if (sig === lastSig) return;
         lastSig = sig;
@@ -1379,6 +1404,8 @@ function App() {
   const onSaveConfig = useCallback(function(cfg) {
     const next = setConfigStore(storeRef.current, mesId, cfg);
     onUpdate(next);
+    // CAMBIO METAS: replicar la config en backend para que se vea en otros navegadores
+    try { enviarConfigRT(cfg, mesId, ""); } catch(e) {}
   },[mesId]);
 
   const handleSync = () => setShowPin(true);
