@@ -203,22 +203,28 @@ const enviarEliminacion = async (fila, mesId) => {
 };
 
 // CAMBIO METAS: enviar config (metas) al backend para sync entre navegadores
-const enviarConfigRT = async (cfg, mesId, who) => {
-  try {
-    const params = new URLSearchParams({
-      accion: "save_config",
-      mesId: String(mesId||""),
-      meta: String(cfg.meta||0),
-      comision: String(cfg.comision||0),
-      metaBase: String(cfg.metaBase||0),
-      pctBase: String(cfg.pctBase||0),
-      metaSfly: String(cfg.metaSfly||0),
-      pctSfly: String(cfg.pctSfly||0),
-      updatedAt: new Date().toISOString(),
-      updatedBy: who || ""
-    });
-    await fetch(SHEETS_URL+"?"+params.toString(), { method:"GET", mode:"no-cors" });
-  } catch(e) {}
+const enviarConfigRT = async (cfg, mesId, who, updatedAtIso) => {
+  // FIX METAS: reintentos para sobrevivir a fallos de red transitorios
+  const upd = updatedAtIso || new Date().toISOString();
+  const params = new URLSearchParams({
+    accion: "save_config",
+    mesId: String(mesId||""),
+    meta: String(cfg.meta||0),
+    comision: String(cfg.comision||0),
+    metaBase: String(cfg.metaBase||0),
+    pctBase: String(cfg.pctBase||0),
+    metaSfly: String(cfg.metaSfly||0),
+    pctSfly: String(cfg.pctSfly||0),
+    updatedAt: upd,
+    updatedBy: who || ""
+  });
+  const url = SHEETS_URL+"?"+params.toString();
+  const intentos = [0, 1500, 4000, 10000, 25000];
+  for (var idx = 0; idx < intentos.length; idx++) {
+    if (idx > 0) await new Promise(r => setTimeout(r, intentos[idx]));
+    try { await fetch(url, { method:"GET", mode:"no-cors" }); } catch(e) {}
+  }
+  return upd;
 };
 
 const descargarCSV = (store, mesId) => {
@@ -1401,9 +1407,26 @@ function App() {
         if (cancelled) return;
         if (!data || !data.ok || !Array.isArray(data.rows)) return;
         const newStore = buildStoreFromRows(data.rows);
-        // CAMBIO METAS: incorporar las configs remotas (metas por mes) al store
+        // FIX METAS: merge inteligente — la edición LOCAL más reciente prevalece sobre la remota
         if (data.configs && typeof data.configs === "object") {
-          newStore.config = Object.assign({}, newStore.config || {}, data.configs);
+          var mergedCfg = Object.assign({}, newStore.config || {});
+          Object.keys(data.configs).forEach(function(mid) {
+            var rem = data.configs[mid] || {};
+            var loc = mergedCfg[mid] || {};
+            var locTs = loc._localUpdatedAt || loc.updatedAt || "";
+            var remTs = rem.updatedAt || "";
+            if (locTs && (!remTs || remTs < locTs)) {
+              mergedCfg[mid] = loc;
+            } else {
+              var clean = Object.assign({}, rem);
+              delete clean._localUpdatedAt;
+              mergedCfg[mid] = clean;
+            }
+          });
+          Object.keys(newStore.config || {}).forEach(function(mid) {
+            if (!mergedCfg[mid]) mergedCfg[mid] = newStore.config[mid];
+          });
+          newStore.config = mergedCfg;
         }
         const sig = JSON.stringify(newStore);
         if (sig === lastSig) return;
@@ -1431,10 +1454,13 @@ function App() {
   },[]);
 
   const onSaveConfig = useCallback(function(cfg) {
-    const next = setConfigStore(storeRef.current, mesId, cfg);
+    // FIX METAS: marcar la config con timestamp local para que el polling no la sobrescriba
+    var nowIso = new Date().toISOString();
+    var cfgConTs = Object.assign({}, cfg, { updatedAt: nowIso, _localUpdatedAt: nowIso });
+    const next = setConfigStore(storeRef.current, mesId, cfgConTs);
     onUpdate(next);
-    // CAMBIO METAS: replicar la config en backend para que se vea en otros navegadores
-    try { enviarConfigRT(cfg, mesId, ""); } catch(e) {}
+    // FIX METAS: enviar al backend con reintentos; el polling verificará persistencia
+    try { enviarConfigRT(cfgConTs, mesId, "", nowIso); } catch(e) {}
   },[mesId]);
 
   const handleSync = () => setShowPin(true);
