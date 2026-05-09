@@ -53,6 +53,9 @@ const LOGO_SQ_SRC  = "https://raw.githubusercontent.com/segurosfly/RealTime/main
 // ── CONSTANTS ──────────────────────────────────────────────────────────────────
 const DOW      = ["Dom","Lun","Mar","Mie","Jue","Vie","Sab"];
 const ASESORES = ["guillermo","carolina"];
+// PROTECCION POR ASESOR: contrasenas requeridas para Guardar/Eliminar
+const PIN_ASESORES = { guillermo: "2026", carolina: "2027" };
+function verificarPinAsesor(asesor){ try { var esperado = PIN_ASESORES[asesor]; if(!esperado) return true; var ingresado = window.prompt("Ingrese la contrase\u00f1a del asesor " + asesor + " para continuar:", ""); if(ingresado === null) return false; if(String(ingresado).trim() === String(esperado)){ return true; } window.alert("Contrase\u00f1a incorrecta. Operaci\u00f3n cancelada."); return false; } catch(e){ return false; } }
 // CAMBIO #10: PIN actualizado a 2187
 const SYNC_PIN = "2187";
 const SHEETS_URL = "https://script.google.com/macros/s/AKfycbw_gKR9rGg8xcVth5eQ1iiKBoWgdH-ly1UHyOBy_KhDrEIT7iTML4xIUaJk_Dz6q7JH/exec";
@@ -951,6 +954,7 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
   // CAMBIO #2: guardar también envía a RealTime
   const saveRow = async () => {
     if (!form.valor) return;
+    if (!verificarPinAsesor(asesor)) { return; }
     setStatus("saving");
     const day    = data[dia]||[];
     const newRow = {id:uid(),orden:form.orden,valor:form.valor,plan:form.plan,ts:Date.now()};
@@ -967,6 +971,7 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
 
   const confirmDelete = async () => {
     if (!confirmDel) return;
+    if (!verificarPinAsesor(asesor)) { setConfirmDel(null); return; }
     const updated    = (data[confirmDel.dia]||[]).filter(r=>r.id!==confirmDel.id);
     const newData    = Object.assign({},data,{[confirmDel.dia]:updated});
     const deletedFila = Object.assign({},confirmDel,{deletedAt:new Date().toISOString()});
@@ -1495,7 +1500,7 @@ function App() {
           ))}
         </div>
         <div className="mob-act" style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
-          <ConfigMes config={cfg} onSave={onSaveConfig} />
+          {/* ConfigMes deshabilitado: las metas se gestionan desde la pestana Config en Drive */}
           <button onClick={()=>descargarCSV(storeRef.current,mesId)} style={{display:"flex",alignItems:"center",gap:4,background:"#f0fdf4",border:"1px solid #a7f3d0",borderRadius:7,padding:"5px 10px",fontSize:11,fontWeight:700,color:"#059669"}}>
             ⬇️ CSV
           </button>
