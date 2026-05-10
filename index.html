@@ -1646,6 +1646,40 @@ function App() {
         const data = await res.json();
         if (cancelled) return;
         if (!data || !data.ok || !Array.isArray(data.rows)) return;
+
+        // ── RESET: si el Sheet está vacío, limpiar store local de ventas ──────
+        // Preservamos config (metas) pero borramos todas las ventas locales
+        if (data.rows.length === 0) {
+          var emptyStore = { config: (storeRef.current && storeRef.current.config) || {} };
+          var emptyStr = JSON.stringify(emptyStore);
+          if (JSON.stringify(storeRef.current) !== emptyStr) {
+            storeRef.current = emptyStore;
+            setStore(emptyStore);
+            try { localStorage.setItem(STORE_KEY, emptyStr); } catch(e) {}
+          }
+          // Aún procesar configs si vienen
+          if (data.configs && typeof data.configs === "object") {
+            Object.keys(data.configs).forEach(function(mid) {
+              var rem = data.configs[mid] || {};
+              var loc = (storeRef.current && storeRef.current.config && storeRef.current.config[mid]) || {};
+              if (!loc._localUpdatedAt) {
+                _remoteConfigCache[mid] = {
+                  meta:     rem.meta     !== undefined ? rem.meta     : rem.metaBase || 12500,
+                  comision: rem.comision !== undefined ? rem.comision : rem.pctBase  || 10,
+                  metaBase: rem.metaBase !== undefined ? rem.metaBase : 12500,
+                  pctBase:  rem.pctBase  !== undefined ? rem.pctBase  : 10,
+                  metaSfly: rem.metaSfly !== undefined ? rem.metaSfly : 18000,
+                  pctSfly:  rem.pctSfly  !== undefined ? rem.pctSfly  : 15,
+                };
+                _remoteConfigLoaded = true;
+              }
+            });
+            setConfigSource("remote");
+          }
+          return;
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         const newStore = buildStoreFromRows(data.rows);
         // FIX METAS: merge inteligente — la edición LOCAL más reciente prevalece sobre la remota
         if (data.configs && typeof data.configs === "object") {
