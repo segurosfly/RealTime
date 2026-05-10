@@ -19,6 +19,7 @@
     ::-webkit-scrollbar{width:4px;}
     ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px;}
     @keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+    @keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-8px);}40%{transform:translateX(8px);}60%{transform:translateX(-6px);}80%{transform:translateX(6px);}}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:9999;animation:fadeIn .15s ease;}
     th{text-align:right;}
 th:first-child{text-align:left;}
@@ -55,7 +56,15 @@ const DOW      = ["Dom","Lun","Mar","Mie","Jue","Vie","Sab"];
 const ASESORES = ["guillermo","carolina"];
 // PROTECCION POR ASESOR: contrasenas requeridas para Guardar/Eliminar
 const PIN_ASESORES = { guillermo: "2026", carolina: "2027" };
-function verificarPinAsesor(asesor){ try { var esperado = PIN_ASESORES[asesor]; if(!esperado) return true; var ingresado = window.prompt("Ingrese la contrase\u00f1a del asesor " + asesor + " para continuar:", ""); if(ingresado === null) return false; if(String(ingresado).trim() === String(esperado)){ return true; } window.alert("Contrase\u00f1a incorrecta. Operaci\u00f3n cancelada."); return false; } catch(e){ return false; } }
+// verificarPinAsesor ahora es async y usa modal React (ver ModalPinAsesor)
+// Se resuelve a true/false via window.__pinAsesorResolve
+function verificarPinAsesor(asesor) {
+  return new Promise(function(resolve) {
+    window.__pinAsesorResolve = resolve;
+    if (window.__pinAsesorShow) window.__pinAsesorShow(asesor);
+    else resolve(false);
+  });
+}
 // CAMBIO #10: PIN actualizado a 2187
 const SYNC_PIN = "2187";
 const SHEETS_URL = "https://script.google.com/macros/s/AKfycbzUyyS2ETrbiE89_eIS5S8449pzPujshcvMqkW-sSHf3q7jvsOfDj6EL2xPYXIq9-PJ/exec";
@@ -431,6 +440,139 @@ function ModalConfirmDelete({fila,onConfirm,onCancel}) {
         <div style={{display:"flex",gap:10,justifyContent:"center"}}>
           <button onClick={onCancel}  style={Object.assign({},btnS("#94a3b8"),{height:36})}>Cancelar</button>
           <button onClick={onConfirm} style={Object.assign({},btnS("#ef4444"),{height:36})}>Eliminar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL PIN ASESOR (reemplaza window.prompt — compatible móvil) ──────────────
+function ModalPinAsesor() {
+  const [visible, setVisible]   = useState(false);
+  const [asesor,  setAsesor]    = useState("");
+  const [pin,     setPin]       = useState("");
+  const [err,     setErr]       = useState(false);
+  const [shake,   setShake]     = useState(false);
+  const inputRef = useRef(null);
+
+  // Exponer show al sistema global para que verificarPinAsesor lo llame
+  useEffect(function() {
+    window.__pinAsesorShow = function(a) {
+      setAsesor(a); setPin(""); setErr(false); setShake(false); setVisible(true);
+      setTimeout(function(){ if(inputRef.current) inputRef.current.focus(); }, 120);
+    };
+    return function() { window.__pinAsesorShow = null; };
+  }, []);
+
+  const resolve = function(result) {
+    setVisible(false); setPin(""); setErr(false);
+    if (window.__pinAsesorResolve) { window.__pinAsesorResolve(result); window.__pinAsesorResolve = null; }
+  };
+
+  const check = function() {
+    var esperado = PIN_ASESORES[asesor];
+    if (String(pin).trim() === String(esperado)) {
+      resolve(true);
+    } else {
+      setErr(true); setShake(true); setPin("");
+      setTimeout(function(){ setShake(false); }, 500);
+      setTimeout(function(){ setErr(false); if(inputRef.current) inputRef.current.focus(); }, 1200);
+    }
+  };
+
+  const cancel = function() { resolve(false); };
+
+  const color = asesor === "guillermo" ? "#2563eb" : "#7c3aed";
+  const inicial = asesor ? asesor[0].toUpperCase() : "?";
+
+  if (!visible) return null;
+  return (
+    <div className="modal-overlay" onClick={cancel} style={{zIndex:9999}}>
+      <div onClick={function(e){e.stopPropagation();}}
+        style={{background:"#fff",borderRadius:20,padding:"32px 28px",width:320,textAlign:"center",
+          boxShadow:"0 24px 64px rgba(0,0,0,0.18)",
+          animation: shake ? "shake 0.4s ease" : "fadeIn .18s ease"}}>
+
+        {/* Avatar asesor */}
+        <div style={{width:56,height:56,borderRadius:"50%",background:color+"18",border:"3px solid "+color+"44",
+          display:"flex",alignItems:"center",justifyContent:"center",
+          fontSize:22,fontWeight:800,color:color,margin:"0 auto 12px"}}>
+          {inicial}
+        </div>
+
+        <div style={{fontSize:16,fontWeight:800,color:"#1e293b",marginBottom:4}}>
+          🔐 Confirmar identidad
+        </div>
+        <div style={{fontSize:13,color:"#64748b",marginBottom:20}}>
+          Ingresá tu contraseña, <strong style={{color:color}}>{asesor && (asesor[0].toUpperCase()+asesor.slice(1))}</strong>
+        </div>
+
+        {/* Dots display */}
+        <div style={{display:"flex",gap:10,justifyContent:"center",marginBottom:16}}>
+          {[0,1,2,3].map(function(i){
+            return (
+              <div key={i} style={{width:14,height:14,borderRadius:"50%",
+                background: pin.length > i ? color : "#e2e8f0",
+                border: "2px solid " + (pin.length > i ? color : "#e2e8f0"),
+                transition:"background 0.15s"}}>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Input oculto */}
+        <input
+          ref={inputRef}
+          type="password"
+          inputMode="numeric"
+          maxLength={8}
+          value={pin}
+          onChange={function(e){ setPin(e.target.value); setErr(false); }}
+          onKeyDown={function(e){ if(e.key==="Enter") check(); }}
+          style={{position:"absolute",opacity:0,pointerEvents:"none",width:1,height:1}}
+        />
+
+        {/* Teclado numérico */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:16}}>
+          {["1","2","3","4","5","6","7","8","9","","0","⌫"].map(function(k,idx){
+            if (k === "") return <div key={idx} />;
+            return (
+              <button key={idx}
+                onClick={function(){
+                  if (k === "⌫") { setPin(function(p){ return p.slice(0,-1); }); }
+                  else { setPin(function(p){ return p.length < 8 ? p+k : p; }); }
+                  setErr(false);
+                }}
+                style={{height:48,borderRadius:12,border:"1.5px solid #e2e8f0",background:k==="⌫"?"#fef2f2":"#f8fafc",
+                  color:k==="⌫"?"#ef4444":"#1e293b",fontSize:k==="⌫"?18:17,fontWeight:700,cursor:"pointer",
+                  transition:"background .1s",fontFamily:"'Sora',sans-serif"}}>
+                {k}
+              </button>
+            );
+          })}
+        </div>
+
+        {err && (
+          <div style={{background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:8,
+            padding:"8px 14px",marginBottom:12,fontSize:12,fontWeight:700,color:"#ef4444"}}>
+            ❌ Contraseña incorrecta. Intentá de nuevo.
+          </div>
+        )}
+
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={cancel}
+            style={{flex:1,height:40,borderRadius:10,border:"1.5px solid #e2e8f0",
+              background:"#f8fafc",color:"#64748b",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+            Cancelar
+          </button>
+          <button onClick={check}
+            style={{flex:1,height:40,borderRadius:10,border:"none",
+              background: pin.length > 0 ? color : "#e2e8f0",
+              color: pin.length > 0 ? "#fff" : "#94a3b8",
+              fontWeight:700,fontSize:13,cursor: pin.length > 0 ? "pointer" : "default",
+              transition:"background .2s,color .2s"}}>
+            Confirmar
+          </button>
         </div>
       </div>
     </div>
@@ -1072,7 +1214,8 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
   // CAMBIO #2: guardar también envía a RealTime
   const saveRow = async () => {
     if (!form.valor) return;
-    if (!verificarPinAsesor(asesor)) { return; }
+    const pinOk = await verificarPinAsesor(asesor);
+    if (!pinOk) { return; }
     setStatus("saving");
     const day    = data[dia]||[];
     const newRow = {id:uid(),orden:form.orden,valor:form.valor,plan:form.plan,ts:Date.now()};
@@ -1089,7 +1232,8 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
 
   const confirmDelete = async () => {
     if (!confirmDel) return;
-    if (!verificarPinAsesor(asesor)) { setConfirmDel(null); return; }
+    const pinOk2 = await verificarPinAsesor(asesor);
+    if (!pinOk2) { setConfirmDel(null); return; }
     const updated    = (data[confirmDel.dia]||[]).filter(r=>r.id!==confirmDel.id);
     const newData    = Object.assign({},data,{[confirmDel.dia]:updated});
     const deletedFila = Object.assign({},confirmDel,{deletedAt:new Date().toISOString()});
@@ -1770,6 +1914,7 @@ function App() {
   return (
     <div style={{fontFamily:"'Sora',system-ui,sans-serif",background:"#f0f4f8",minHeight:"100vh",color:"#1e293b"}}>
       {showPin&&<ModalPin onSuccess={onPinSuccess} onCancel={()=>setShowPin(false)} />}
+      <ModalPinAsesor />
       {/* NAVBAR con LOGO */}
       <div className="mob-hdr" style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"0 18px",display:"flex",alignItems:"center",gap:10,height:56,position:"sticky",top:0,zIndex:50,boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}>
         <div className="mob-logo" style={{display:"flex",alignItems:"center",flexShrink:0}}>
