@@ -58,7 +58,122 @@ const PIN_ASESORES = { guillermo: "2026", carolina: "2027" };
 function verificarPinAsesor(asesor){ try { var esperado = PIN_ASESORES[asesor]; if(!esperado) return true; var ingresado = window.prompt("Ingrese la contrase\u00f1a del asesor " + asesor + " para continuar:", ""); if(ingresado === null) return false; if(String(ingresado).trim() === String(esperado)){ return true; } window.alert("Contrase\u00f1a incorrecta. Operaci\u00f3n cancelada."); return false; } catch(e){ return false; } }
 // CAMBIO #10: PIN actualizado a 2187
 const SYNC_PIN = "2187";
-const SHEETS_URL = "https://script.google.com/macros/s/AKfycbw_gKR9rGg8xcVth5eQ1iiKBoWgdH-ly1UHyOBy_KhDrEIT7iTML4xIUaJk_Dz6q7JH/exec";
+const SHEETS_URL = "https://script.google.com/macros/s/AKfycbzUyyS2ETrbiE89_eIS5S8449pzPujshcvMqkW-sSHf3q7jvsOfDj6EL2xPYXIq9-PJ/exec";
+
+// ── CONFIG REMOTA (pestaña Config de Google Sheets) ────────────────────────────
+// Cache en memoria: { "2026-05": { metaBase, pctBase, metaSfly, pctSfly, meta, comision }, ... }
+var _remoteConfigCache = {};
+var _remoteConfigLoaded = false;
+var _remoteConfigLoading = false;
+var _remoteConfigCallbacks = [];
+
+// Parsea el valor "$10,000" o "10000" → número
+function parseMontoConfig(v) {
+  if (v === undefined || v === null || v === "") return 0;
+  return parseFloat(String(v).replace(/[$,\s]/g,"")) || 0;
+}
+// Parsea "10%" o "10" → número entero (NO dividir por 100)
+function parsePctConfig(v) {
+  if (v === undefined || v === null || v === "") return 0;
+  return parseFloat(String(v).replace(/%/g,"").trim()) || 0;
+}
+
+const MES_LABEL_TO_ID = {
+  "enero":"2026-01","febrero":"2026-02","marzo":"2026-03","abril":"2026-04",
+  "mayo":"2026-05","junio":"2026-06","julio":"2026-07","agosto":"2026-08",
+  "septiembre":"2026-09","octubre":"2026-10","noviembre":"2026-11","diciembre":"2026-12"
+};
+
+async function fetchRemoteConfig() {
+  if (_remoteConfigLoading) return;
+  _remoteConfigLoading = true;
+  try {
+    // Intento 1: endpoint dedicado get_config
+    const url = SHEETS_URL + "?accion=get_config";
+    const res = await fetch(url, { method:"GET", cache:"no-store" });
+    const data = await res.json();
+    if (data && data.ok && data.configs && typeof data.configs === "object" && Object.keys(data.configs).length > 0) {
+      // Formato: { ok:true, configs: { "2026-05": { metaBase, pctBase, metaSfly, pctSfly } } }
+      Object.keys(data.configs).forEach(function(mid) {
+        var rem = data.configs[mid] || {};
+        _remoteConfigCache[mid] = {
+          meta:     parseMontoConfig(rem.meta     || rem.metaBase),
+          comision: parsePctConfig(rem.comision   || rem.pctBase),
+          metaBase: parseMontoConfig(rem.metaBase || rem.meta),
+          pctBase:  parsePctConfig(rem.pctBase    || rem.comision),
+          metaSfly: parseMontoConfig(rem.metaSfly),
+          pctSfly:  parsePctConfig(rem.pctSfly),
+        };
+      });
+      _remoteConfigLoaded = true;
+    } else if (data && data.ok && Array.isArray(data.configRows)) {
+      // Alternativa: array de filas planas
+      (data.configRows || []).forEach(function(row) {
+        var mesId = MES_LABEL_TO_ID[(row.mes||"").toLowerCase().trim()];
+        if (!mesId) return;
+        _remoteConfigCache[mesId] = {
+          meta:     parseMontoConfig(row.meta_proyeccion || row.meta_base),
+          comision: parsePctConfig(row.comision_base),
+          metaBase: parseMontoConfig(row.meta_base),
+          pctBase:  parsePctConfig(row.comision_base),
+          metaSfly: parseMontoConfig(row.meta_segurosfly || row.meta_sfly),
+          pctSfly:  parsePctConfig(row.comision_segurosfly || row.comision_sfly),
+        };
+      });
+      _remoteConfigLoaded = true;
+    } else if (data && data.ok && data.configs) {
+      // Si configs llegó del polling normal (con metas de las sheets)
+      _remoteConfigLoaded = true;
+    }
+    // Si ninguno funcionó, el cache se alimentará del polling de RealTime (data.configs)
+  } catch(e) {
+    // Fallo silencioso
+  }
+  _remoteConfigLoading = false;
+}
+
+// Obtiene config para un mes: remota si existe, local si no
+function getEffectiveConfig(store, mesId) {
+  // 1. Config local editada manualmente (tiene prioridad si hay _localUpdatedAt reciente)
+  const local = store.config && store.config[mesId] ? store.config[mesId] : null;
+  // 2. Config remota de la pestaña Config del Sheet
+  const remote = _remoteConfigCache[mesId] || null;
+
+  // Si hay local con timestamp local (editada en el dashboard), la usamos
+  if (local && local._localUpdatedAt) {
+    return {
+      meta:     local.meta      !== undefined ? local.meta      : 12500,
+      comision: local.comision  !== undefined ? local.comision  : 10,
+      metaBase: local.metaBase  !== undefined ? local.metaBase  : 12500,
+      pctBase:  local.pctBase   !== undefined ? local.pctBase   : 10,
+      metaSfly: local.metaSfly  !== undefined ? local.metaSfly  : 18000,
+      pctSfly:  local.pctSfly   !== undefined ? local.pctSfly   : 15,
+    };
+  }
+  // Si hay config remota del Sheet, la usamos
+  if (remote) {
+    return {
+      meta:     remote.meta     !== undefined ? remote.meta     : remote.metaBase || 12500,
+      comision: remote.comision !== undefined ? remote.comision : remote.pctBase  || 10,
+      metaBase: remote.metaBase !== undefined ? remote.metaBase : 12500,
+      pctBase:  remote.pctBase  !== undefined ? remote.pctBase  : 10,
+      metaSfly: remote.metaSfly !== undefined ? remote.metaSfly : 18000,
+      pctSfly:  remote.pctSfly  !== undefined ? remote.pctSfly  : 15,
+    };
+  }
+  // Fallback: config local sin timestamp, o defaults
+  if (local) {
+    return {
+      meta:     local.meta      !== undefined ? local.meta      : 12500,
+      comision: local.comision  !== undefined ? local.comision  : 10,
+      metaBase: local.metaBase  !== undefined ? local.metaBase  : 12500,
+      pctBase:  local.pctBase   !== undefined ? local.pctBase   : 10,
+      metaSfly: local.metaSfly  !== undefined ? local.metaSfly  : 18000,
+      pctSfly:  local.pctSfly   !== undefined ? local.pctSfly   : 15,
+    };
+  }
+  return { meta:12500, comision:10, metaBase:12500, pctBase:10, metaSfly:18000, pctSfly:15 };
+}
 
 const PLANES = [
   "Plan Lite","Plan Smart","Plan Plus","Plan Max",
@@ -100,17 +215,8 @@ const saveStore = (d) => { try { localStorage.setItem(STORE_KEY, JSON.stringify(
 const getMonthData = (store, mesId, asesor) => (store[mesId] && store[mesId][asesor]) ? store[mesId][asesor] : {};
 
 // CAMBIO #3: getConfig ahora soporta metaBase y metaSfly
-const getConfig = (store, mesId) => {
-  const stored = store.config && store.config[mesId] ? store.config[mesId] : {};
-  return {
-    meta:      stored.meta      !== undefined ? stored.meta      : 12500,
-    comision:  stored.comision  !== undefined ? stored.comision  : 10,
-    metaBase:  stored.metaBase  !== undefined ? stored.metaBase  : 12500,
-    pctBase:   stored.pctBase   !== undefined ? stored.pctBase   : 10,
-    metaSfly:  stored.metaSfly  !== undefined ? stored.metaSfly  : 18000,
-    pctSfly:   stored.pctSfly   !== undefined ? stored.pctSfly   : 15,
-  };
-};
+// Ahora delega a getEffectiveConfig que lee primero desde Google Sheets pestaña Config
+const getConfig = (store, mesId) => getEffectiveConfig(store, mesId);
 
 const setMonthData = (store, mesId, asesor, data) => {
   const next = Object.assign({}, store, { [mesId]: Object.assign({}, store[mesId]||{}, { [asesor]: data }) });
@@ -870,12 +976,13 @@ function QueParaSi({acum,mesId,metaBase,metaSfly,color}) {
 }
 
 // ── METAS GLOBALES (CAMBIO #4) ─────────────────────────────────────────────────
-function MetasGlobales({store,mesId,total,proy}) {
+function MetasGlobales({store,mesId,total,proy,configSource}) {
   const cfg = getConfig(store, mesId);
   const proyFin = proy;
   const metaBase = cfg.metaBase;
   const metaSfly = cfg.metaSfly;
   const proyBajoMetas = proyFin < metaBase && proyFin < metaSfly;
+  const mesLabel = getMesInfo(mesId).label;
 
   const metas = [
     { label:"Proyección al ritmo actual", val:proyFin, note:"Si el equipo mantiene el ritmo actual", c:"#6366f1", icon:"📊" },
@@ -885,7 +992,18 @@ function MetasGlobales({store,mesId,total,proy}) {
 
   return (
     <Card accent="#6366f1">
-      <SLabel>🎯 Metas Globales del Equipo</SLabel>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <SLabel style={{marginBottom:0}}>🎯 Metas Globales del Equipo — {mesLabel}</SLabel>
+        <span style={{
+          fontSize:10, fontWeight:700, padding:"3px 10px", borderRadius:20,
+          background: configSource==="remote" ? "#ecfdf5" : "#f1f5f9",
+          color:      configSource==="remote" ? "#059669" : "#94a3b8",
+          border:     "1px solid " + (configSource==="remote" ? "#a7f3d0" : "#e2e8f0"),
+          display:"flex", alignItems:"center", gap:4
+        }}>
+          {configSource==="remote" ? "🟢 Config desde Sheets" : "⚪ Config local"}
+        </span>
+      </div>
       {proyBajoMetas&&(
         <div style={{background:"#fff7ed",border:"1px solid #fdba74",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:20}}>⚠️</span>
@@ -1074,7 +1192,7 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
 }
 
 // ── GLOBAL TAB ─────────────────────────────────────────────────────────────────
-function GlobalTab({store,mesId}) {
+function GlobalTab({store,mesId,configSource}) {
   const mesInfo  = getMesInfo(mesId);
   const cfg      = getConfig(store,mesId);
   const diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
@@ -1117,7 +1235,7 @@ function GlobalTab({store,mesId}) {
       </div>
 
       {/* CAMBIO #4: Metas Globales */}
-      <MetasGlobales store={store} mesId={mesId} total={total} proy={totProy} />
+      <MetasGlobales store={store} mesId={mesId} total={total} proy={totProy} configSource={configSource} />
 
       <div style={{background:liderC+"08",border:"1.5px solid "+liderC+"33",borderRadius:12,padding:"14px 20px",display:"flex",alignItems:"center",gap:16}}>
         <span style={{fontSize:26}}>🏆</span>
@@ -1307,12 +1425,112 @@ function TrackerTab({store}) {
   );
 }
 
+// ── CALCULADORAS DE VIAJE ──────────────────────────────────────────────────────
+function CalcCard({ index, label, color, accent, pasajeros, dias, onPasajerosChange, onDiasChange }) {
+  const [valor, setValor] = useState("");
+  const v=parseFloat(valor)||0, p=parseInt(pasajeros)||1, d=parseInt(dias)||1;
+  const porPasajero=p>0?v/p:0, porDia=d>0?v/d:0, porPaxDia=(p>0&&d>0)?v/p/d:0;
+  const fmtUSD=(n)=>n>0?"$"+n.toLocaleString("es-CO",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
+  const inputBase={height:40,border:"2px solid #e2e8f0",borderRadius:10,padding:"0 12px",fontSize:14,color:"#1e293b",background:"#fff",outline:"none",width:"100%",fontFamily:"'Sora',sans-serif",fontWeight:600,transition:"border-color .15s"};
+  return (
+    <div style={{background:"#fff",border:"2px solid "+accent+"44",borderRadius:16,overflow:"hidden",boxShadow:"0 4px 20px "+accent+"18",flex:1,minWidth:260,display:"flex",flexDirection:"column"}}>
+      <div style={{background:"linear-gradient(135deg,"+color+" 0%,"+accent+" 100%)",padding:"14px 18px",display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:800,color:"#fff",flexShrink:0}}>{index}</div>
+        <div>
+          <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{label}</div>
+          <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",fontWeight:600}}>Calculadora de inversión</div>
+        </div>
+      </div>
+      <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12,flex:1}}>
+        <div>
+          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>💰 Valor Total (USD)</div>
+          <div style={{position:"relative"}}>
+            <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"#64748b",fontWeight:700,fontSize:14,pointerEvents:"none"}}>$</span>
+            <input type="number" min="0" placeholder="0.00" value={valor} onChange={e=>setValor(e.target.value)}
+              style={Object.assign({},inputBase,{paddingLeft:24,borderColor:v>0?accent:"#e2e8f0",boxShadow:v>0?"0 0 0 3px "+accent+"18":"none",fontSize:16,fontWeight:700})} />
+          </div>
+        </div>
+        <div>
+          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>👥 Pasajeros</div>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <button onClick={()=>onPasajerosChange(Math.max(1,p-1))} style={{width:34,height:34,border:"2px solid #e2e8f0",borderRadius:8,background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:16,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+            <input type="number" min="1" max="20" value={pasajeros} onChange={e=>onPasajerosChange(Math.max(1,parseInt(e.target.value)||1))}
+              style={Object.assign({},inputBase,{textAlign:"center",fontWeight:700,fontSize:15})} />
+            <button onClick={()=>onPasajerosChange(Math.min(20,p+1))} style={{width:34,height:34,border:"2px solid #e2e8f0",borderRadius:8,background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:16,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+          </div>
+        </div>
+        <div>
+          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>📅 Días de viaje</div>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <button onClick={()=>onDiasChange(Math.max(1,d-1))} style={{width:34,height:34,border:"2px solid #e2e8f0",borderRadius:8,background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:16,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+            <input type="number" min="1" max="365" value={dias} onChange={e=>onDiasChange(Math.max(1,parseInt(e.target.value)||1))}
+              style={Object.assign({},inputBase,{textAlign:"center",fontWeight:700,fontSize:15})} />
+            <button onClick={()=>onDiasChange(Math.min(365,d+1))} style={{width:34,height:34,border:"2px solid #e2e8f0",borderRadius:8,background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:16,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+          </div>
+        </div>
+        <div style={{borderTop:"1px dashed #e2e8f0",margin:"4px 0"}} />
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>✅ Resultados</div>
+          {[{label:"por pasajero",val:porPasajero,color:accent,icon:"👤"},{label:"por día",val:porDia,color:"#0891b2",icon:"📆"},{label:"por pax / por día",val:porPaxDia,color:"#7c3aed",icon:"🧮"}].map(r=>(
+            <div key={r.label} style={{background:v>0?r.color+"0f":"#f8fafc",border:"1px solid "+(v>0?r.color+"33":"#e2e8f0"),borderRadius:10,padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:10,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em"}}>{r.label}</div>
+                <div style={{fontSize:20,fontWeight:800,color:v>0?r.color:"#94a3b8",lineHeight:1.1,marginTop:2}}>{fmtUSD(r.val)}</div>
+              </div>
+              <div style={{fontSize:22,opacity:0.35}}>{r.icon}</div>
+            </div>
+          ))}
+        </div>
+        {v>0&&<button onClick={()=>setValor("")} style={{height:32,border:"1px solid #fca5a5",borderRadius:8,background:"#fff5f5",color:"#ef4444",fontWeight:700,fontSize:11,cursor:"pointer",marginTop:2}}>🗑️ Limpiar</button>}
+      </div>
+    </div>
+  );
+}
+function CalcTab() {
+  const [pasajeros,setPasajeros]=useState(2), [dias,setDias]=useState(7);
+  const [syncPax,setSyncPax]=useState(true), [syncDias,setSyncDias]=useState(true);
+  const [paxArr,setPaxArr]=useState([2,2,2]), [diasArr,setDiasArr]=useState([7,7,7]);
+  const OPCIONES=[{index:"1",label:"Opción 1 · Plan Lite",color:"#1e3a5f",accent:"#2563eb"},{index:"2",label:"Opción 2 · Plan Smart",color:"#065f46",accent:"#059669"},{index:"3",label:"Opción 3 · Plan Plus",color:"#7c2d12",accent:"#ea580c"}];
+  const getPax=(i)=>syncPax?pasajeros:paxArr[i];
+  const getDias=(i)=>syncDias?dias:diasArr[i];
+  const handlePax=(i,v)=>{if(syncPax){setPasajeros(v);}else{const a=[...paxArr];a[i]=v;setPaxArr(a);}};
+  const handleDias=(i,v)=>{if(syncDias){setDias(v);}else{const a=[...diasArr];a[i]=v;setDiasArr(a);}};
+  return (
+    <div>
+      <div style={{background:"linear-gradient(135deg,#1e3a5f 0%,#b45309 100%)",borderRadius:14,padding:"18px 22px",marginBottom:16,display:"flex",alignItems:"center",gap:14}}>
+        <div style={{fontSize:32}}>✈️</div>
+        <div>
+          <div style={{fontSize:17,fontWeight:800,color:"#fff"}}>Calculadoras de Viaje</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.75)",fontWeight:500,marginTop:2}}>Compará 3 opciones en tiempo real · Mostrá la inversión por pasajero y por día</div>
+        </div>
+      </div>
+      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"12px 16px",marginBottom:16,display:"flex",flexWrap:"wrap",gap:12,alignItems:"center"}}>
+        <div style={{fontSize:11,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",flexShrink:0}}>🔗 Sincronizar entre opciones:</div>
+        <button onClick={()=>setSyncPax(!syncPax)} style={{height:30,borderRadius:20,padding:"0 14px",border:"2px solid "+(syncPax?"#2563eb":"#e2e8f0"),background:syncPax?"#eff6ff":"#f8fafc",color:syncPax?"#2563eb":"#94a3b8",fontWeight:700,fontSize:11,cursor:"pointer"}}>
+          {syncPax?"🔒":"🔓"} Pasajeros {syncPax?"(sincronizados)":"(individuales)"}
+        </button>
+        <button onClick={()=>setSyncDias(!syncDias)} style={{height:30,borderRadius:20,padding:"0 14px",border:"2px solid "+(syncDias?"#0891b2":"#e2e8f0"),background:syncDias?"#ecfeff":"#f8fafc",color:syncDias?"#0891b2":"#94a3b8",fontWeight:700,fontSize:11,cursor:"pointer"}}>
+          {syncDias?"🔒":"🔓"} Días {syncDias?"(sincronizados)":"(individuales)"}
+        </button>
+        <div style={{marginLeft:"auto",fontSize:11,color:"#94a3b8",fontWeight:600}}>💡 Ingresá el valor total del plan en cada opción</div>
+      </div>
+      <div style={{display:"flex",gap:14,alignItems:"stretch",flexWrap:"wrap"}}>
+        {OPCIONES.map((op,i)=><CalcCard key={i} index={op.index} label={op.label} color={op.color} accent={op.accent} pasajeros={getPax(i)} dias={getDias(i)} onPasajerosChange={(v)=>handlePax(i,v)} onDiasChange={(v)=>handleDias(i,v)} />)}
+      </div>
+      <div style={{marginTop:16,background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"10px 16px",fontSize:12,color:"#92400e",fontWeight:600}}>
+        💡 <strong>Tip de cierre:</strong> "El plan te cuesta solo X por persona por día · ¡menos que un café al día!" — dividí la inversión para reducir la percepción de costo.
+      </div>
+    </div>
+  );
+}
+
 // ── MAIN APP ───────────────────────────────────────────────────────────────────
 const MAIN_TABS = [
-  { id:"global",    label:"Equipo",     color:"#1e3a5f" },
-  { id:"guillermo", label:"Guillermo",  color:"#2563eb" },
-  { id:"carolina",  label:"Carolina",   color:"#7c3aed" },
-  { id:"tracker",   label:"Tracker",    color:"#0f766e" },
+  { id:"global",    label:"Equipo",        color:"#1e3a5f" },
+  { id:"guillermo", label:"Guillermo",     color:"#2563eb" },
+  { id:"carolina",  label:"Carolina",      color:"#7c3aed" },
+  { id:"tracker",   label:"Tracker",       color:"#0f766e" },
+  { id:"calc",      label:"Calculadoras",  color:"#b45309" },
 ];
 
 function App() {
@@ -1320,7 +1538,24 @@ function App() {
   const [mesId,  setMesId]  = useState(getMesActual);
   const [store,  setStore]  = useState(loadStore);
   const [showPin,setShowPin] = useState(false);
+  const [configSource, setConfigSource] = useState("local"); // "remote" | "local"
   const storeRef = useRef(store);
+
+  // ── CARGA INICIAL Y PERIÓDICA DE CONFIG DESDE SHEETS (pestaña Config) ─────────
+  useEffect(function() {
+    var cancelled = false;
+    async function loadConfig() {
+      await fetchRemoteConfig();
+      if (!cancelled) setConfigSource(_remoteConfigLoaded ? "remote" : "local");
+    }
+    loadConfig();
+    // Refresca la config remota cada 60s (los datos de config cambian poco)
+    const id = setInterval(function() {
+      _remoteConfigLoading = false; // permitir re-fetch
+      loadConfig();
+    }, 60000);
+    return function() { cancelled = true; clearInterval(id); };
+  }, []);
   // -- REAL-TIME POLLING desde Google Sheets (Apps Script) -------------------
   // Cada 10s lee la hoja RealTime, reconstruye el store y lo aplica con setStore.
   useEffect(function() {
@@ -1414,6 +1649,24 @@ function App() {
         const newStore = buildStoreFromRows(data.rows);
         // FIX METAS: merge inteligente — la edición LOCAL más reciente prevalece sobre la remota
         if (data.configs && typeof data.configs === "object") {
+          // NUEVO: también poblar el cache remoto de Config del Sheet
+          Object.keys(data.configs).forEach(function(mid) {
+            var rem = data.configs[mid] || {};
+            // Solo actualizar cache remoto si NO hay edición local reciente
+            var loc = (storeRef.current && storeRef.current.config && storeRef.current.config[mid]) || {};
+            if (!loc._localUpdatedAt) {
+              _remoteConfigCache[mid] = {
+                meta:     rem.meta     !== undefined ? rem.meta     : rem.metaBase || 12500,
+                comision: rem.comision !== undefined ? rem.comision : rem.pctBase  || 10,
+                metaBase: rem.metaBase !== undefined ? rem.metaBase : 12500,
+                pctBase:  rem.pctBase  !== undefined ? rem.pctBase  : 10,
+                metaSfly: rem.metaSfly !== undefined ? rem.metaSfly : 18000,
+                pctSfly:  rem.pctSfly  !== undefined ? rem.pctSfly  : 15,
+              };
+              _remoteConfigLoaded = true;
+            }
+          });
+          setConfigSource("remote");
           var mergedCfg = Object.assign({}, newStore.config || {});
           Object.keys(data.configs).forEach(function(mid) {
             var rem = data.configs[mid] || {};
@@ -1495,7 +1748,7 @@ function App() {
         <div className="mob-tabs" style={{display:"flex",gap:3,flex:1,justifyContent:"center",overflowX:"auto"}}>
           {MAIN_TABS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} style={{background:tab===t.id?t.color:"transparent",color:tab===t.id?"#fff":"#64748b",border:"1px solid "+(tab===t.id?t.color:"#e2e8f0"),borderRadius:7,padding:"5px 14px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
-              {t.id==="global"?"✈️ "+t.label:t.id==="guillermo"?"G · "+t.label:t.id==="carolina"?"C · "+t.label:"📊 "+t.label}
+              {t.id==="global"?"✈️ "+t.label:t.id==="guillermo"?"G · "+t.label:t.id==="carolina"?"C · "+t.label:t.id==="calc"?"📊 "+t.label:"📊 "+t.label}
             </button>
           ))}
         </div>
@@ -1514,10 +1767,11 @@ function App() {
         </div>
       </div>
       <div className="mob-pad" style={{maxWidth:1100,margin:"0 auto",padding:"16px 18px 48px"}}>
-        {tab==="global"    &&<GlobalTab store={store} mesId={mesId} />}
-        {tab==="guillermo" &&<AdvisorTab name="Guillermo" asesor="guillermo" color="#2563eb" store={store} mesId={mesId} onUpdate={onUpdate} />}
-        {tab==="carolina"  &&<AdvisorTab name="Carolina"  asesor="carolina"  color="#7c3aed" store={store} mesId={mesId} onUpdate={onUpdate} />}
+        {tab==="global"    &&<GlobalTab store={store} mesId={mesId} configSource={configSource} />}
+        {tab==="guillermo" &&<AdvisorTab name="Guillermo" asesor="guillermo" color="#2563eb" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
+        {tab==="carolina"  &&<AdvisorTab name="Carolina"  asesor="carolina"  color="#7c3aed" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
         {tab==="tracker"   &&<TrackerTab store={store} />}
+        {tab==="calc"      &&<CalcTab />}
       </div>
     </div>
   );
