@@ -84,7 +84,18 @@ function parseMontoConfig(v) {
 // Parsea "10%" o "10" → número entero (NO dividir por 100)
 function parsePctConfig(v) {
   if (v === undefined || v === null || v === "") return 0;
-  return parseFloat(String(v).replace(/%/g,"").trim()) || 0;
+  var n = parseFloat(String(v).replace(/%/g,"").trim()) || 0;
+  // Google Sheets envía celdas con formato % como decimal (0.08 en vez de 8)
+  // Normalizamos: si es menor a 1 y mayor que 0, lo convertimos a entero
+  if (n > 0 && n < 1) n = Math.round(n * 100);
+  return n;
+}
+// Normaliza cualquier porcentaje recibido de Sheets o local
+// garantiza que siempre sea número entero (8, 10, 15)
+function normalizePct(v) {
+  var n = parseFloat(v) || 0;
+  if (n > 0 && n < 1) n = Math.round(n * 100);
+  return n;
 }
 
 const MES_LABEL_TO_ID = {
@@ -159,26 +170,26 @@ function getEffectiveConfig(store, mesId) {
       pctSfly:  local.pctSfly   !== undefined ? local.pctSfly   : 15,
     };
   }
-  // Si hay config remota del Sheet, la usamos
+  // Si hay config remota del Sheet, la usamos (normalizamos pct por si Sheets mandó 0.08 en vez de 8)
   if (remote) {
     return {
       meta:     remote.meta     !== undefined ? remote.meta     : remote.metaBase || 12500,
-      comision: remote.comision !== undefined ? remote.comision : remote.pctBase  || 10,
+      comision: normalizePct(remote.comision !== undefined ? remote.comision : remote.pctBase || 10),
       metaBase: remote.metaBase !== undefined ? remote.metaBase : 12500,
-      pctBase:  remote.pctBase  !== undefined ? remote.pctBase  : 10,
+      pctBase:  normalizePct(remote.pctBase  !== undefined ? remote.pctBase  : 10),
       metaSfly: remote.metaSfly !== undefined ? remote.metaSfly : 18000,
-      pctSfly:  remote.pctSfly  !== undefined ? remote.pctSfly  : 15,
+      pctSfly:  normalizePct(remote.pctSfly  !== undefined ? remote.pctSfly  : 15),
     };
   }
   // Fallback: config local sin timestamp, o defaults
   if (local) {
     return {
       meta:     local.meta      !== undefined ? local.meta      : 12500,
-      comision: local.comision  !== undefined ? local.comision  : 10,
+      comision: normalizePct(local.comision  !== undefined ? local.comision  : 10),
       metaBase: local.metaBase  !== undefined ? local.metaBase  : 12500,
-      pctBase:  local.pctBase   !== undefined ? local.pctBase   : 10,
+      pctBase:  normalizePct(local.pctBase   !== undefined ? local.pctBase   : 10),
       metaSfly: local.metaSfly  !== undefined ? local.metaSfly  : 18000,
-      pctSfly:  local.pctSfly   !== undefined ? local.pctSfly   : 15,
+      pctSfly:  normalizePct(local.pctSfly   !== undefined ? local.pctSfly   : 15),
     };
   }
   return { meta:12500, comision:10, metaBase:12500, pctBase:10, metaSfly:18000, pctSfly:15 };
@@ -723,7 +734,8 @@ function BloqueOperativo() {
 
 // ── COMISIONES ─────────────────────────────────────────────────────────────────
 function ComisionesPanel({acum,proy,color,label,comisionPct}) {
-  const pct = comisionPct/100;
+  // normalizePct garantiza que 0.08 → 8 antes de dividir
+  const pct = normalizePct(comisionPct)/100;
   return (
     <Card>
       <SLabel>Comisiones — {label} ({comisionPct}%)</SLabel>
@@ -1292,10 +1304,44 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
             );
           })}
         </div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"9px 14px",marginBottom:12}}>
-          <span style={{fontSize:13,color:"#64748b"}}>{(dia===diaHoyMes&&mesId===getMesActual())?"HOY · ":""}Dia {dia} ({dowDia(dia,mesId)}) — {rowsHoy.length} registro{rowsHoy.length!==1?"s":""}</span>
-          <span style={{fontSize:18,fontWeight:800,color:color}}>{usd(totHoy)}</span>
-        </div>
+        {/* BANNER: mes y día activo — para que el asesor siempre sepa dónde está registrando */}
+        {(()=>{
+          const esHoy = dia===diaHoyMes && mesId===getMesActual();
+          const esMesActual = mesId===getMesActual();
+          const mesLabel = getMesInfo(mesId).label;
+          const bannerBg = !esMesActual ? "#fff7ed" : esHoy ? "#f0fdf4" : "#eff6ff";
+          const bannerBorder = !esMesActual ? "#fb923c" : esHoy ? "#10b981" : "#2563eb";
+          const bannerIcon = !esMesActual ? "⚠️" : esHoy ? "📍" : "📅";
+          const bannerMsg = !esMesActual
+            ? `Estás registrando en ${mesLabel} — ¡no es el mes actual!`
+            : esHoy
+            ? `Registrando en ${mesLabel} · Día ${dia} (hoy)`
+            : `Registrando en ${mesLabel} · Día ${dia} — no es hoy`;
+          return (
+            <div style={{background:bannerBg,border:"2px solid "+bannerBorder,borderRadius:10,
+              padding:"10px 16px",marginBottom:10,display:"flex",alignItems:"center",
+              justifyContent:"space-between",gap:10}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:18}}>{bannerIcon}</span>
+                <div>
+                  <div style={{fontSize:12,fontWeight:800,color:bannerBorder}}>{bannerMsg}</div>
+                  <div style={{fontSize:11,color:"#64748b",marginTop:1}}>
+                    {rowsHoy.length} registro{rowsHoy.length!==1?"s":""} · {usd(totHoy)} en este día
+                  </div>
+                </div>
+              </div>
+              {!esMesActual && (
+                <div style={{fontSize:10,fontWeight:700,color:"#ea580c",background:"#fff",
+                  border:"1px solid #fb923c",borderRadius:6,padding:"3px 8px",whiteSpace:"nowrap"}}>
+                  Mes incorrecto
+                </div>
+              )}
+              {esMesActual && (
+                <span style={{fontSize:18,fontWeight:800,color:bannerBorder}}>{usd(totHoy)}</span>
+              )}
+            </div>
+          );
+        })()}
         <div className="mob-form" style={{display:"grid",gridTemplateColumns:"1fr 100px 1fr auto",gap:8,marginBottom:10}}>
           <input value={form.orden} onChange={e=>setForm(Object.assign({},form,{orden:e.target.value}))} placeholder="Orden / cliente" style={iStyle} />
           <input value={form.valor} onChange={e=>setForm(Object.assign({},form,{valor:e.target.value}))} type="number" min="0" step="0.01" placeholder="USD" style={iStyle} />
@@ -1351,7 +1397,7 @@ function GlobalTab({store,mesId,configSource}) {
   const cDias    = Object.keys(cData).filter(d=>cData[d]&&cData[d].length>0).length;
   const gProm    = gDias>0?gAcum/gDias:0, cProm = cDias>0?cAcum/cDias:0;
   const gProy    = gAcum+gProm*diasRest, cProy = cAcum+cProm*diasRest, totProy = gProy+cProy;
-  const metaEq   = cfg.metaBase, metaInd = cfg.metaBase/2, comPct = cfg.pctBase/100;
+  const metaEq   = cfg.metaBase, metaInd = cfg.metaBase/2, comPct = normalizePct(cfg.pctBase)/100;
   const maxBar   = Math.max(gAcum,cAcum,1);
   const lider    = gAcum>=cAcum?"Guillermo":"Carolina";
   const liderC   = gAcum>=cAcum?"#2563eb":"#7c3aed";
@@ -1811,9 +1857,9 @@ function App() {
                   meta:     rem.meta     !== undefined ? rem.meta     : rem.metaBase || 12500,
                   comision: rem.comision !== undefined ? rem.comision : rem.pctBase  || 10,
                   metaBase: rem.metaBase !== undefined ? rem.metaBase : 12500,
-                  pctBase:  rem.pctBase  !== undefined ? rem.pctBase  : 10,
+                  pctBase:  normalizePct(rem.pctBase  !== undefined ? rem.pctBase  : 10),
                   metaSfly: rem.metaSfly !== undefined ? rem.metaSfly : 18000,
-                  pctSfly:  rem.pctSfly  !== undefined ? rem.pctSfly  : 15,
+                  pctSfly:  normalizePct(rem.pctSfly  !== undefined ? rem.pctSfly  : 15),
                 };
                 _remoteConfigLoaded = true;
               }
@@ -1835,11 +1881,11 @@ function App() {
             if (!loc._localUpdatedAt) {
               _remoteConfigCache[mid] = {
                 meta:     rem.meta     !== undefined ? rem.meta     : rem.metaBase || 12500,
-                comision: rem.comision !== undefined ? rem.comision : rem.pctBase  || 10,
+                comision: normalizePct(rem.comision !== undefined ? rem.comision : rem.pctBase  || 10),
                 metaBase: rem.metaBase !== undefined ? rem.metaBase : 12500,
-                pctBase:  rem.pctBase  !== undefined ? rem.pctBase  : 10,
+                pctBase:  normalizePct(rem.pctBase  !== undefined ? rem.pctBase  : 10),
                 metaSfly: rem.metaSfly !== undefined ? rem.metaSfly : 18000,
-                pctSfly:  rem.pctSfly  !== undefined ? rem.pctSfly  : 15,
+                pctSfly:  normalizePct(rem.pctSfly  !== undefined ? rem.pctSfly  : 15),
               };
               _remoteConfigLoaded = true;
             }
