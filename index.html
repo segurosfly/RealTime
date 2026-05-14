@@ -47,8 +47,8 @@ th:first-child{text-align:left;}
 <script type="text/babel">
 const { useState, useEffect, useCallback, useRef, useMemo } = React;
 
-const LOGO_WEB_SRC = "https://raw.githubusercontent.com/segurosfly/RealTime/main/Logo-Square.png";
-const LOGO_SQ_SRC  = "https://raw.githubusercontent.com/segurosfly/RealTime/main/Logo-Square.png";
+const LOGO_WEB_SRC = "https://segurosfly.github.io/RealTime/Logo-Square.png";
+const LOGO_SQ_SRC  = "https://segurosfly.github.io/RealTime/Logo-Square.png";
 
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────────
@@ -1764,9 +1764,9 @@ function CalcTab() {
   const [syncPax,setSyncPax]=useState(true), [syncDias,setSyncDias]=useState(true);
   const [paxArr,setPaxArr]=useState([2,2,2]), [diasArr,setDiasArr]=useState([7,7,7]);
   const OPCIONES=[
-    {index:"1",label:"Opción 1 · Plan Lite",color:"#1e3a5f",accent:"#2563eb",planName:"Lite",link:"https://segurosfly.github.io/RealTime/plan-lite.html"},
-    {index:"2",label:"Opción 2 · Plan Smart",color:"#065f46",accent:"#059669",planName:"Smart",link:"https://segurosfly.github.io/RealTime/plan-smart.html"},
-    {index:"3",label:"Opción 3 · Plan Plus",color:"#7c2d12",accent:"#ea580c",planName:"Plus",link:"https://segurosfly.github.io/RealTime/plan-plus.html"},
+    {index:"1",label:"Opción 1 · Plan Lite",color:"#1e3a5f",accent:"#2563eb",planName:"Lite",link:"https://segurosfly.github.io/RealTime/SegurosFly-Lite.html"},
+    {index:"2",label:"Opción 2 · Plan Smart",color:"#065f46",accent:"#059669",planName:"Smart",link:"https://segurosfly.github.io/RealTime/SegurosFly-Smart.html"},
+    {index:"3",label:"Opción 3 · Plan Plus",color:"#7c2d12",accent:"#ea580c",planName:"Plus",link:"https://segurosfly.github.io/RealTime/SegurosFly-Plus.html"},
   ];
   const getPax=(i)=>syncPax?pasajeros:paxArr[i];
   const getDias=(i)=>syncDias?dias:diasArr[i];
