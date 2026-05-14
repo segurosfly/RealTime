@@ -1764,9 +1764,9 @@ function CalcTab() {
   const [syncPax,setSyncPax]=useState(true), [syncDias,setSyncDias]=useState(true);
   const [paxArr,setPaxArr]=useState([2,2,2]), [diasArr,setDiasArr]=useState([7,7,7]);
   const OPCIONES=[
-    {index:"1",label:"Opción 1 · Plan Lite",color:"#1e3a5f",accent:"#2563eb",planName:"Lite",link:"https://segurosfly.github.io/RealTime/SegurosFly-Lite.html"},
-    {index:"2",label:"Opción 2 · Plan Smart",color:"#065f46",accent:"#059669",planName:"Smart",link:"https://segurosfly.github.io/RealTime/SegurosFly-Smart.html"},
-    {index:"3",label:"Opción 3 · Plan Plus",color:"#7c2d12",accent:"#ea580c",planName:"Plus",link:"https://segurosfly.github.io/RealTime/SegurosFly-Plus.html"},
+    {index:"1",label:"Opción 1 · Plan Lite",color:"#1e3a5f",accent:"#2563eb",planName:"Lite",link:"https://segurosfly.github.io/Brochures/SegurosFly-Lite.html"},
+    {index:"2",label:"Opción 2 · Plan Smart",color:"#065f46",accent:"#059669",planName:"Smart",link:"https://segurosfly.github.io/Brochures/SegurosFly-Smart.html"},
+    {index:"3",label:"Opción 3 · Plan Plus",color:"#7c2d12",accent:"#ea580c",planName:"Plus",link:"https://segurosfly.github.io/Brochures/SegurosFly-Plus.html"},
   ];
   const getPax=(i)=>syncPax?pasajeros:paxArr[i];
   const getDias=(i)=>syncDias?dias:diasArr[i];
