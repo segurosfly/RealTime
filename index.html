@@ -1662,7 +1662,7 @@ function TrackerTab({store}) {
 }
 
 // ── CALCULADORAS DE VIAJE ──────────────────────────────────────────────────────
-function CalcCard({ index, label, color, accent, pasajeros, dias, onPasajerosChange, onDiasChange, link }) {
+function CalcCard({ index, label, color, accent, planName, pasajeros, dias, onPasajerosChange, onDiasChange, link }) {
   const [valor, setValor] = useState("");
   const v=parseFloat(valor)||0, p=parseInt(pasajeros)||1, d=parseInt(dias)||1;
   const porPasajero=p>0?v/p:0, porDia=d>0?v/d:0, porPaxDia=(p>0&&d>0)?v/p/d:0;
@@ -1740,13 +1740,13 @@ function CalcCard({ index, label, color, accent, pasajeros, dias, onPasajerosCha
               <div style={{display:"flex",gap:6}}>
                 <button onClick={doCopy}
                   style={{flex:1,height:36,borderRadius:10,border:"none",
-                    background:copied?"#ecfdf5":"linear-gradient(135deg,#7c2d12,#ea580c)",
+                    background:copied?"#ecfdf5":`linear-gradient(135deg,${color},${accent})`,
                     color:copied?"#059669":"#fff",fontWeight:700,fontSize:12,cursor:"pointer",
                     transition:"all .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                  {copied?"✅ ¡Link copiado!":"📋 Copiar link del Plan Plus"}
+                  {copied?"✅ ¡Link copiado!":`📋 Copiar link del Plan ${planName}`}
                 </button>
                 <a href={link} target="_blank" rel="noopener noreferrer"
-                  style={{width:36,height:36,borderRadius:10,border:"1.5px solid #ea580c",
+                  style={{width:36,height:36,borderRadius:10,border:`1.5px solid ${accent}`,
                     background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",
                     fontSize:16,textDecoration:"none",flexShrink:0}} title="Abrir brochure">
                   ↗
@@ -1764,9 +1764,9 @@ function CalcTab() {
   const [syncPax,setSyncPax]=useState(true), [syncDias,setSyncDias]=useState(true);
   const [paxArr,setPaxArr]=useState([2,2,2]), [diasArr,setDiasArr]=useState([7,7,7]);
   const OPCIONES=[
-    {index:"1",label:"Opción 1 · Plan Lite",color:"#1e3a5f",accent:"#2563eb",link:null},
-    {index:"2",label:"Opción 2 · Plan Smart",color:"#065f46",accent:"#059669",link:null},
-    {index:"3",label:"Opción 3 · Plan Plus",color:"#7c2d12",accent:"#ea580c",link:"https://segurosfly.github.io/RealTime/plan-plus.html"},
+    {index:"1",label:"Opción 1 · Plan Lite",color:"#1e3a5f",accent:"#2563eb",planName:"Lite",link:"https://segurosfly.github.io/RealTime/plan-lite.html"},
+    {index:"2",label:"Opción 2 · Plan Smart",color:"#065f46",accent:"#059669",planName:"Smart",link:"https://segurosfly.github.io/RealTime/plan-smart.html"},
+    {index:"3",label:"Opción 3 · Plan Plus",color:"#7c2d12",accent:"#ea580c",planName:"Plus",link:"https://segurosfly.github.io/RealTime/plan-plus.html"},
   ];
   const getPax=(i)=>syncPax?pasajeros:paxArr[i];
   const getDias=(i)=>syncDias?dias:diasArr[i];
@@ -1792,7 +1792,7 @@ function CalcTab() {
         <div style={{marginLeft:"auto",fontSize:11,color:"#94a3b8",fontWeight:600}}>💡 Ingresá el valor total del plan en cada opción</div>
       </div>
       <div style={{display:"flex",gap:14,alignItems:"stretch",flexWrap:"wrap"}}>
-        {OPCIONES.map((op,i)=><CalcCard key={i} index={op.index} label={op.label} color={op.color} accent={op.accent} link={op.link||null} pasajeros={getPax(i)} dias={getDias(i)} onPasajerosChange={(v)=>handlePax(i,v)} onDiasChange={(v)=>handleDias(i,v)} />)}
+        {OPCIONES.map((op,i)=><CalcCard key={i} index={op.index} label={op.label} color={op.color} accent={op.accent} planName={op.planName||"Plan"} link={op.link||null} pasajeros={getPax(i)} dias={getDias(i)} onPasajerosChange={(v)=>handlePax(i,v)} onDiasChange={(v)=>handleDias(i,v)} />)}
       </div>
       <div style={{marginTop:16,background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"10px 16px",fontSize:12,color:"#92400e",fontWeight:600}}>
         💡 <strong>Tip de cierre:</strong> "El plan te cuesta solo X por persona por día · ¡menos que un café al día!" — dividí la inversión para reducir la percepción de costo.
