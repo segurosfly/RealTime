@@ -47,15 +47,15 @@ th:first-child{text-align:left;}
 <script type="text/babel">
 const { useState, useEffect, useCallback, useRef, useMemo } = React;
 
-const LOGO_WEB_SRC = "https://segurosfly.github.io/RealTime/Logo-Square.png";
-const LOGO_SQ_SRC  = "https://segurosfly.github.io/RealTime/Logo-Square.png";
+const LOGO_WEB_SRC = "https://raw.githubusercontent.com/segurosfly/RealTime/main/Logo-Square.png";
+const LOGO_SQ_SRC  = "https://raw.githubusercontent.com/segurosfly/RealTime/main/Logo-Square.png";
 
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────────
 const DOW      = ["Dom","Lun","Mar","Mie","Jue","Vie","Sab"];
-const ASESORES = ["guillermo","carolina"];
+const ASESORES = ["guillermo","carolina","daniel"];
 // PROTECCION POR ASESOR: contrasenas requeridas para Guardar/Eliminar
-const PIN_ASESORES = { guillermo: "2026", carolina: "2027" };
+const PIN_ASESORES = { guillermo: "2026", carolina: "2027", daniel: "2028" };
 // verificarPinAsesor ahora es async y usa modal React (ver ModalPinAsesor)
 // Se resuelve a true/false via window.__pinAsesorResolve
 function verificarPinAsesor(asesor) {
@@ -493,7 +493,7 @@ function ModalPinAsesor() {
 
   const cancel = function() { resolve(false); };
 
-  const color = asesor === "guillermo" ? "#2563eb" : "#7c3aed";
+  const color = asesor === "guillermo" ? "#2563eb" : asesor === "carolina" ? "#7c3aed" : "#0f766e";
   const inicial = asesor ? asesor[0].toUpperCase() : "?";
 
   if (!visible) return null;
@@ -846,20 +846,20 @@ function AsesorHeader({name, asesor, color, data, mesId, diaHoy}) {
 
 // ── GLOBAL DAY STATS (reemplaza BloqueOperativo en Global) ────────────────────
 // Tique promedio · ventas · día top · revenue top · barra por día semana
-function GlobalDayStats({gData, cData, mesId, total, gVentas, cVentas, gAcum, cAcum}) {
+function GlobalDayStats({gData, cData, dData, mesId, total, gVentas, cVentas, dVentas, gAcum, cAcum, dAcum}) {
   const DOW_LABELS = ["Dom","Lun","Mar","Mie","Jue","Vie","Sab"];
   const DOW_FULL   = ["Dom","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
 
   // Aggregate all rows
   const allRows = [];
-  [gData, cData].forEach(d => Object.values(d).forEach(arr => arr.forEach(r => allRows.push(r))));
-  const totalVentas = gVentas + cVentas;
+  [gData, cData, dData].forEach(d => Object.values(d).forEach(arr => arr.forEach(r => allRows.push(r))));
+  const totalVentas = gVentas + cVentas + dVentas;
   const avgTicket = totalVentas > 0 ? total / totalVentas : 0;
 
   // Day totals
   const dayTotals = {};
   const dayVentas = {};
-  [gData, cData].forEach(d => {
+  [gData, cData, dData].forEach(d => {
     Object.entries(d).forEach(([dia, rows]) => {
       const v = sumR(rows);
       dayTotals[+dia] = (dayTotals[+dia]||0) + v;
@@ -874,7 +874,7 @@ function GlobalDayStats({gData, cData, mesId, total, gVentas, cVentas, gAcum, cA
   // Aggregate by day-of-week
   const dowRev = {0:0,1:0,2:0,3:0,4:0,5:0,6:0};
   const dowCnt = {0:0,1:0,2:0,3:0,4:0,5:0,6:0};
-  [gData, cData].forEach(d => {
+  [gData, cData, dData].forEach(d => {
     Object.entries(d).forEach(([dia, rows]) => {
       const mesInfo = getMesInfo(mesId);
       const dow = (mesInfo.dow0 + (+dia) - 1) % 7;
@@ -1435,27 +1435,31 @@ function GlobalTab({store,mesId,configSource}) {
   const diasRest = Math.max(1,mesInfo.dias-diaHoy);
   const gData    = getMonthData(store,mesId,"guillermo");
   const cData    = getMonthData(store,mesId,"carolina");
+  const dData    = getMonthData(store,mesId,"daniel");
   const gRows    = Object.values(gData).reduce((a,b)=>a.concat(b),[]);
   const cRows    = Object.values(cData).reduce((a,b)=>a.concat(b),[]);
-  const gAcum    = sumR(gRows), cAcum = sumR(cRows), total = gAcum+cAcum;
-  const gVentas  = gRows.length, cVentas = cRows.length;
+  const dRows    = Object.values(dData).reduce((a,b)=>a.concat(b),[]);
+  const gAcum    = sumR(gRows), cAcum = sumR(cRows), dAcum = sumR(dRows), total = gAcum+cAcum+dAcum;
+  const gVentas  = gRows.length, cVentas = cRows.length, dVentas = dRows.length;
   const gDias    = Object.keys(gData).filter(d=>gData[d]&&gData[d].length>0).length;
   const cDias    = Object.keys(cData).filter(d=>cData[d]&&cData[d].length>0).length;
-  const gProm    = gDias>0?gAcum/gDias:0, cProm = cDias>0?cAcum/cDias:0;
-  const gProy    = gAcum+gProm*diasRest, cProy = cAcum+cProm*diasRest, totProy = gProy+cProy;
+  const dDias    = Object.keys(dData).filter(d=>dData[d]&&dData[d].length>0).length;
+  const gProm    = gDias>0?gAcum/gDias:0, cProm = cDias>0?cAcum/cDias:0, dProm = dDias>0?dAcum/dDias:0;
+  const gProy    = gAcum+gProm*diasRest, cProy = cAcum+cProm*diasRest, dProy = dAcum+dProm*diasRest, totProy = gProy+cProy+dProy;
   const metaEq   = cfg.metaBase, metaInd = cfg.metaBase/2, comPct = normalizePct(cfg.pctBase)/100;
-  const maxBar   = Math.max(gAcum,cAcum,1);
-  const lider    = gAcum>=cAcum?"Guillermo":"Carolina";
-  const liderC   = gAcum>=cAcum?"#2563eb":"#7c3aed";
+  const maxBar   = Math.max(gAcum,cAcum,dAcum,1);
+  const liderAcum = Math.max(gAcum,cAcum,dAcum);
+  const lider    = liderAcum===gAcum?"Guillermo":liderAcum===cAcum?"Carolina":"Daniel R.";
+  const liderC   = liderAcum===gAcum?"#2563eb":liderAcum===cAcum?"#7c3aed":"#0f766e";
   const revPorDia = {};
-  [gData,cData].forEach(d=>Object.entries(d).forEach(function(e){ revPorDia[e[0]]=(revPorDia[e[0]]||0)+sumR(e[1]); }));
+  [gData,cData,dData].forEach(d=>Object.entries(d).forEach(function(e){ revPorDia[e[0]]=(revPorDia[e[0]]||0)+sumR(e[1]); }));
   const diasOrd = Object.keys(revPorDia).sort((a,b)=>+a-+b);
   const maxDia  = Math.max.apply(null,Object.values(revPorDia).concat([1]));
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       {/* STATS GLOBALES: TIQUE PROMEDIO + DIAS */}
-      <GlobalDayStats gData={gData} cData={cData} mesId={mesId} total={total} gVentas={gVentas} cVentas={cVentas} gAcum={gAcum} cAcum={cAcum} />
+      <GlobalDayStats gData={gData} cData={cData} dData={dData} mesId={mesId} total={total} gVentas={gVentas} cVentas={cVentas} dVentas={dVentas} gAcum={gAcum} cAcum={cAcum} dAcum={dAcum} />
 
       {/* CABECERA LOGO GLOBAL */}
       <div style={{background:"linear-gradient(135deg,#1e3a5f,#2c5282)",borderRadius:14,padding:"18px 24px",display:"flex",alignItems:"center",gap:16}}>
@@ -1476,7 +1480,7 @@ function GlobalTab({store,mesId,configSource}) {
       <div style={{background:liderC+"08",border:"1.5px solid "+liderC+"33",borderRadius:12,padding:"14px 20px",display:"flex",alignItems:"center",gap:16}}>
         <span style={{fontSize:26}}>🏆</span>
         <div style={{flex:1}}>
-          <div style={{fontSize:14,fontWeight:800,color:liderC}}>{lider} lidera por {usd(Math.abs(gAcum-cAcum),0)}</div>
+          <div style={{fontSize:14,fontWeight:800,color:liderC}}>{lider} lidera por {usd(liderAcum-Math.max(...[gAcum,cAcum,dAcum].filter(v=>v!==liderAcum)),0)}</div>
           <div style={{fontSize:12,color:"#64748b",marginTop:3}}>G: {usd(gAcum,0)} ({gVentas} ventas) · C: {usd(cAcum,0)} ({cVentas} ventas)</div>
         </div>
         <div style={{textAlign:"right"}}>
@@ -1492,7 +1496,7 @@ function GlobalTab({store,mesId,configSource}) {
       </div>
       <Card>
         <SLabel>Comparativa de Asesores</SLabel>
-        {[{name:"Guillermo",acum:gAcum,proy:gProy,prom:gProm,color:"#2563eb",ventas:gVentas},{name:"Carolina",acum:cAcum,proy:cProy,prom:cProm,color:"#7c3aed",ventas:cVentas}].map(a=>(
+        {[{name:"Guillermo",acum:gAcum,proy:gProy,prom:gProm,color:"#2563eb",ventas:gVentas},{name:"Carolina",acum:cAcum,proy:cProy,prom:cProm,color:"#7c3aed",ventas:cVentas},{name:"Daniel R.",acum:dAcum,proy:dProy,prom:dProm,color:"#0f766e",ventas:dVentas}].map(a=>(
           <div key={a.name} style={{marginBottom:16}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1522,7 +1526,8 @@ function GlobalTab({store,mesId,configSource}) {
         <SLabel>Comisiones Proyectadas al Cierre ({cfg.pctBase}% Base / {cfg.pctSfly}% SFly)</SLabel>
         <div className="mob-g4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:10}}>
           {[{l:"G actual",v:gAcum*comPct,c:"#2563eb"},{l:"G proyectada",v:gProy*comPct,c:"#2563eb"},
-            {l:"C actual",v:cAcum*comPct,c:"#7c3aed"},{l:"C proyectada",v:cProy*comPct,c:"#7c3aed"}].map(x=>(
+            {l:"C actual",v:cAcum*comPct,c:"#7c3aed"},{l:"C proyectada",v:cProy*comPct,c:"#7c3aed"},
+            {l:"D actual",v:dAcum*comPct,c:"#0f766e"},{l:"D proyectada",v:dProy*comPct,c:"#0f766e"}].map(x=>(
             <div key={x.l} style={{background:x.c+"08",border:"1px solid "+x.c+"22",borderRadius:10,padding:"12px 14px"}}>
               <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>{x.l}</div>
               <div style={{fontSize:18,fontWeight:800,color:x.c}}>{usd(x.v,0)}</div>
@@ -1539,7 +1544,7 @@ function GlobalTab({store,mesId,configSource}) {
           <SLabel>Revenue por Dia — Equipo</SLabel>
           <div style={{display:"flex",flexDirection:"column",gap:5}}>
             {diasOrd.map(d=>{
-              const gV=sumR(gData[d]||[]), cV=sumR(cData[d]||[]);
+              const gV=sumR(gData[d]||[]), cV=sumR(cData[d]||[]), dV=sumR(dData[d]||[]);
               return (
                 <div key={d} style={{display:"flex",alignItems:"center",gap:10}}>
                   <span style={{fontSize:11,color:"#94a3b8",minWidth:60}}>D{d} {dowDia(+d,mesId)}</span>
@@ -1578,12 +1583,14 @@ function TrackerTab({store}) {
   const resumen = mesesConDatos.map(m=>{
     const gData=getMonthData(store,m.id,"guillermo");
     const cData=getMonthData(store,m.id,"carolina");
+    const dData=getMonthData(store,m.id,"daniel");
     const gRows=Object.values(gData).reduce((a,b)=>a.concat(b),[]);
     const cRows=Object.values(cData).reduce((a,b)=>a.concat(b),[]);
-    const gAcum=sumR(gRows), cAcum=sumR(cRows), total=gAcum+cAcum;
+    const dRows=Object.values(dData).reduce((a,b)=>a.concat(b),[]);
+    const gAcum=sumR(gRows), cAcum=sumR(cRows), dAcum=sumR(dRows), total=gAcum+cAcum+dAcum;
     const cfg=getConfig(store,m.id);
     const cumplimiento=cfg.metaBase>0?(total/cfg.metaBase)*100:0;
-    return Object.assign({},m,{gAcum,cAcum,total,gVentas:gRows.length,cVentas:cRows.length,cfg,cumplimiento});
+    return Object.assign({},m,{gAcum,cAcum,dAcum,total,gVentas:gRows.length,cVentas:cRows.length,dVentas:dRows.length,cfg,cumplimiento});
   });
   const totalHistorico = resumen.reduce((s,r)=>s+r.total,0);
   const maxTotal = Math.max.apply(null,resumen.map(r=>r.total).concat([1]));
@@ -1662,7 +1669,7 @@ function TrackerTab({store}) {
 }
 
 // ── CALCULADORAS DE VIAJE ──────────────────────────────────────────────────────
-function CalcCard({ index, label, color, accent, planName, pasajeros, dias, onPasajerosChange, onDiasChange, link }) {
+function CalcCard({ index, label, color, accent, pasajeros, dias, onPasajerosChange, onDiasChange, link }) {
   const [valor, setValor] = useState("");
   const v=parseFloat(valor)||0, p=parseInt(pasajeros)||1, d=parseInt(dias)||1;
   const porPasajero=p>0?v/p:0, porDia=d>0?v/d:0, porPaxDia=(p>0&&d>0)?v/p/d:0;
@@ -1740,13 +1747,13 @@ function CalcCard({ index, label, color, accent, planName, pasajeros, dias, onPa
               <div style={{display:"flex",gap:6}}>
                 <button onClick={doCopy}
                   style={{flex:1,height:36,borderRadius:10,border:"none",
-                    background:copied?"#ecfdf5":`linear-gradient(135deg,${color},${accent})`,
+                    background:copied?"#ecfdf5":"linear-gradient(135deg,#7c2d12,#ea580c)",
                     color:copied?"#059669":"#fff",fontWeight:700,fontSize:12,cursor:"pointer",
                     transition:"all .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                  {copied?"✅ ¡Link copiado!":`📋 Copiar link del Plan ${planName}`}
+                  {copied?"✅ ¡Link copiado!":"📋 Copiar link del Plan Plus"}
                 </button>
                 <a href={link} target="_blank" rel="noopener noreferrer"
-                  style={{width:36,height:36,borderRadius:10,border:`1.5px solid ${accent}`,
+                  style={{width:36,height:36,borderRadius:10,border:"1.5px solid #ea580c",
                     background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",
                     fontSize:16,textDecoration:"none",flexShrink:0}} title="Abrir brochure">
                   ↗
@@ -1764,9 +1771,9 @@ function CalcTab() {
   const [syncPax,setSyncPax]=useState(true), [syncDias,setSyncDias]=useState(true);
   const [paxArr,setPaxArr]=useState([2,2,2]), [diasArr,setDiasArr]=useState([7,7,7]);
   const OPCIONES=[
-    {index:"1",label:"Opción 1 · Plan Lite",color:"#1e3a5f",accent:"#2563eb",planName:"Lite",link:"https://segurosfly.github.io/Brochures/SegurosFly-Lite.html"},
-    {index:"2",label:"Opción 2 · Plan Smart",color:"#065f46",accent:"#059669",planName:"Smart",link:"https://segurosfly.github.io/Brochures/SegurosFly-Smart.html"},
-    {index:"3",label:"Opción 3 · Plan Plus",color:"#7c2d12",accent:"#ea580c",planName:"Plus",link:"https://segurosfly.github.io/Brochures/SegurosFly-Plus.html"},
+    {index:"1",label:"Opción 1 · Plan Lite",color:"#1e3a5f",accent:"#2563eb",link:null},
+    {index:"2",label:"Opción 2 · Plan Smart",color:"#065f46",accent:"#059669",link:null},
+    {index:"3",label:"Opción 3 · Plan Plus",color:"#7c2d12",accent:"#ea580c",link:"https://segurosfly.github.io/RealTime/plan-plus.html"},
   ];
   const getPax=(i)=>syncPax?pasajeros:paxArr[i];
   const getDias=(i)=>syncDias?dias:diasArr[i];
@@ -1792,7 +1799,7 @@ function CalcTab() {
         <div style={{marginLeft:"auto",fontSize:11,color:"#94a3b8",fontWeight:600}}>💡 Ingresá el valor total del plan en cada opción</div>
       </div>
       <div style={{display:"flex",gap:14,alignItems:"stretch",flexWrap:"wrap"}}>
-        {OPCIONES.map((op,i)=><CalcCard key={i} index={op.index} label={op.label} color={op.color} accent={op.accent} planName={op.planName||"Plan"} link={op.link||null} pasajeros={getPax(i)} dias={getDias(i)} onPasajerosChange={(v)=>handlePax(i,v)} onDiasChange={(v)=>handleDias(i,v)} />)}
+        {OPCIONES.map((op,i)=><CalcCard key={i} index={op.index} label={op.label} color={op.color} accent={op.accent} link={op.link||null} pasajeros={getPax(i)} dias={getDias(i)} onPasajerosChange={(v)=>handlePax(i,v)} onDiasChange={(v)=>handleDias(i,v)} />)}
       </div>
       <div style={{marginTop:16,background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:"10px 16px",fontSize:12,color:"#92400e",fontWeight:600}}>
         💡 <strong>Tip de cierre:</strong> "El plan te cuesta solo X por persona por día · ¡menos que un café al día!" — dividí la inversión para reducir la percepción de costo.
@@ -1806,7 +1813,8 @@ const MAIN_TABS = [
   { id:"global",    label:"Equipo",        color:"#1e3a5f" },
   { id:"guillermo", label:"Guillermo",     color:"#2563eb" },
   { id:"carolina",  label:"Carolina",      color:"#7c3aed" },
-  { id:"tracker",   label:"Tracker",       color:"#0f766e" },
+  { id:"daniel",    label:"Daniel",        color:"#0f766e" },
+  { id:"tracker",   label:"Tracker",       color:"#0d9488" },
   { id:"calc",      label:"Calculadoras",  color:"#b45309" },
 ];
 
@@ -2060,7 +2068,7 @@ function App() {
         <div className="mob-tabs" style={{display:"flex",gap:3,flex:1,justifyContent:"center",overflowX:"auto"}}>
           {MAIN_TABS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} style={{background:tab===t.id?t.color:"transparent",color:tab===t.id?"#fff":"#64748b",border:"1px solid "+(tab===t.id?t.color:"#e2e8f0"),borderRadius:7,padding:"5px 14px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
-              {t.id==="global"?"✈️ "+t.label:t.id==="guillermo"?"G · "+t.label:t.id==="carolina"?"C · "+t.label:t.id==="calc"?"📊 "+t.label:"📊 "+t.label}
+              {t.id==="global"?"✈️ "+t.label:t.id==="guillermo"?"G · "+t.label:t.id==="carolina"?"C · "+t.label:t.id==="daniel"?"D · "+t.label:t.id==="calc"?"📊 "+t.label:"📊 "+t.label}
             </button>
           ))}
         </div>
@@ -2082,6 +2090,7 @@ function App() {
         {tab==="global"    &&<GlobalTab store={store} mesId={mesId} configSource={configSource} />}
         {tab==="guillermo" &&<AdvisorTab name="Guillermo" asesor="guillermo" color="#2563eb" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
         {tab==="carolina"  &&<AdvisorTab name="Carolina"  asesor="carolina"  color="#7c3aed" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
+        {tab==="daniel"    &&<AdvisorTab name="Daniel Romero" asesor="daniel" color="#0f766e" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
         {tab==="tracker"   &&<TrackerTab store={store} />}
         {tab==="calc"      &&<CalcTab />}
       </div>
