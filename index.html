@@ -733,51 +733,65 @@ function BloqueOperativo() {
 }
 
 // ── COMISIONES ─────────────────────────────────────────────────────────────────
-function ComisionesPanel({acum,proy,color,label,cfg}) {
-  // Pisos de comisión: base (10%), mid hacia meta base (11%), top meta SFly (12%)
-  const pct1 = normalizePct(cfg.pctBase||10)/100;        // Piso base — donde está HOY
-  const pct2 = normalizePct(cfg.comision||11)/100;       // Piso medio (meta base)
-  const pct3 = normalizePct(cfg.pctSfly||12)/100;        // Piso top (meta SFly)
-  const metaBase = cfg.metaBase||12500;
-  const metaSfly = cfg.metaSfly||18000;
+function ComisionesPanel({acum,proy,color,label,cfg,totalEquipo}) {
+  // Pisos de comisión según el TOTAL DEL EQUIPO (no el asesor individual)
+  const pct1 = normalizePct(cfg.pctBase||10)/100;   // 10% — piso base
+  const pct2 = normalizePct(cfg.comision||11)/100;  // 11% — meta base del equipo
+  const pct3 = normalizePct(cfg.pctSfly||12)/100;   // 12% — meta SFly del equipo
+  const metaEquipo     = cfg.metaBase || 10000;  // meta base del equipo (ej: $10,001)
+  const metaSflyEquipo = cfg.metaSfly || 13000;  // meta SFly del equipo (ej: $13,001)
 
-  // ¿En qué piso está actualmente el asesor?
-  const pisoActual = acum>=metaSfly ? 3 : acum>=metaBase ? 2 : 1;
+  // El piso lo determina cuánto lleva el EQUIPO, no el asesor solo
+  const teActual = totalEquipo || 0;
+  const pisoActual = teActual >= metaSflyEquipo ? 3 : teActual >= metaEquipo ? 2 : 1;
   const pctActual  = pisoActual===3 ? pct3 : pisoActual===2 ? pct2 : pct1;
-  const pisoColors = ["#94a3b8","#2563eb","#f59e0b","#10b981"];
-  const pisoLabels = ["","Base 10%","Meta 11%","SFly 12%"];
+
+  const pisoColors = ["#94a3b8","#94a3b8","#f59e0b","#10b981"];
+  const pisoLabels = ["","Base "+Math.round(pct1*100)+"%","Meta "+Math.round(pct2*100)+"%","SFly "+Math.round(pct3*100)+"%"];
+  const pisoDesc   = ["","Equipo aún no supera "+usd(metaEquipo,0),"Equipo superó "+usd(metaEquipo,0),"Equipo superó "+usd(metaSflyEquipo,0)];
+
+  // Proyección del asesor al cierre — ¿qué piso alcanzará el equipo?
+  // Para simplificar usamos misma proyección proporcional que el acumulado del equipo
+  const factorProy = teActual > 0 ? proy / Math.max(acum, 1) : 1;
+  const teProyectado = teActual * factorProy; // estimado equipo al cierre
+  const pisoProyectado = teProyectado >= metaSflyEquipo ? 3 : teProyectado >= metaEquipo ? 2 : 1;
+  const pctProyectado  = pisoProyectado===3 ? pct3 : pisoProyectado===2 ? pct2 : pct1;
 
   const pisos = [
     {
       t:"Comisión actual",
-      sub:"Piso donde estás · "+pisoLabels[pisoActual],
-      v:acum*pctActual,
-      pct:Math.round(pctActual*100),
-      highlight:true,
-      badge:pisoColors[pisoActual]
+      sub:"Piso "+pisoLabels[pisoActual]+" · "+pisoDesc[pisoActual],
+      v: acum * pctActual,
+      pct: Math.round(pctActual*100),
+      highlight: true,
+      badge: pisoColors[pisoActual]
     },
     {
       t:"Proyección al cierre",
-      sub: proy>=metaSfly?"🏆 Al ritmo actual llegas al piso SFly":proy>=metaBase?"⬆️ Proyectas alcanzar meta base":"📈 Proyección piso actual",
-      v:proy*pctActual,
-      pct:Math.round(pctActual*100),
-      highlight:false,
-      badge:color
+      sub: pisoProyectado > pisoActual
+        ? "⬆️ El equipo proyecta subir al piso "+pisoLabels[pisoProyectado]
+        : pisoActual===3
+        ? "🏆 Equipo ya en piso máximo"
+        : "📈 Al ritmo actual · piso "+pisoLabels[pisoActual],
+      v: proy * pctProyectado,
+      pct: Math.round(pctProyectado*100),
+      highlight: false,
+      badge: color
     },
     {
-      t:"Si llegas a Meta Base",
-      sub:usd(metaBase,0)+" · "+Math.round(pct2*100)+"% comisión",
-      v:Math.max(proy,metaBase)*pct2,
-      pct:Math.round(pct2*100),
-      highlight:false,
-      badge:"#2563eb"
+      t:"Si equipo llega a "+usd(metaEquipo,0),
+      sub: usd(metaEquipo,0)+" equipo · "+Math.round(pct2*100)+"% para todos",
+      v: proy * pct2,
+      pct: Math.round(pct2*100),
+      highlight: pisoActual < 2,
+      badge:"#f59e0b"
     },
     {
-      t:"Si llegas a Meta SFly",
-      sub:usd(metaSfly,0)+" · "+Math.round(pct3*100)+"% comisión",
-      v:Math.max(proy,metaSfly)*pct3,
-      pct:Math.round(pct3*100),
-      highlight:false,
+      t:"Si equipo llega a "+usd(metaSflyEquipo,0),
+      sub: usd(metaSflyEquipo,0)+" equipo · "+Math.round(pct3*100)+"% para todos",
+      v: proy * pct3,
+      pct: Math.round(pct3*100),
+      highlight: false,
       badge:"#10b981"
     },
   ];
@@ -1312,6 +1326,12 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
   const metaBaseSolo = cfg.metaBase/2;
   const metaSlySolo  = cfg.metaSfly/2;
 
+  // Total del equipo completo — determina en qué piso de comisión están todos
+  const totalEquipo = ASESORES.reduce((s,a)=>{
+    const rows = Object.values(getMonthData(store,mesId,a)).reduce((a,b)=>a.concat(b),[]);
+    return s + sumR(rows);
+  }, 0);
+
   const allRows   = Object.values(data).reduce((a,b)=>a.concat(b),[]);
   const acum      = sumR(allRows);
   const totalVtas = allRows.length;
@@ -1382,7 +1402,7 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
 
       <PanelPresion acum={acum} promDia={promDia} proy={proy} name={name} mesId={mesId} metaInd={metaInd} />
 
-      <ComisionesPanel acum={acum} proy={proy} color={color} label={name} cfg={cfg} />
+      <ComisionesPanel acum={acum} proy={proy} color={color} label={name} cfg={cfg} totalEquipo={totalEquipo} />
 
       {/* CAMBIO #8: Registro Diario con alertas días sin registro */}
       <Card>
