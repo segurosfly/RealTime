@@ -734,66 +734,69 @@ function BloqueOperativo() {
 
 // ── COMISIONES ─────────────────────────────────────────────────────────────────
 function ComisionesPanel({acum,proy,color,label,cfg,totalEquipo}) {
-  // Pisos de comisión según el TOTAL DEL EQUIPO (no el asesor individual)
-  const pct1 = normalizePct(cfg.pctBase||10)/100;   // 10% — piso base
-  const pct2 = normalizePct(cfg.comision||11)/100;  // 11% — meta base del equipo
-  const pct3 = normalizePct(cfg.pctSfly||12)/100;   // 12% — meta SFly del equipo
-  const metaEquipo     = cfg.metaBase || 10000;  // meta base del equipo (ej: $10,001)
-  const metaSflyEquipo = cfg.metaSfly || 13000;  // meta SFly del equipo (ej: $13,001)
+  // ── PISOS desde Google Sheets Config ──────────────────────────────────────
+  // pctBase  = comisión piso 1 (ej: 10%) — columna E del Sheet Config
+  // comision = comisión piso 2 (ej: 11%) — columna C del Sheet Config
+  // pctSfly  = comisión piso 3 (ej: 12%) — columna G del Sheet Config
+  // metaBase = meta equipo piso 2        — columna D del Sheet Config (ej: $10,001)
+  // metaSfly = meta equipo piso 3        — columna F del Sheet Config (ej: $13,001)
+  const pct1 = normalizePct(cfg.pctBase  || 10) / 100;  // 10% piso base
+  const pct2 = normalizePct(cfg.comision || 11) / 100;  // 11% piso medio
+  const pct3 = normalizePct(cfg.pctSfly  || 12) / 100;  // 12% piso top
+  const metaPiso2 = cfg.metaBase || 10000;
+  const metaPiso3 = cfg.metaSfly || 13000;
 
-  // El piso lo determina cuánto lleva el EQUIPO, no el asesor solo
-  const teActual = totalEquipo || 0;
-  const pisoActual = teActual >= metaSflyEquipo ? 3 : teActual >= metaEquipo ? 2 : 1;
-  const pctActual  = pisoActual===3 ? pct3 : pisoActual===2 ? pct2 : pct1;
+  // ── Piso actual del EQUIPO ────────────────────────────────────────────────
+  const te = totalEquipo || 0;
+  const pisoEquipo = te >= metaPiso3 ? 3 : te >= metaPiso2 ? 2 : 1;
+  const pctActual  = pisoEquipo===3 ? pct3 : pisoEquipo===2 ? pct2 : pct1;
+  const pctActualN = Math.round(pctActual * 100);
 
-  const pisoColors = ["#94a3b8","#94a3b8","#f59e0b","#10b981"];
-  const pisoLabels = ["","Base "+Math.round(pct1*100)+"%","Meta "+Math.round(pct2*100)+"%","SFly "+Math.round(pct3*100)+"%"];
-  const pisoDesc   = ["","Equipo aún no supera "+usd(metaEquipo,0),"Equipo superó "+usd(metaEquipo,0),"Equipo superó "+usd(metaSflyEquipo,0)];
+  // ── Piso proyectado al cierre ─────────────────────────────────────────────
+  // Estimamos el total del equipo al cierre de forma proporcional
+  const teProyectado = acum > 0 ? te * (proy / acum) : te;
+  const pisoProy    = teProyectado >= metaPiso3 ? 3 : teProyectado >= metaPiso2 ? 2 : 1;
+  const pctProy     = pisoProy===3 ? pct3 : pisoProy===2 ? pct2 : pct1;
+  const pctProyN    = Math.round(pctProy * 100);
 
-  // Proyección del asesor al cierre — ¿qué piso alcanzará el equipo?
-  // Para simplificar usamos misma proyección proporcional que el acumulado del equipo
-  const factorProy = teActual > 0 ? proy / Math.max(acum, 1) : 1;
-  const teProyectado = teActual * factorProy; // estimado equipo al cierre
-  const pisoProyectado = teProyectado >= metaSflyEquipo ? 3 : teProyectado >= metaEquipo ? 2 : 1;
-  const pctProyectado  = pisoProyectado===3 ? pct3 : pisoProyectado===2 ? pct2 : pct1;
+  // ── Texto descriptivo ─────────────────────────────────────────────────────
+  const pisoNombre = (p) => p===3?"SFly "+Math.round(pct3*100)+"%":p===2?"Meta "+Math.round(pct2*100)+"%":"Base "+Math.round(pct1*100)+"%";
+  const subActual  = pisoEquipo===1
+    ? "Equipo lleva "+usd(te,0)+" · aún no supera "+usd(metaPiso2,0)
+    : pisoEquipo===2
+    ? "Equipo superó "+usd(metaPiso2,0)+" · camino a "+usd(metaPiso3,0)
+    : "🏆 Equipo superó "+usd(metaPiso3,0)+" · piso máximo";
+  const subProy = pisoProy > pisoEquipo
+    ? "⬆️ Proyectas subir al piso "+pisoNombre(pisoProy)
+    : pisoProy===3
+    ? "🏆 Proyectas mantener piso máximo"
+    : "📈 Al ritmo actual te quedas en piso "+pisoNombre(pisoEquipo);
 
-  const pisos = [
-    {
-      t:"Comisión actual",
-      sub:"Piso "+pisoLabels[pisoActual]+" · "+pisoDesc[pisoActual],
-      v: acum * pctActual,
-      pct: Math.round(pctActual*100),
-      highlight: true,
-      badge: pisoColors[pisoActual]
-    },
-    {
-      t:"Proyección al cierre",
-      sub: pisoProyectado > pisoActual
-        ? "⬆️ El equipo proyecta subir al piso "+pisoLabels[pisoProyectado]
-        : pisoActual===3
-        ? "🏆 Equipo ya en piso máximo"
-        : "📈 Al ritmo actual · piso "+pisoLabels[pisoActual],
-      v: proy * pctProyectado,
-      pct: Math.round(pctProyectado*100),
-      highlight: false,
-      badge: color
-    },
-    {
-      t:"Si equipo llega a "+usd(metaEquipo,0),
-      sub: usd(metaEquipo,0)+" equipo · "+Math.round(pct2*100)+"% para todos",
+  // ── Solo mostrar cards de pisos superiores que aún NO se alcanzaron ───────
+  const cardsExtra = [];
+  if (pisoEquipo < 2) {
+    cardsExtra.push({
+      t: "Si equipo llega a "+usd(metaPiso2,0),
+      sub: "Piso "+pisoNombre(2)+" · "+Math.round(pct2*100)+"% para todos",
       v: proy * pct2,
       pct: Math.round(pct2*100),
-      highlight: pisoActual < 2,
       badge:"#f59e0b"
-    },
-    {
-      t:"Si equipo llega a "+usd(metaSflyEquipo,0),
-      sub: usd(metaSflyEquipo,0)+" equipo · "+Math.round(pct3*100)+"% para todos",
+    });
+  }
+  if (pisoEquipo < 3) {
+    cardsExtra.push({
+      t: "Si equipo llega a "+usd(metaPiso3,0),
+      sub: "Piso "+pisoNombre(3)+" · "+Math.round(pct3*100)+"% para todos",
       v: proy * pct3,
       pct: Math.round(pct3*100),
-      highlight: false,
       badge:"#10b981"
-    },
+    });
+  }
+
+  const pisos = [
+    { t:"Comisión actual",        sub:subActual, v:acum*pctActual, pct:pctActualN, highlight:true,  badge:pisoEquipo===1?"#94a3b8":pisoEquipo===2?"#f59e0b":"#10b981" },
+    { t:"Proyección al cierre",   sub:subProy,   v:proy*pctProy,   pct:pctProyN,   highlight:false, badge:color },
+    ...cardsExtra
   ];
   return (
     <Card>
