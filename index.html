@@ -53,9 +53,9 @@ const LOGO_SQ_SRC  = "https://raw.githubusercontent.com/segurosfly/RealTime/main
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────────
 const DOW      = ["Dom","Lun","Mar","Mie","Jue","Vie","Sab"];
-const ASESORES = ["guillermo","carolina","daniel"];
+const ASESORES = ["guillermo","carolina","daniel","wilmary"];
 // PROTECCION POR ASESOR: contrasenas requeridas para Guardar/Eliminar
-const PIN_ASESORES = { guillermo: "2026", carolina: "2027", daniel: "2028" };
+const PIN_ASESORES = { guillermo: "2026", carolina: "2027", daniel: "2028", wilmary: "2029" };
 // verificarPinAsesor ahora es async y usa modal React (ver ModalPinAsesor)
 // Se resuelve a true/false via window.__pinAsesorResolve
 function verificarPinAsesor(asesor) {
@@ -493,7 +493,7 @@ function ModalPinAsesor() {
 
   const cancel = function() { resolve(false); };
 
-  const color = asesor === "guillermo" ? "#2563eb" : asesor === "carolina" ? "#7c3aed" : "#0f766e";
+  const color = asesor === "guillermo" ? "#2563eb" : asesor === "carolina" ? "#7c3aed" : asesor === "daniel" ? "#0f766e" : "#be185d";
   const inicial = asesor ? asesor[0].toUpperCase() : "?";
 
   if (!visible) return null;
@@ -733,17 +733,71 @@ function BloqueOperativo() {
 }
 
 // ── COMISIONES ─────────────────────────────────────────────────────────────────
-function ComisionesPanel({acum,proy,color,label,comisionPct}) {
-  // normalizePct garantiza que 0.08 → 8 antes de dividir
-  const pct = normalizePct(comisionPct)/100;
+function ComisionesPanel({acum,proy,color,label,cfg}) {
+  // Pisos de comisión: base (10%), mid hacia meta base (11%), top meta SFly (12%)
+  const pct1 = normalizePct(cfg.pctBase||10)/100;        // Piso base — donde está HOY
+  const pct2 = normalizePct(cfg.comision||11)/100;       // Piso medio (meta base)
+  const pct3 = normalizePct(cfg.pctSfly||12)/100;        // Piso top (meta SFly)
+  const metaBase = cfg.metaBase||12500;
+  const metaSfly = cfg.metaSfly||18000;
+
+  // ¿En qué piso está actualmente el asesor?
+  const pisoActual = acum>=metaSfly ? 3 : acum>=metaBase ? 2 : 1;
+  const pctActual  = pisoActual===3 ? pct3 : pisoActual===2 ? pct2 : pct1;
+  const pisoColors = ["#94a3b8","#2563eb","#f59e0b","#10b981"];
+  const pisoLabels = ["","Base 10%","Meta 11%","SFly 12%"];
+
+  const pisos = [
+    {
+      t:"Comisión actual",
+      sub:"Piso donde estás · "+pisoLabels[pisoActual],
+      v:acum*pctActual,
+      pct:Math.round(pctActual*100),
+      highlight:true,
+      badge:pisoColors[pisoActual]
+    },
+    {
+      t:"Proyección al cierre",
+      sub: proy>=metaSfly?"🏆 Al ritmo actual llegas al piso SFly":proy>=metaBase?"⬆️ Proyectas alcanzar meta base":"📈 Proyección piso actual",
+      v:proy*pctActual,
+      pct:Math.round(pctActual*100),
+      highlight:false,
+      badge:color
+    },
+    {
+      t:"Si llegas a Meta Base",
+      sub:usd(metaBase,0)+" · "+Math.round(pct2*100)+"% comisión",
+      v:Math.max(proy,metaBase)*pct2,
+      pct:Math.round(pct2*100),
+      highlight:false,
+      badge:"#2563eb"
+    },
+    {
+      t:"Si llegas a Meta SFly",
+      sub:usd(metaSfly,0)+" · "+Math.round(pct3*100)+"% comisión",
+      v:Math.max(proy,metaSfly)*pct3,
+      pct:Math.round(pct3*100),
+      highlight:false,
+      badge:"#10b981"
+    },
+  ];
   return (
     <Card>
-      <SLabel>Comisiones — {label} ({comisionPct}%)</SLabel>
+      <SLabel>Comisiones — {label}</SLabel>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-        {[{t:"Comision actual",v:acum*pct},{t:"Comision proyectada",v:proy*pct}].map(r=>(
-          <div key={r.t} style={{background:color+"08",border:"1px solid "+color+"22",borderRadius:10,padding:"12px 16px"}}>
-            <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:6}}>{r.t}</div>
-            <div style={{fontSize:20,fontWeight:800,color:color}}>{usd(r.v,0)}</div>
+        {pisos.map(r=>(
+          <div key={r.t} style={{
+            background:r.highlight?color+"12":"#f8fafc",
+            border:"1px solid "+(r.highlight?color+"44":"#e2e8f0"),
+            borderRadius:10,padding:"12px 14px",
+            outline:r.highlight?"2px solid "+color+"33":"none"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase"}}>{r.t}</div>
+              <span style={{fontSize:9,fontWeight:800,padding:"2px 6px",borderRadius:6,
+                background:r.badge+"18",color:r.badge}}>{r.pct}%</span>
+            </div>
+            <div style={{fontSize:20,fontWeight:800,color:r.highlight?color:"#1e293b"}}>{usd(r.v,0)}</div>
+            <div style={{fontSize:9,color:"#94a3b8",marginTop:3}}>{r.sub}</div>
           </div>
         ))}
       </div>
@@ -846,20 +900,20 @@ function AsesorHeader({name, asesor, color, data, mesId, diaHoy}) {
 
 // ── GLOBAL DAY STATS (reemplaza BloqueOperativo en Global) ────────────────────
 // Tique promedio · ventas · día top · revenue top · barra por día semana
-function GlobalDayStats({gData, cData, dData, mesId, total, gVentas, cVentas, dVentas, gAcum, cAcum, dAcum}) {
+function GlobalDayStats({gData, cData, dData, wData, mesId, total, gVentas, cVentas, dVentas, wVentas, gAcum, cAcum, dAcum, wAcum}) {
   const DOW_LABELS = ["Dom","Lun","Mar","Mie","Jue","Vie","Sab"];
   const DOW_FULL   = ["Dom","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
 
   // Aggregate all rows
   const allRows = [];
-  [gData, cData, dData].forEach(d => Object.values(d).forEach(arr => arr.forEach(r => allRows.push(r))));
-  const totalVentas = gVentas + cVentas + dVentas;
+  [gData, cData, dData, wData].forEach(d => Object.values(d).forEach(arr => arr.forEach(r => allRows.push(r))));
+  const totalVentas = gVentas + cVentas + dVentas + wVentas;
   const avgTicket = totalVentas > 0 ? total / totalVentas : 0;
 
   // Day totals
   const dayTotals = {};
   const dayVentas = {};
-  [gData, cData, dData].forEach(d => {
+  [gData, cData, dData, wData].forEach(d => {
     Object.entries(d).forEach(([dia, rows]) => {
       const v = sumR(rows);
       dayTotals[+dia] = (dayTotals[+dia]||0) + v;
@@ -874,7 +928,7 @@ function GlobalDayStats({gData, cData, dData, mesId, total, gVentas, cVentas, dV
   // Aggregate by day-of-week
   const dowRev = {0:0,1:0,2:0,3:0,4:0,5:0,6:0};
   const dowCnt = {0:0,1:0,2:0,3:0,4:0,5:0,6:0};
-  [gData, cData, dData].forEach(d => {
+  [gData, cData, dData, wData].forEach(d => {
     Object.entries(d).forEach(([dia, rows]) => {
       const mesInfo = getMesInfo(mesId);
       const dow = (mesInfo.dow0 + (+dia) - 1) % 7;
@@ -1328,7 +1382,7 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
 
       <PanelPresion acum={acum} promDia={promDia} proy={proy} name={name} mesId={mesId} metaInd={metaInd} />
 
-      <ComisionesPanel acum={acum} proy={proy} color={color} label={name} comisionPct={cfg.pctBase} />
+      <ComisionesPanel acum={acum} proy={proy} color={color} label={name} cfg={cfg} />
 
       {/* CAMBIO #8: Registro Diario con alertas días sin registro */}
       <Card>
@@ -1436,30 +1490,33 @@ function GlobalTab({store,mesId,configSource}) {
   const gData    = getMonthData(store,mesId,"guillermo");
   const cData    = getMonthData(store,mesId,"carolina");
   const dData    = getMonthData(store,mesId,"daniel");
+  const wData    = getMonthData(store,mesId,"wilmary");
   const gRows    = Object.values(gData).reduce((a,b)=>a.concat(b),[]);
   const cRows    = Object.values(cData).reduce((a,b)=>a.concat(b),[]);
   const dRows    = Object.values(dData).reduce((a,b)=>a.concat(b),[]);
-  const gAcum    = sumR(gRows), cAcum = sumR(cRows), dAcum = sumR(dRows), total = gAcum+cAcum+dAcum;
-  const gVentas  = gRows.length, cVentas = cRows.length, dVentas = dRows.length;
+  const wRows    = Object.values(wData).reduce((a,b)=>a.concat(b),[]);
+  const gAcum    = sumR(gRows), cAcum = sumR(cRows), dAcum = sumR(dRows), wAcum = sumR(wRows), total = gAcum+cAcum+dAcum+wAcum;
+  const gVentas  = gRows.length, cVentas = cRows.length, dVentas = dRows.length, wVentas = wRows.length;
   const gDias    = Object.keys(gData).filter(d=>gData[d]&&gData[d].length>0).length;
   const cDias    = Object.keys(cData).filter(d=>cData[d]&&cData[d].length>0).length;
   const dDias    = Object.keys(dData).filter(d=>dData[d]&&dData[d].length>0).length;
-  const gProm    = gDias>0?gAcum/gDias:0, cProm = cDias>0?cAcum/cDias:0, dProm = dDias>0?dAcum/dDias:0;
-  const gProy    = gAcum+gProm*diasRest, cProy = cAcum+cProm*diasRest, dProy = dAcum+dProm*diasRest, totProy = gProy+cProy+dProy;
+  const wDias    = Object.keys(wData).filter(d=>wData[d]&&wData[d].length>0).length;
+  const gProm    = gDias>0?gAcum/gDias:0, cProm = cDias>0?cAcum/cDias:0, dProm = dDias>0?dAcum/dDias:0, wProm = wDias>0?wAcum/wDias:0;
+  const gProy    = gAcum+gProm*diasRest, cProy = cAcum+cProm*diasRest, dProy = dAcum+dProm*diasRest, wProy = wAcum+wProm*diasRest, totProy = gProy+cProy+dProy+wProy;
   const metaEq   = cfg.metaBase, metaInd = cfg.metaBase/2, comPct = normalizePct(cfg.pctBase)/100;
-  const maxBar   = Math.max(gAcum,cAcum,dAcum,1);
-  const liderAcum = Math.max(gAcum,cAcum,dAcum);
-  const lider    = liderAcum===gAcum?"Guillermo":liderAcum===cAcum?"Carolina":"Daniel R.";
-  const liderC   = liderAcum===gAcum?"#2563eb":liderAcum===cAcum?"#7c3aed":"#0f766e";
+  const maxBar   = Math.max(gAcum,cAcum,dAcum,wAcum,1);
+  const liderAcum = Math.max(gAcum,cAcum,dAcum,wAcum);
+  const lider    = liderAcum===gAcum?"Guillermo":liderAcum===cAcum?"Carolina":liderAcum===dAcum?"Daniel R.":"Wilmary";
+  const liderC   = liderAcum===gAcum?"#2563eb":liderAcum===cAcum?"#7c3aed":liderAcum===dAcum?"#0f766e":"#be185d";
   const revPorDia = {};
-  [gData,cData,dData].forEach(d=>Object.entries(d).forEach(function(e){ revPorDia[e[0]]=(revPorDia[e[0]]||0)+sumR(e[1]); }));
+  [gData,cData,dData,wData].forEach(d=>Object.entries(d).forEach(function(e){ revPorDia[e[0]]=(revPorDia[e[0]]||0)+sumR(e[1]); }));
   const diasOrd = Object.keys(revPorDia).sort((a,b)=>+a-+b);
   const maxDia  = Math.max.apply(null,Object.values(revPorDia).concat([1]));
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       {/* STATS GLOBALES: TIQUE PROMEDIO + DIAS */}
-      <GlobalDayStats gData={gData} cData={cData} dData={dData} mesId={mesId} total={total} gVentas={gVentas} cVentas={cVentas} dVentas={dVentas} gAcum={gAcum} cAcum={cAcum} dAcum={dAcum} />
+      <GlobalDayStats gData={gData} cData={cData} dData={dData} wData={wData} mesId={mesId} total={total} gVentas={gVentas} cVentas={cVentas} dVentas={dVentas} wVentas={wVentas} gAcum={gAcum} cAcum={cAcum} dAcum={dAcum} wAcum={wAcum} />
 
       {/* CABECERA LOGO GLOBAL */}
       <div style={{background:"linear-gradient(135deg,#1e3a5f,#2c5282)",borderRadius:14,padding:"18px 24px",display:"flex",alignItems:"center",gap:16}}>
@@ -1481,7 +1538,7 @@ function GlobalTab({store,mesId,configSource}) {
         <span style={{fontSize:26}}>🏆</span>
         <div style={{flex:1}}>
           <div style={{fontSize:14,fontWeight:800,color:liderC}}>{lider} lidera por {usd(liderAcum-Math.max(...[gAcum,cAcum,dAcum].filter(v=>v!==liderAcum)),0)}</div>
-          <div style={{fontSize:12,color:"#64748b",marginTop:3}}>G: {usd(gAcum,0)} ({gVentas}v) · C: {usd(cAcum,0)} ({cVentas}v) · D: {usd(dAcum,0)} ({dVentas}v)</div>
+          <div style={{fontSize:12,color:"#64748b",marginTop:3}}>G: {usd(gAcum,0)} ({gVentas}v) · C: {usd(cAcum,0)} ({cVentas}v) · D: {usd(dAcum,0)} ({dVentas}v) · W: {usd(wAcum,0)} ({wVentas}v)</div>
         </div>
         <div style={{textAlign:"right"}}>
           <div style={{fontSize:11,color:"#94a3b8"}}>Proyeccion equipo</div>
@@ -1496,7 +1553,7 @@ function GlobalTab({store,mesId,configSource}) {
       </div>
       <Card>
         <SLabel>Comparativa de Asesores</SLabel>
-        {[{name:"Guillermo",acum:gAcum,proy:gProy,prom:gProm,color:"#2563eb",ventas:gVentas},{name:"Carolina",acum:cAcum,proy:cProy,prom:cProm,color:"#7c3aed",ventas:cVentas},{name:"Daniel R.",acum:dAcum,proy:dProy,prom:dProm,color:"#0f766e",ventas:dVentas}].map(a=>(
+        {[{name:"Guillermo",acum:gAcum,proy:gProy,prom:gProm,color:"#2563eb",ventas:gVentas},{name:"Carolina",acum:cAcum,proy:cProy,prom:cProm,color:"#7c3aed",ventas:cVentas},{name:"Daniel R.",acum:dAcum,proy:dProy,prom:dProm,color:"#0f766e",ventas:dVentas},{name:"Wilmary",acum:wAcum,proy:wProy,prom:wProm,color:"#be185d",ventas:wVentas}].map(a=>(
           <div key={a.name} style={{marginBottom:16}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1527,7 +1584,8 @@ function GlobalTab({store,mesId,configSource}) {
         <div className="mob-g4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:10}}>
           {[{l:"G actual",v:gAcum*comPct,c:"#2563eb"},{l:"G proyectada",v:gProy*comPct,c:"#2563eb"},
             {l:"C actual",v:cAcum*comPct,c:"#7c3aed"},{l:"C proyectada",v:cProy*comPct,c:"#7c3aed"},
-            {l:"D actual",v:dAcum*comPct,c:"#0f766e"},{l:"D proyectada",v:dProy*comPct,c:"#0f766e"}].map(x=>(
+            {l:"D actual",v:dAcum*comPct,c:"#0f766e"},{l:"D proyectada",v:dProy*comPct,c:"#0f766e"},
+            {l:"W actual",v:wAcum*comPct,c:"#be185d"},{l:"W proyectada",v:wProy*comPct,c:"#be185d"}].map(x=>(
             <div key={x.l} style={{background:x.c+"08",border:"1px solid "+x.c+"22",borderRadius:10,padding:"12px 14px"}}>
               <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>{x.l}</div>
               <div style={{fontSize:18,fontWeight:800,color:x.c}}>{usd(x.v,0)}</div>
@@ -1536,7 +1594,7 @@ function GlobalTab({store,mesId,configSource}) {
         </div>
         <div style={{padding:"10px 14px",background:"#ecfdf5",border:"1px solid #a7f3d0",borderRadius:8,display:"flex",justifyContent:"space-between"}}>
           <span style={{fontSize:12,fontWeight:700,color:"#059669"}}>Total comisiones equipo proyectadas</span>
-          <span style={{fontSize:17,fontWeight:800,color:"#059669"}}>{usd((gProy+cProy+dProy)*comPct,0)}</span>
+          <span style={{fontSize:17,fontWeight:800,color:"#059669"}}>{usd((gProy+cProy+dProy+wProy)*comPct,0)}</span>
         </div>
       </Card>
       {diasOrd.length>0&&(
@@ -1544,7 +1602,7 @@ function GlobalTab({store,mesId,configSource}) {
           <SLabel>Revenue por Dia — Equipo</SLabel>
           <div style={{display:"flex",flexDirection:"column",gap:5}}>
             {diasOrd.map(d=>{
-              const gV=sumR(gData[d]||[]), cV=sumR(cData[d]||[]), dV=sumR(dData[d]||[]);
+              const gV=sumR(gData[d]||[]), cV=sumR(cData[d]||[]), dV=sumR(dData[d]||[]), wV=sumR(wData[d]||[]);
               return (
                 <div key={d} style={{display:"flex",alignItems:"center",gap:10}}>
                   <span style={{fontSize:11,color:"#94a3b8",minWidth:60}}>D{d} {dowDia(+d,mesId)}</span>
@@ -1552,8 +1610,9 @@ function GlobalTab({store,mesId,configSource}) {
                     <div style={{width:((gV/maxDia)*100)+"%",height:"100%",background:"#2563eb"}} />
                     <div style={{width:((cV/maxDia)*100)+"%",height:"100%",background:"#7c3aed"}} />
                     <div style={{width:((dV/maxDia)*100)+"%",height:"100%",background:"#0f766e"}} />
+                    <div style={{width:((wV/maxDia)*100)+"%",height:"100%",background:"#be185d"}} />
                   </div>
-                  <span style={{fontSize:12,fontWeight:700,color:"#334155",minWidth:80,textAlign:"right"}}>{usd(gV+cV+dV,0)}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:"#334155",minWidth:80,textAlign:"right"}}>{usd(gV+cV+dV+wV,0)}</span>
                 </div>
               );
             })}
@@ -1562,6 +1621,7 @@ function GlobalTab({store,mesId,configSource}) {
             <span><span style={{color:"#2563eb",fontWeight:700}}>■</span> Guillermo</span>
             <span><span style={{color:"#7c3aed",fontWeight:700}}>■</span> Carolina</span>
             <span><span style={{color:"#0f766e",fontWeight:700}}>■</span> Daniel R.</span>
+            <span><span style={{color:"#be185d",fontWeight:700}}>■</span> Wilmary</span>
           </div>
         </Card>
       )}
@@ -1586,13 +1646,15 @@ function TrackerTab({store}) {
     const gData=getMonthData(store,m.id,"guillermo");
     const cData=getMonthData(store,m.id,"carolina");
     const dData=getMonthData(store,m.id,"daniel");
+    const wData=getMonthData(store,m.id,"wilmary");
     const gRows=Object.values(gData).reduce((a,b)=>a.concat(b),[]);
     const cRows=Object.values(cData).reduce((a,b)=>a.concat(b),[]);
     const dRows=Object.values(dData).reduce((a,b)=>a.concat(b),[]);
-    const gAcum=sumR(gRows), cAcum=sumR(cRows), dAcum=sumR(dRows), total=gAcum+cAcum+dAcum;
+    const wRows=Object.values(wData).reduce((a,b)=>a.concat(b),[]);
+    const gAcum=sumR(gRows), cAcum=sumR(cRows), dAcum=sumR(dRows), wAcum=sumR(wRows), total=gAcum+cAcum+dAcum+wAcum;
     const cfg=getConfig(store,m.id);
     const cumplimiento=cfg.metaBase>0?(total/cfg.metaBase)*100:0;
-    return Object.assign({},m,{gAcum,cAcum,dAcum,total,gVentas:gRows.length,cVentas:cRows.length,dVentas:dRows.length,cfg,cumplimiento});
+    return Object.assign({},m,{gAcum,cAcum,dAcum,wAcum,total,gVentas:gRows.length,cVentas:cRows.length,dVentas:dRows.length,wVentas:wRows.length,cfg,cumplimiento});
   });
   const totalHistorico = resumen.reduce((s,r)=>s+r.total,0);
   const maxTotal = Math.max.apply(null,resumen.map(r=>r.total).concat([1]));
@@ -1613,6 +1675,7 @@ function TrackerTab({store}) {
                 <div style={{width:((r.gAcum/maxTotal)*100)+"%",height:"100%",background:"#2563eb",position:"absolute",left:0}} />
                 <div style={{width:((r.cAcum/maxTotal)*100)+"%",height:"100%",background:"#7c3aed66",position:"absolute",left:((r.gAcum/maxTotal)*100)+"%"}} />
                 <div style={{width:((r.dAcum/maxTotal)*100)+"%",height:"100%",background:"#0f766e88",position:"absolute",left:(((r.gAcum+r.cAcum)/maxTotal)*100)+"%"}} />
+                <div style={{width:(((r.wAcum||0)/maxTotal)*100)+"%",height:"100%",background:"#be185d88",position:"absolute",left:(((r.gAcum+r.cAcum+r.dAcum)/maxTotal)*100)+"%"}} />
               </div>
               <span style={{fontSize:13,fontWeight:800,color:"#1e293b",minWidth:90,textAlign:"right"}}>{usd(r.total,0)}</span>
               <Pill color={r.cumplimiento>=100?"#10b981":r.cumplimiento>=80?"#3b82f6":"#f97316"}
@@ -1624,6 +1687,7 @@ function TrackerTab({store}) {
           <span><span style={{color:"#2563eb",fontWeight:700}}>■</span> Guillermo</span>
           <span><span style={{color:"#7c3aed",fontWeight:700}}>■</span> Carolina</span>
           <span><span style={{color:"#0f766e",fontWeight:700}}>■</span> Daniel R.</span>
+          <span><span style={{color:"#be185d",fontWeight:700}}>■</span> Wilmary</span>
         </div>
       </Card>
       <Card>
@@ -1632,7 +1696,7 @@ function TrackerTab({store}) {
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <thead>
               <tr style={{borderBottom:"2px solid #f1f5f9"}}>
-                {["Mes","Meta Base","Meta SFly","% Com","Guillermo","G Vtas","Carolina","C Vtas","Daniel R.","D Vtas","Total","Cumpl."].map(h=>(
+                {["Mes","Meta Base","Meta SFly","% Com","Guillermo","G Vtas","Carolina","C Vtas","Daniel R.","D Vtas","Wilmary","W Vtas","Total","Cumpl."].map(h=>(
                   <th key={h} style={{padding:"8px 10px",color:"#94a3b8",fontWeight:700,textTransform:"uppercase",fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr>
@@ -1650,6 +1714,8 @@ function TrackerTab({store}) {
                   <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8"}}>{r.cVentas}</td>
                   <td style={{padding:"9px 10px",textAlign:"right",color:"#0f766e",fontWeight:700}}>{usd(r.dAcum,0)}</td>
                   <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8"}}>{r.dVentas}</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",color:"#be185d",fontWeight:700}}>{usd(r.wAcum||0,0)}</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8"}}>{r.wVentas||0}</td>
                   <td style={{padding:"9px 10px",textAlign:"right",fontWeight:800,color:"#1e293b"}}>{usd(r.total,0)}</td>
                   <td style={{padding:"9px 10px",textAlign:"right"}}>
                     <Pill color={r.cumplimiento>=100?"#10b981":r.cumplimiento>=80?"#3b82f6":"#f97316"}
@@ -1665,6 +1731,8 @@ function TrackerTab({store}) {
                 <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8",fontWeight:700}}>{resumen.reduce((s,r)=>s+r.cVentas,0)}</td>
                 <td style={{padding:"9px 10px",textAlign:"right",color:"#0f766e",fontWeight:800}}>{usd(resumen.reduce((s,r)=>s+r.dAcum,0),0)}</td>
                 <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8",fontWeight:700}}>{resumen.reduce((s,r)=>s+r.dVentas,0)}</td>
+                <td style={{padding:"9px 10px",textAlign:"right",color:"#be185d",fontWeight:800}}>{usd(resumen.reduce((s,r)=>s+(r.wAcum||0),0),0)}</td>
+                <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8",fontWeight:700}}>{resumen.reduce((s,r)=>s+(r.wVentas||0),0)}</td>
                 <td style={{padding:"9px 10px",textAlign:"right",fontWeight:800,color:"#6366f1",fontSize:14}}>{usd(totalHistorico,0)}</td>
                 <td></td>
               </tr>
@@ -1823,12 +1891,55 @@ const TOSSPILE_KEY = "sfly_tosspile_v1";
 const TOSSPILE_PIN = "2024";
 const REVIEW_VALUE = 1;
 
+// ── Tosspile — carga desde Sheets (compartido entre todos) con fallback a localStorage
 function loadTosspile() {
   try { return JSON.parse(localStorage.getItem(TOSSPILE_KEY)) || []; }
   catch(e) { return []; }
 }
 function saveTosspile(data) {
   try { localStorage.setItem(TOSSPILE_KEY, JSON.stringify(data)); } catch(e) {}
+}
+
+// Sync Trustpilot reviews to Google Sheets (pestaña "Reseñas")
+async function syncReviewToSheets(review, action) {
+  try {
+    const params = new URLSearchParams({
+      accion: action==="delete" ? "delete_review" : "save_review",
+      sheet: "Resenas",
+      reviewId: review.id,
+      fecha:    review.fecha,
+      email:    review.email,
+      asesor:   review.asesor,
+      estrellas: String(review.estrellas||5),
+      valor:    String(REVIEW_VALUE),
+      nota:     action==="delete" ? "eliminado" : ""
+    });
+    await fetch(SHEETS_URL+"?"+params.toString(), { method:"GET", mode:"no-cors" });
+  } catch(e) {}
+}
+
+// Carga reseñas desde Sheets al arrancar el tab
+async function fetchReviewsFromSheets(setReviews) {
+  try {
+    const res = await fetch(SHEETS_URL+"?accion=read&sheet=Resenas", { method:"GET", cache:"no-store" });
+    const data = await res.json();
+    if (data && data.ok && Array.isArray(data.rows) && data.rows.length > 0) {
+      const mapped = data.rows
+        .filter(r => r.nota !== "eliminado" && r.reviewId)
+        .map(r => ({
+          id:        String(r.reviewId||r.orden||Date.now()),
+          fecha:     String(r.fecha||"").slice(0,10),
+          email:     String(r.asesor2||r.nota||r.mes||""),
+          asesor:    String(r.asesor||"guillermo").toLowerCase().trim(),
+          estrellas: parseInt(r.dia||r.valorUsd||5)||5,
+          valor:     REVIEW_VALUE,
+        }));
+      if (mapped.length > 0) {
+        saveTosspile(mapped);
+        setReviews(mapped);
+      }
+    }
+  } catch(e) {}
 }
 
 // Estrellas Trustpilot SVG
@@ -1971,12 +2082,15 @@ function TosspileTab({ store, onUpdate }) {
   const [saved, setSaved]     = useState(false);
   const [filterAsesor, setFilterAsesor] = useState("todos");
 
-  const persist = (data) => { saveTosspile(data); setReviews(data); };
+  const persist = (data, lastReview=null, action="save") => { saveTosspile(data); setReviews(data); if(lastReview) syncReviewToSheets(lastReview, action); };
+
+  // Cargar desde Sheets al montar (compartido entre todos los asesores)
+  useEffect(function(){ fetchReviewsFromSheets(setReviews); }, []);
   const visibles = reviews.filter(r => !r.deleted);
 
-  const TP_ASESORES = ["guillermo","daniel"]; // Solo los asesores activos en Trustpilot
-  const COLOR = { guillermo:"#2563eb", carolina:"#7c3aed", daniel:"#0f766e" };
-  const nombreAsesor = (a) => a ? a[0].toUpperCase()+a.slice(1) : a;
+  const TP_ASESORES = ["guillermo","daniel","wilmary"]; // Asesores activos en Trustpilot — editar aquí para agregar más
+  const COLOR = { guillermo:"#2563eb", carolina:"#7c3aed", daniel:"#0f766e", wilmary:"#be185d" };
+  const nombreAsesor = (a) => { const names={guillermo:"Guillermo",carolina:"Carolina",daniel:"Daniel R.",wilmary:"Wilmary"}; return names[a]||( a?a[0].toUpperCase()+a.slice(1):a); };
 
   const totales = TP_ASESORES.reduce((acc, a) => {
     acc[a] = visibles.filter(r => r.asesor===a).length * REVIEW_VALUE;
@@ -2011,8 +2125,9 @@ function TosspileTab({ store, onUpdate }) {
     } else {
       updated = [{ id:Date.now().toString(), ...form, valor:REVIEW_VALUE }, ...reviews];
     }
-    persist(updated);
-    setForm({ fecha: new Date().toISOString().slice(0,10), email:"", asesor: ASESORES[0] });
+    const lastRev = editId ? updated.find(r=>r.id===editId) : updated[0];
+    persist(updated, lastRev, "save");
+    setForm({ fecha: new Date().toISOString().slice(0,10), email:"", asesor: TP_ASESORES[0] });
     setSaved(true); setTimeout(()=>setSaved(false), 2000);
   };
 
@@ -2024,7 +2139,8 @@ function TosspileTab({ store, onUpdate }) {
 
   const handleDelConfirm = () => {
     if (delPin===TOSSPILE_PIN) {
-      persist(reviews.filter(r=>r.id!==delId));
+      const deletedRev = reviews.find(r=>r.id===delId);
+      persist(reviews.filter(r=>r.id!==delId), deletedRev, "delete");
       setDelId(null); setDelPin(""); setDelErr(false);
     } else {
       setDelErr(true); setDelPin("");
@@ -2306,6 +2422,7 @@ const MAIN_TABS = [
   { id:"guillermo", label:"Guillermo",     color:"#2563eb" },
   { id:"carolina",  label:"Carolina",      color:"#7c3aed" },
   { id:"daniel",    label:"Daniel",        color:"#0f766e" },
+  { id:"wilmary",   label:"Wilmary",       color:"#be185d" },
   { id:"tracker",   label:"Tracker",       color:"#0d9488" },
   { id:"calc",      label:"Calculadoras",  color:"#b45309" },
   { id:"tosspile",  label:"Trustpilot",    color:"#00b67a" },
@@ -2561,7 +2678,7 @@ function App() {
         <div className="mob-tabs" style={{display:"flex",gap:3,flex:1,justifyContent:"center",overflowX:"auto"}}>
           {MAIN_TABS.map(t=>(
             <button key={t.id} onClick={()=>setTab(t.id)} style={{background:tab===t.id?t.color:"transparent",color:tab===t.id?"#fff":"#64748b",border:"1px solid "+(tab===t.id?t.color:"#e2e8f0"),borderRadius:7,padding:"5px 14px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
-              {t.id==="global"?"✈️ "+t.label:t.id==="guillermo"?"G · "+t.label:t.id==="carolina"?"C · "+t.label:t.id==="daniel"?"D · "+t.label:t.id==="calc"?"📊 "+t.label:t.id==="tosspile"?"⭐ "+t.label:"📊 "+t.label}
+              {t.id==="global"?"✈️ "+t.label:t.id==="guillermo"?"G · "+t.label:t.id==="carolina"?"C · "+t.label:t.id==="daniel"?"D · "+t.label:t.id==="wilmary"?"W · "+t.label:t.id==="calc"?"📊 "+t.label:t.id==="tosspile"?"⭐ "+t.label:"📊 "+t.label}
             </button>
           ))}
         </div>
@@ -2584,6 +2701,7 @@ function App() {
         {tab==="guillermo" &&<AdvisorTab name="Guillermo" asesor="guillermo" color="#2563eb" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
         {tab==="carolina"  &&<AdvisorTab name="Carolina"  asesor="carolina"  color="#7c3aed" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
         {tab==="daniel"    &&<AdvisorTab name="Daniel Romero" asesor="daniel" color="#0f766e" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
+        {tab==="wilmary"   &&<AdvisorTab name="Wilmary Antolinez" asesor="wilmary" color="#be185d" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
         {tab==="tracker"   &&<TrackerTab store={store} />}
         {tab==="tosspile"  &&<TosspileTab store={store} onUpdate={onUpdate} />}
         {tab==="calc"      &&<CalcTab />}
