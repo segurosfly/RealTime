@@ -2675,6 +2675,108 @@ function TrackerTab({store}) {
 }
 
 
+
+// ── DATOS MALLA EMBEBIDOS (sincronizados desde Sheet) ────────────────────────
+const MALLA_AGOSTO = {
+  mes: "2026-08",
+  turnos: [
+    {
+      id:"1", horario:"08:00–16:00",
+      dias: {
+        "1":"N/A","2":"N/A","3":"Daniel Romero","4":"Daniel Romero","5":"Daniel Romero","6":"Daniel Romero","7":"Daniel Romero",
+        "8":"N/A","9":"N/A","10":"Wilmary Antolinez","11":"Wilmary Antolinez","12":"Wilmary Antolinez","13":"Wilmary Antolinez","14":"Wilmary Antolinez",
+        "15":"N/A","16":"N/A","17":"Guillermo González","18":"Guillermo González","19":"Guillermo González","20":"Guillermo González","21":"Guillermo González",
+        "22":"N/A","23":"N/A","24":"Daniel Romero","25":"Daniel Romero","26":"Daniel Romero","27":"Daniel Romero","28":"Daniel Romero",
+        "29":"N/A","30":"N/A","31":"Wilmary Antolinez"
+      }
+    },
+    {
+      id:"3", horario:"10:00–18:00",
+      dias: {
+        "1":"N/A","2":"N/A","3":"Guillermo González","4":"Guillermo González","5":"Guillermo González","6":"Guillermo González","7":"Guillermo González",
+        "8":"N/A","9":"N/A","10":"Daniel Romero","11":"Daniel Romero","12":"Daniel Romero","13":"Daniel Romero","14":"Daniel Romero",
+        "15":"N/A","16":"N/A","17":"Wilmary Antolinez","18":"Wilmary Antolinez","19":"Wilmary Antolinez","20":"Wilmary Antolinez","21":"Wilmary Antolinez",
+        "22":"N/A","23":"N/A","24":"Guillermo González","25":"Guillermo González","26":"Guillermo González","27":"Guillermo González","28":"Guillermo González",
+        "29":"N/A","30":"N/A","31":"Daniel Romero"
+      }
+    },
+    {
+      id:"2", horario:"14:00–22:00",
+      dias: {
+        "1":"N/A","2":"N/A","3":"Wilmary Antolinez","4":"Wilmary Antolinez","5":"Wilmary Antolinez","6":"Wilmary Antolinez","7":"Wilmary Antolinez",
+        "8":"N/A","9":"N/A","10":"Guillermo González","11":"Guillermo González","12":"Guillermo González","13":"Guillermo González","14":"Guillermo González",
+        "15":"N/A","16":"N/A","17":"Daniel Romero","18":"Daniel Romero","19":"Daniel Romero","20":"Daniel Romero","21":"Daniel Romero",
+        "22":"N/A","23":"N/A","24":"Wilmary Antolinez","25":"Wilmary Antolinez","26":"Wilmary Antolinez","27":"Wilmary Antolinez","28":"Wilmary Antolinez",
+        "29":"N/A","30":"N/A","31":"Guillermo González"
+      }
+    },
+    {
+      id:"5", horario:"08:00–15:00",
+      dias: {
+        "1":"Guillermo González","2":"Wilker Casadiego",
+        "8":"Daniel Romero","9":"Otoniel Martell",
+        "15":"Wilmary Antolinez","16":"Jhojan Torres",
+        "22":"Guillermo González","23":"Ricardo Torres",
+        "29":"Daniel Romero","30":"Wilker Casadiego"
+      }
+    },
+    {
+      id:"6", horario:"13:00–20:00",
+      dias: {
+        "1":"Daniel Romero","2":"Jhojan Torres",
+        "8":"Wilmary Antolinez","9":"Ricardo Torres",
+        "15":"Guillermo González","16":"Wilker Casadiego",
+        "22":"Daniel Romero","23":"Otoniel Martell",
+        "29":"Wilmary Antolinez","30":"Jhojan Torres"
+      }
+    },
+    {
+      id:"4", horario:"22:00–08:00",
+      dias: Object.fromEntries(Array.from({length:31},(_,i)=>[(i+1).toString(),"Bot Madruga"]))
+    }
+  ],
+  breaks: [
+    {
+      id:"Break 1", horario:"12:30–13:00",
+      dias: {
+        "1":"Guillermo González","3":"Daniel Romero","4":"Daniel Romero","5":"Daniel Romero","6":"Daniel Romero","7":"Daniel Romero",
+        "8":"Wilmary Antolinez","10":"Wilmary Antolinez","11":"Wilmary Antolinez","12":"Wilmary Antolinez","13":"Wilmary Antolinez","14":"Wilmary Antolinez","15":"Wilmary Antolinez",
+        "17":"Guillermo González","18":"Guillermo González","19":"Guillermo González","20":"Guillermo González","21":"Guillermo González","22":"Wilmary Antolinez",
+        "24":"Daniel Romero","25":"Daniel Romero","26":"Daniel Romero","27":"Daniel Romero","28":"Daniel Romero","29":"Wilmary Antolinez","31":"Wilmary Antolinez"
+      }
+    },
+    {
+      id:"Break 2", horario:"15:30–16:00",
+      dias: {
+        "1":"Daniel Romero","3":"Guillermo González","4":"Guillermo González","5":"Guillermo González","6":"Guillermo González","7":"Guillermo González",
+        "8":"Daniel Romero","10":"Daniel Romero","11":"Daniel Romero","12":"Daniel Romero","13":"Daniel Romero","14":"Daniel Romero","15":"Guillermo González",
+        "17":"Wilmary Antolinez","18":"Wilmary Antolinez","19":"Wilmary Antolinez","20":"Wilmary Antolinez","21":"Wilmary Antolinez","22":"Guillermo González",
+        "24":"Guillermo González","25":"Guillermo González","26":"Guillermo González","27":"Guillermo González","28":"Guillermo González","29":"Daniel Romero","31":"Daniel Romero"
+      }
+    },
+    {
+      id:"Break 3", horario:"17:30–18:00",
+      dias: {
+        "3":"Wilmary Antolinez","4":"Wilmary Antolinez","5":"Wilmary Antolinez","6":"Wilmary Antolinez","7":"Wilmary Antolinez",
+        "8":"Guillermo González","9":"Guillermo González","10":"Guillermo González","11":"Guillermo González","12":"Guillermo González","13":"Guillermo González","14":"Guillermo González",
+        "15":"Daniel Romero","16":"Daniel Romero","17":"Daniel Romero","18":"Daniel Romero","19":"Daniel Romero","20":"Daniel Romero","21":"Daniel Romero",
+        "22":"Wilmary Antolinez","23":"Wilmary Antolinez","24":"Wilmary Antolinez","25":"Wilmary Antolinez","26":"Wilmary Antolinez","27":"Wilmary Antolinez","28":"Wilmary Antolinez",
+        "29":"Guillermo González","30":"Guillermo González","31":"Guillermo González"
+      }
+    }
+  ],
+  descansos: [
+    { agente:"Otoniel Martell",  dias:[1,2,9,10,17,18,25,26] },
+    { agente:"Ricardo Torres",   dias:[1,2,9,10,17,18,25,26] },
+    { agente:"Jhojan Torres",    dias:[8,9,16,17,24,25] },
+    { agente:"Wilker Casadiego", dias:[8,9,16,17,24,25] },
+  ]
+};
+
+// Índice por mes — agregar aquí los meses futuros
+const MALLA_POR_MES = {
+  "2026-08": MALLA_AGOSTO,
+};
 // ── MALLA SEGUROSFLY ─────────────────────────────────────────────────────────
 // Agentes principales y socios de fin de semana
 const MALLA_AGENTES  = ["Guillermo González","Wilmary Antolinez","Daniel Romero"];
@@ -2724,99 +2826,37 @@ function MallaTab({ mesId, store }) {
 
   useEffect(function() {
     setLoading(true); setError(null);
-    fetch(SHEETS_URL + "?accion=read&sheet=Malla%20de%20SegurosFly", { cache:"no-store" })
-      .then(r=>r.json())
-      .then(function(data) {
-        if (data && data.ok && data.rows) {
-          setMalla(data.rows);
-        } else {
-          setError("No se pudo cargar la malla del Sheet.");
-        }
-        setLoading(false);
-      })
-      .catch(function(e) {
-        setError("Error de conexión al cargar la malla.");
-        setLoading(false);
-      });
+    // Usar datos embebidos directamente (no depende del endpoint de Sheets)
+    const mallaData = MALLA_POR_MES[mesId];
+    if (mallaData) {
+      setMalla(mallaData);
+    } else {
+      setError("No hay malla cargada para este mes aún. Disponible desde Agosto 2026.");
+    }
+    setLoading(false);
   }, [mesId]);
 
-  // Parsear malla para el mes activo
-  // El Sheet tiene columnas: fecha (A), asesor (B), dia (C=número), ...
-  // La pestaña "Malla de SegurosFly" tiene estructura especial:
-  // Fila 1: encabezados de fecha (1/8, 2/8, ...)
-  // Filas siguientes: turno + asignaciones por día
-  // Como el Sheet llega como rows de {fecha, mes, asesor, dia, orden, plan, valorUsd, ts}
-  // necesitamos procesar la data cruda diferente.
-  // El Apps Script convierte todo con ese formato pero la malla es diferente.
-  // Usamos la data tal como llega y la reconstruimos.
-
-  // Construir vista desde la data cruda del Sheet
-  // rows[0] = encabezado de fechas {fecha: "Turno", mes: "Horario", asesor: "Sábado", dia: "Domingo", ...}
-  // rows[1..n] = turnos con asignaciones
+  // Construir calendario desde datos embebidos
   const semanas = useMemo(function() {
-    if (!malla || !malla.length) return [];
-    // La fila 0 tiene las fechas en los campos del row
-    const header = malla[0];
-    const dias = []; // [{num: "1", dow: "Sábado", mesN: 8, colKey: "asesor"...}]
-
-    // Los campos del header row: fecha=Turno, mes=Horario, asesor=Sáb label, dia=num, orden=..., etc
-    // Necesitamos leer la estructura real
-    // Como el sheet es inusual, raw row fields:
-    // {fecha: "Turno", mes: "Horario", asesor: col_dow1, dia: col_date1, ...}
-    // Mejor: reconstruct from the flat row array structure
-    // Each row has: r.fecha=turno_id, r.mes=horario, r.asesor=val_col3, r.dia=val_col4, r.orden=val5...
-    // The header row (first row with "Turno"/"Horario"): cols after horario = fecha labels like "Sábado 1/8"
-
-    // Build days array from header row values
-    const hKeys = ["fecha","mes","asesor","dia","orden","plan","valorUsd","ts","nota"];
-    const hVals = [header.fecha, header.mes, header.asesor, header.dia,
-                   header.orden, header.plan, String(header.valorUsd||""), header.ts, header.nota||""];
-
-    // Filter to current month columns
-    const mesStr = "/"+mesNum; // e.g., "/8"
-    const colDays = [];
-    hVals.forEach(function(v, i) {
-      const s = String(v||"");
-      if (s.includes(mesStr)) {
-        const dayNum = parseInt(s.split("/")[0]);
-        if (!isNaN(dayNum)) colDays.push({ col: hKeys[i], dayNum, label: s });
-      }
-    });
-
-    if (!colDays.length) return [];
-
-    // Build turno rows
-    const turnoRows = malla.slice(1).filter(r => r.fecha && String(r.fecha).trim() !== "");
-
-    // Group by weeks (Sat–Fri) based on dayNum
-    // Get all days of this month
+    if (!malla) return null;
     const year = parseInt(mesId.split("-")[0]);
     const daysInMonth = new Date(year, mesNum, 0).getDate();
     const firstDow = new Date(year, mesNum-1, 1).getDay(); // 0=Dom,6=Sáb
-
-    // Build calendar weeks
     const weeks = [];
     let week = [];
-    // Pad start
     for (let d=0; d<firstDow; d++) week.push(null);
     for (let d=1; d<=daysInMonth; d++) {
       week.push(d);
       const dow = (firstDow + d - 1) % 7;
-      if (dow === 6 || d === daysInMonth) { // Sábado o último día
-        weeks.push([...week]);
-        week = [];
-      }
+      if (dow === 6 || d === daysInMonth) { weeks.push([...week]); week = []; }
     }
-
-    return { colDays, turnoRows, weeks, daysInMonth, firstDow, year };
+    return { weeks, daysInMonth, firstDow, year };
   }, [malla, mesId, mesNum]);
 
-  // Get assignment for a specific day and turno
-  function getAsign(turnoRow, dayNum) {
-    if (!semanas || !semanas.colDays) return "";
-    const col = semanas.colDays.find(c => c.dayNum === dayNum);
-    if (!col) return "";
-    return String(turnoRow[col.col] || "");
+  // Obtener asignación de un turno en un día específico
+  function getAsign(turno, dayNum) {
+    if (!turno || !turno.dias) return "";
+    return turno.dias[String(dayNum)] || "";
   }
 
   // Detect if day is weekend (Sab=6, Dom=0)
@@ -2969,9 +3009,9 @@ function MallaTab({ mesId, store }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {semanas.turnoRows.map(function(turno, ti) {
-                        const tId = String(turno.fecha||"").trim();
-                        const tHor = String(turno.mes||"").trim();
+                      {[...malla.turnos,...malla.breaks].map(function(turno, ti) {
+                        const tId = String(turno.id||"").trim();
+                        const tHor = String(turno.horario||"").trim();
                         if (!tId) return null;
                         const isBreak = tId.toLowerCase().includes("break");
                         const isDescanso = tId.toLowerCase().includes("descanso");
@@ -3019,7 +3059,7 @@ function MallaTab({ mesId, store }) {
                   // Quién trabaja los fines de semana en esta semana
                   const sociosDia = {};
                   fds.forEach(function(d) {
-                    const asigns = semanas.turnoRows
+                    const asigns = [...malla.turnos,...malla.breaks]
                       .map(r=>getAsign(r,d))
                       .filter(a=>a&&a!=="N/A"&&a!==""&&a!=="Bot Madruga");
                     const uniq = [...new Set(asigns)];
@@ -3106,17 +3146,9 @@ function MallaTab({ mesId, store }) {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
               {MALLA_AGENTES.map(function(agente) {
-                const descansoRows = semanas.turnoRows.filter(r=>
-                  String(r.fecha||"").toLowerCase().includes("descanso")
-                );
-                const diasDescanso = [];
-                semanas.colDays.forEach(function(col) {
-                  descansoRows.forEach(function(r) {
-                    if (String(r[col.col]||"").includes(agente.split(" ")[0])) {
-                      diasDescanso.push(col.dayNum);
-                    }
-                  });
-                });
+                const diasDescanso = (malla.descansos||[])
+                .filter(d=>d.agente===agente)
+                .flatMap(d=>d.dias||[]);
                 return (
                   <div key={agente} style={{background:"#fff",border:"1px solid #bbf7d0",
                     borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
