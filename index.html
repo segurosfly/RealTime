@@ -953,7 +953,7 @@ function verificarPinAsesor(asesor) {
 }
 // CAMBIO #10: PIN actualizado a 2187
 const SYNC_PIN = "2187";
-const SHEETS_URL = "https://script.google.com/macros/s/AKfycbzUyyS2ETrbiE89_eIS5S8449pzPujshcvMqkW-sSHf3q7jvsOfDj6EL2xPYXIq9-PJ/exec";
+const SHEETS_URL = "https://script.google.com/macros/s/AKfycbzhmgg75tWcY_c-UTlB39E3it45Vi3KwXhVjzERLFzDqqcZoRXRk4ty9qrLFvLQss5A/exec";
 
 // ── CONFIG REMOTA (pestaña Config de Google Sheets) ────────────────────────────
 // Cache en memoria: { "2026-05": { metaBase, pctBase, metaSfly, pctSfly, meta, comision }, ... }
@@ -2674,6 +2674,473 @@ function TrackerTab({store}) {
   );
 }
 
+
+// ── MALLA SEGUROSFLY ─────────────────────────────────────────────────────────
+// Agentes principales y socios de fin de semana
+const MALLA_AGENTES  = ["Guillermo González","Wilmary Antolinez","Daniel Romero"];
+const MALLA_SOCIOS   = ["Jhojan Torres","Wilker Casadiego","Otoniel Martell","Ricardo Torres"];
+const MALLA_TURNOS   = [
+  { id:"1", label:"Turno 1", horario:"08:00–16:00", color:"#2563eb" },
+  { id:"3", label:"Turno 3", horario:"10:00–18:00", color:"#0f766e" },
+  { id:"2", label:"Turno 2", horario:"14:00–22:00", color:"#7c3aed" },
+  { id:"5", label:"Sáb T5",  horario:"08:00–15:00", color:"#b45309" },
+  { id:"6", label:"Dom T6",  horario:"13:00–20:00", color:"#be185d" },
+  { id:"4", label:"Nocturno",horario:"22:00–08:00", color:"#475569" },
+];
+const MESES_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
+                  "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+
+// Parsea las filas crudas del Sheet en estructura útil
+function parseMallaRows(rows) {
+  // rows viene del read?sheet=Malla de SegurosFly
+  // Columnas: A=Turno B=Horario C=dia1/mes D=dia2/mes ...
+  // Primera fila: encabezado de fechas  (ej: "1/8","2/8",...)
+  // Filas siguientes: turno + asignaciones
+  if (!rows || rows.length < 2) return null;
+  return rows;
+}
+
+// ── NOTAS DE SOCIOS (localStorage por socio+fecha) ───────────────────────────
+const NOTAS_KEY = "sfly_malla_notas_v1";
+function loadNotas() {
+  try { return JSON.parse(localStorage.getItem(NOTAS_KEY)) || {}; }
+  catch(e) { return {}; }
+}
+function saveNotas(n) {
+  try { localStorage.setItem(NOTAS_KEY, JSON.stringify(n)); } catch(e) {}
+}
+
+function MallaTab({ mesId, store }) {
+  const [malla,    setMalla]    = useState(null);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(null);
+  const [notas,    setNotas]    = useState(loadNotas);
+  const [editNota, setEditNota] = useState(null); // { key, value }
+
+  // Mes en texto para comparar con encabezados del Sheet
+  const mesInfo   = getMesInfo(mesId);
+  const mesNum    = parseInt(mesId.split("-")[1]); // ej: 8 para agosto
+  const mesLabel  = MESES_ES[mesNum-1];
+
+  useEffect(function() {
+    setLoading(true); setError(null);
+    fetch(SHEETS_URL + "?accion=read&sheet=Malla%20de%20SegurosFly", { cache:"no-store" })
+      .then(r=>r.json())
+      .then(function(data) {
+        if (data && data.ok && data.rows) {
+          setMalla(data.rows);
+        } else {
+          setError("No se pudo cargar la malla del Sheet.");
+        }
+        setLoading(false);
+      })
+      .catch(function(e) {
+        setError("Error de conexión al cargar la malla.");
+        setLoading(false);
+      });
+  }, [mesId]);
+
+  // Parsear malla para el mes activo
+  // El Sheet tiene columnas: fecha (A), asesor (B), dia (C=número), ...
+  // La pestaña "Malla de SegurosFly" tiene estructura especial:
+  // Fila 1: encabezados de fecha (1/8, 2/8, ...)
+  // Filas siguientes: turno + asignaciones por día
+  // Como el Sheet llega como rows de {fecha, mes, asesor, dia, orden, plan, valorUsd, ts}
+  // necesitamos procesar la data cruda diferente.
+  // El Apps Script convierte todo con ese formato pero la malla es diferente.
+  // Usamos la data tal como llega y la reconstruimos.
+
+  // Construir vista desde la data cruda del Sheet
+  // rows[0] = encabezado de fechas {fecha: "Turno", mes: "Horario", asesor: "Sábado", dia: "Domingo", ...}
+  // rows[1..n] = turnos con asignaciones
+  const semanas = useMemo(function() {
+    if (!malla || !malla.length) return [];
+    // La fila 0 tiene las fechas en los campos del row
+    const header = malla[0];
+    const dias = []; // [{num: "1", dow: "Sábado", mesN: 8, colKey: "asesor"...}]
+
+    // Los campos del header row: fecha=Turno, mes=Horario, asesor=Sáb label, dia=num, orden=..., etc
+    // Necesitamos leer la estructura real
+    // Como el sheet es inusual, raw row fields:
+    // {fecha: "Turno", mes: "Horario", asesor: col_dow1, dia: col_date1, ...}
+    // Mejor: reconstruct from the flat row array structure
+    // Each row has: r.fecha=turno_id, r.mes=horario, r.asesor=val_col3, r.dia=val_col4, r.orden=val5...
+    // The header row (first row with "Turno"/"Horario"): cols after horario = fecha labels like "Sábado 1/8"
+
+    // Build days array from header row values
+    const hKeys = ["fecha","mes","asesor","dia","orden","plan","valorUsd","ts","nota"];
+    const hVals = [header.fecha, header.mes, header.asesor, header.dia,
+                   header.orden, header.plan, String(header.valorUsd||""), header.ts, header.nota||""];
+
+    // Filter to current month columns
+    const mesStr = "/"+mesNum; // e.g., "/8"
+    const colDays = [];
+    hVals.forEach(function(v, i) {
+      const s = String(v||"");
+      if (s.includes(mesStr)) {
+        const dayNum = parseInt(s.split("/")[0]);
+        if (!isNaN(dayNum)) colDays.push({ col: hKeys[i], dayNum, label: s });
+      }
+    });
+
+    if (!colDays.length) return [];
+
+    // Build turno rows
+    const turnoRows = malla.slice(1).filter(r => r.fecha && String(r.fecha).trim() !== "");
+
+    // Group by weeks (Sat–Fri) based on dayNum
+    // Get all days of this month
+    const year = parseInt(mesId.split("-")[0]);
+    const daysInMonth = new Date(year, mesNum, 0).getDate();
+    const firstDow = new Date(year, mesNum-1, 1).getDay(); // 0=Dom,6=Sáb
+
+    // Build calendar weeks
+    const weeks = [];
+    let week = [];
+    // Pad start
+    for (let d=0; d<firstDow; d++) week.push(null);
+    for (let d=1; d<=daysInMonth; d++) {
+      week.push(d);
+      const dow = (firstDow + d - 1) % 7;
+      if (dow === 6 || d === daysInMonth) { // Sábado o último día
+        weeks.push([...week]);
+        week = [];
+      }
+    }
+
+    return { colDays, turnoRows, weeks, daysInMonth, firstDow, year };
+  }, [malla, mesId, mesNum]);
+
+  // Get assignment for a specific day and turno
+  function getAsign(turnoRow, dayNum) {
+    if (!semanas || !semanas.colDays) return "";
+    const col = semanas.colDays.find(c => c.dayNum === dayNum);
+    if (!col) return "";
+    return String(turnoRow[col.col] || "");
+  }
+
+  // Detect if day is weekend (Sab=6, Dom=0)
+  function getDow(dayNum) {
+    if (!semanas) return -1;
+    return (semanas.firstDow + dayNum - 1) % 7;
+  }
+  const isWeekend = (d) => { const dow=getDow(d); return dow===0||dow===6; };
+  const isSab = (d) => getDow(d) === 6;
+  const isDom = (d) => getDow(d) === 0;
+
+  // Nota key: socio+fecha
+  function notaKey(socio, dayNum) { return `${mesId}|${socio}|${dayNum}`; }
+  function saveNota(key, val) {
+    const n = {...notas, [key]: val};
+    setNotas(n); saveNotas(n);
+  }
+
+  const DOW_LABELS = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+  const TURNO_COLORS = {"1":"#2563eb","3":"#0f766e","2":"#7c3aed","5":"#b45309","6":"#be185d","4":"#475569"};
+  const AGENTE_COLORS = {
+    "Guillermo González":"#2563eb","Wilmary Antolinez":"#be185d","Daniel Romero":"#0f766e",
+    "Jhojan Torres":"#b45309","Wilker Casadiego":"#0891b2","Otoniel Martell":"#7c3aed","Ricardo Torres":"#059669",
+    "Bot Madruga":"#475569","N/A":""
+  };
+
+  function PersonBadge({name}) {
+    if (!name || name==="N/A" || name==="") return <span style={{color:"#94a3b8",fontSize:11}}>—</span>;
+    const c = AGENTE_COLORS[name]||"#6366f1";
+    const isSocio = MALLA_SOCIOS.includes(name);
+    return (
+      <span style={{display:"inline-flex",alignItems:"center",gap:4,background:c+"15",
+        border:"1px solid "+c+"33",borderRadius:20,padding:"2px 8px",fontSize:11,
+        fontWeight:700,color:c,whiteSpace:"nowrap"}}>
+        <span style={{width:16,height:16,borderRadius:"50%",background:c,
+          display:"inline-flex",alignItems:"center",justifyContent:"center",
+          fontSize:8,color:"#fff",fontWeight:800,flexShrink:0}}>
+          {name[0]}
+        </span>
+        {name.split(" ")[0]}
+        {isSocio && <span style={{fontSize:9,opacity:0.7}}>·socio</span>}
+      </span>
+    );
+  }
+
+  if (loading) return (
+    <div style={{textAlign:"center",padding:48,color:"#64748b"}}>
+      <div style={{fontSize:32,marginBottom:12,animation:"spin 1s linear infinite",display:"inline-block"}}>⏳</div>
+      <div style={{fontWeight:700}}>Cargando malla desde Google Sheets...</div>
+    </div>
+  );
+
+  if (error) return (
+    <div style={{textAlign:"center",padding:48}}>
+      <div style={{fontSize:32,marginBottom:12}}>⚠️</div>
+      <div style={{color:"#ef4444",fontWeight:700}}>{error}</div>
+      <div style={{color:"#94a3b8",fontSize:13,marginTop:8}}>Verificá la conexión con Google Sheets</div>
+    </div>
+  );
+
+  const hasDays = semanas && semanas.colDays && semanas.colDays.length > 0;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+
+      {/* HEADER */}
+      <div style={{background:"linear-gradient(135deg,#3b0764,#6d28d9)",borderRadius:14,
+        padding:"18px 22px",display:"flex",alignItems:"center",gap:14}}>
+        <div style={{fontSize:32}}>📅</div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:17,fontWeight:800,color:"#fff"}}>Malla SegurosFly — {mesLabel}</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.75)",marginTop:2}}>
+            Turnos, descansos y socios de fin de semana · sincronizado desde Google Sheets
+          </div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:700,textTransform:"uppercase"}}>Equipo</div>
+          <div style={{fontSize:13,fontWeight:800,color:"#fff",marginTop:2}}>{MALLA_AGENTES.length} agentes · {MALLA_SOCIOS.length} socios</div>
+        </div>
+      </div>
+
+      {/* LEYENDA */}
+      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"12px 16px",
+        display:"flex",flexWrap:"wrap",gap:10,alignItems:"center"}}>
+        <span style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginRight:4}}>Leyenda:</span>
+        {[...MALLA_AGENTES,...MALLA_SOCIOS].map(n=>(
+          <PersonBadge key={n} name={n}/>
+        ))}
+        <span style={{display:"inline-flex",alignItems:"center",gap:4,background:"#f1f5f9",
+          border:"1px solid #e2e8f0",borderRadius:20,padding:"2px 8px",fontSize:11,color:"#94a3b8"}}>
+          N/A = libre
+        </span>
+      </div>
+
+      {!hasDays ? (
+        <div style={{textAlign:"center",padding:40,background:"#fff",borderRadius:14,
+          border:"1.5px dashed #e2e8f0",color:"#94a3b8"}}>
+          <div style={{fontSize:28,marginBottom:8}}>📭</div>
+          <div style={{fontWeight:700,fontSize:14}}>No hay malla cargada para {mesLabel}</div>
+          <div style={{fontSize:12,marginTop:6}}>La malla de agosto en adelante se cargará automáticamente desde el Sheet.</div>
+        </div>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+
+          {/* VISTA CALENDARIO POR SEMANA */}
+          {semanas.weeks.map(function(week, wi) {
+            const realDays = week.filter(Boolean);
+            if (!realDays.length) return null;
+            const hasWeekend = realDays.some(d=>isWeekend(d));
+
+            return (
+              <div key={wi} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden"}}>
+                {/* Semana header */}
+                <div style={{background:"#f8fafc",borderBottom:"1px solid #e2e8f0",
+                  padding:"10px 16px",display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:12,fontWeight:800,color:"#6d28d9"}}>Semana {wi+1}</span>
+                  <span style={{fontSize:11,color:"#94a3b8"}}>
+                    {mesLabel} {realDays[0]} – {realDays[realDays.length-1]}
+                  </span>
+                  {hasWeekend && (
+                    <span style={{background:"#fef3c7",border:"1px solid #fbbf24",borderRadius:20,
+                      padding:"2px 8px",fontSize:10,fontWeight:700,color:"#b45309",marginLeft:"auto"}}>
+                      🏖 Fin de semana incluido
+                    </span>
+                  )}
+                </div>
+
+                {/* Grid días */}
+                <div style={{overflowX:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
+                    <thead>
+                      <tr>
+                        <th style={{padding:"8px 12px",fontSize:11,fontWeight:700,color:"#94a3b8",
+                          textAlign:"left",borderBottom:"1px solid #e2e8f0",background:"#f8fafc",
+                          whiteSpace:"nowrap",width:120}}>Turno</th>
+                        {week.map(function(d,di) {
+                          if (d===null) return <th key={di} style={{borderBottom:"1px solid #e2e8f0",background:"#f8fafc"}}/>;
+                          const dow = getDow(d);
+                          const wknd = isWeekend(d);
+                          return (
+                            <th key={di} style={{padding:"6px 8px",fontSize:11,fontWeight:700,
+                              color:wknd?"#be185d":"#475569",textAlign:"center",
+                              borderBottom:"1px solid #e2e8f0",minWidth:80,
+                              background:wknd?"#fff1f2":"#f8fafc"}}>
+                              <div style={{fontWeight:800}}>{DOW_LABELS[dow]}</div>
+                              <div style={{fontSize:13,color:wknd?"#be185d":"#1e293b",fontWeight:800}}>{d}</div>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {semanas.turnoRows.map(function(turno, ti) {
+                        const tId = String(turno.fecha||"").trim();
+                        const tHor = String(turno.mes||"").trim();
+                        if (!tId) return null;
+                        const isBreak = tId.toLowerCase().includes("break");
+                        const isDescanso = tId.toLowerCase().includes("descanso");
+                        const tColor = TURNO_COLORS[tId]||"#6366f1";
+
+                        return (
+                          <tr key={ti} style={{borderBottom:"1px solid #f1f5f9",
+                            background:isBreak?"#fffbeb":isDescanso?"#f0fdf4":"#fff"}}>
+                            <td style={{padding:"8px 12px",borderRight:"1px solid #f1f5f9"}}>
+                              <div style={{fontSize:11,fontWeight:800,
+                                color:isBreak?"#b45309":isDescanso?"#059669":tColor}}>
+                                {isBreak?"☕ "+tId:isDescanso?"🏖 Descanso":"⏰ Turno "+tId}
+                              </div>
+                              {tHor&&<div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>{tHor}</div>}
+                            </td>
+                            {week.map(function(d,di) {
+                              if (d===null) return <td key={di}/>;
+                              const asign = getAsign(turno, d);
+                              const wknd = isWeekend(d);
+                              const isBotOrNA = asign==="N/A"||asign===""||asign==="Bot Madruga";
+                              return (
+                                <td key={di} style={{padding:"6px 8px",textAlign:"center",
+                                  background:wknd?"#fff8f8":"transparent",
+                                  verticalAlign:"middle"}}>
+                                  {isBotOrNA ? (
+                                    <span style={{fontSize:10,color:"#cbd5e1"}}>
+                                      {asign==="Bot Madruga"?"🤖 Bot":"—"}
+                                    </span>
+                                  ) : (
+                                    <PersonBadge name={asign}/>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Socios de fin de semana + notas */}
+                {hasWeekend && (()=>{
+                  const fds = realDays.filter(d=>isWeekend(d));
+                  // Quién trabaja los fines de semana en esta semana
+                  const sociosDia = {};
+                  fds.forEach(function(d) {
+                    const asigns = semanas.turnoRows
+                      .map(r=>getAsign(r,d))
+                      .filter(a=>a&&a!=="N/A"&&a!==""&&a!=="Bot Madruga");
+                    const uniq = [...new Set(asigns)];
+                    sociosDia[d] = uniq;
+                  });
+
+                  return (
+                    <div style={{borderTop:"1px solid #fecdd3",background:"#fff1f2",padding:"12px 16px"}}>
+                      <div style={{fontSize:11,fontWeight:800,color:"#be185d",marginBottom:10,
+                        textTransform:"uppercase",letterSpacing:"0.06em"}}>
+                        📋 Notas de socios · Fin de semana
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:10}}>
+                        {fds.map(function(d) {
+                          const dow = getDow(d);
+                          const asigns = semanas.turnoRows
+                            .map(r=>getAsign(r,d))
+                            .filter(a=>a&&a!=="N/A"&&a!==""&&a!=="Bot Madruga");
+                          const uniq=[...new Set(asigns)];
+                          return uniq.map(function(socio) {
+                            const key = notaKey(socio,d);
+                            const nota = notas[key]||"";
+                            const isEditing = editNota && editNota.key===key;
+                            return (
+                              <div key={key} style={{background:"#fff",border:"1px solid #fecdd3",
+                                borderRadius:10,padding:"10px 12px"}}>
+                                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                                  <PersonBadge name={socio}/>
+                                  <span style={{fontSize:10,color:"#94a3b8",fontWeight:700}}>
+                                    {DOW_LABELS[dow]} {d}/{mesNum}
+                                  </span>
+                                </div>
+                                {isEditing ? (
+                                  <div>
+                                    <textarea
+                                      autoFocus
+                                      defaultValue={editNota.value}
+                                      onChange={e=>setEditNota({...editNota,value:e.target.value})}
+                                      rows={3}
+                                      style={{width:"100%",border:"1.5px solid #6d28d9",borderRadius:8,
+                                        padding:"6px 10px",fontSize:12,fontFamily:"'Sora',sans-serif",
+                                        resize:"vertical",outline:"none"}}
+                                      placeholder="Pendientes, promesas, novedades del turno..."
+                                    />
+                                    <div style={{display:"flex",gap:6,marginTop:6}}>
+                                      <button onClick={()=>{saveNota(key,editNota.value);setEditNota(null);}}
+                                        style={{flex:1,height:30,borderRadius:8,border:"none",
+                                          background:"#6d28d9",color:"#fff",fontWeight:700,fontSize:11,cursor:"pointer"}}>
+                                        ✅ Guardar
+                                      </button>
+                                      <button onClick={()=>setEditNota(null)}
+                                        style={{height:30,padding:"0 10px",borderRadius:8,
+                                          border:"1px solid #e2e8f0",background:"#f8fafc",
+                                          color:"#64748b",fontWeight:700,fontSize:11,cursor:"pointer"}}>
+                                        ✕
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div onClick={()=>setEditNota({key,value:nota})}
+                                    style={{minHeight:40,padding:"6px 8px",borderRadius:8,
+                                      border:"1.5px dashed #e2e8f0",background:"#f8fafc",
+                                      fontSize:12,color:nota?"#1e293b":"#94a3b8",cursor:"pointer",
+                                      lineHeight:1.5}}>
+                                    {nota||"Tocá para agregar notas del turno..."}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          });
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            );
+          })}
+
+          {/* RESUMEN: ¿Quién descansa este mes? */}
+          <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:14,padding:"16px 20px"}}>
+            <div style={{fontSize:13,fontWeight:800,color:"#059669",marginBottom:12}}>
+              🏖 Descansos del mes — {mesLabel}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
+              {MALLA_AGENTES.map(function(agente) {
+                const descansoRows = semanas.turnoRows.filter(r=>
+                  String(r.fecha||"").toLowerCase().includes("descanso")
+                );
+                const diasDescanso = [];
+                semanas.colDays.forEach(function(col) {
+                  descansoRows.forEach(function(r) {
+                    if (String(r[col.col]||"").includes(agente.split(" ")[0])) {
+                      diasDescanso.push(col.dayNum);
+                    }
+                  });
+                });
+                return (
+                  <div key={agente} style={{background:"#fff",border:"1px solid #bbf7d0",
+                    borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+                    <PersonBadge name={agente}/>
+                    <div>
+                      {diasDescanso.length>0 ? (
+                        <div style={{fontSize:11,color:"#059669",fontWeight:700}}>
+                          Descansa: {diasDescanso.map(d=>`${d}/${mesNum}`).join(", ")}
+                        </div>
+                      ) : (
+                        <div style={{fontSize:11,color:"#94a3b8"}}>Sin descanso registrado</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── CALCULADORAS DE VIAJE ──────────────────────────────────────────────────────
 function CalcCard({ index, label, color, accent, pasajeros, dias, onPasajerosChange, onDiasChange, link }) {
   const [valor, setValor] = useState("");
@@ -3449,6 +3916,7 @@ const MAIN_TABS = [
   { id:"wilmary",   label:"Wilmary",       color:"#be185d" },
   { id:"tracker",   label:"Tracker",       color:"#0d9488" },
   { id:"calc",      label:"Calculadoras",  color:"#b45309" },
+  { id:"malla",      label:"Malla SF",       color:"#6d28d9" },
   { id:"cotizador",  label:"Cotizador",      color:"#1B72C4" },
   { id:"tosspile",  label:"Trustpilot",    color:"#00b67a" },
 ];
@@ -3703,7 +4171,7 @@ function App() {
         <div style={{display:"flex",flexDirection:"column",gap:3,flex:1,overflow:"hidden"}}>
           {/* Fila 1 — Secciones principales */}
           <div style={{display:"flex",gap:3,overflowX:"auto",justifyContent:"center"}}>
-            {[{id:"global",label:"✈️ Equipo",color:"#1e3a5f"},{id:"tracker",label:"📊 Tracker",color:"#0d9488"},{id:"calc",label:"🧮 Calculadoras",color:"#b45309"},{id:"cotizador",label:"💼 Cotizador",color:"#1B72C4"},{id:"tosspile",label:"⭐ Trustpilot",color:"#00b67a"}].map(t=>(
+            {[{id:"global",label:"✈️ Equipo",color:"#1e3a5f"},{id:"tracker",label:"📊 Tracker",color:"#0d9488"},{id:"calc",label:"🧮 Calculadoras",color:"#b45309"},{id:"malla",label:"📅 Malla SF",color:"#6d28d9"},{id:"cotizador",label:"💼 Cotizador",color:"#1B72C4"},{id:"tosspile",label:"⭐ Trustpilot",color:"#00b67a"}].map(t=>(
               <button key={t.id} onClick={()=>setTab(t.id)}
                 style={{background:tab===t.id?t.color:"transparent",color:tab===t.id?"#fff":"#64748b",
                   border:"1px solid "+(tab===t.id?t.color:"#e2e8f0"),borderRadius:7,
@@ -3751,6 +4219,7 @@ function App() {
         {tab==="tracker"   &&<TrackerTab store={store} />}
         {tab==="tosspile"  &&<TosspileTab store={store} onUpdate={onUpdate} />}
         {tab==="calc"      &&<CalcTab />}
+        {tab==="malla"     &&<MallaTab mesId={mesId} store={store} />}
         {tab==="cotizador" &&<CotizadorTab />}
       </div>
     </div>
