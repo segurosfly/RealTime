@@ -2813,9 +2813,9 @@ function saveNotas(n) {
 }
 
 function MallaTab({ mesId, store }) {
-  const [malla,    setMalla]    = useState(null);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState(null);
+  const [malla,    setMalla]    = useState(function(){ return MALLA_POR_MES[mesId]||null; });
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState(function(){ return MALLA_POR_MES[mesId]?null:"No hay malla cargada para este mes aún. Disponible desde Agosto 2026."; });
   const [notas,    setNotas]    = useState(loadNotas);
   const [editNota, setEditNota] = useState(null); // { key, value }
 
@@ -2825,14 +2825,9 @@ function MallaTab({ mesId, store }) {
   const mesLabel  = MESES_ES[mesNum-1];
 
   useEffect(function() {
-    setLoading(true); setError(null);
-    // Usar datos embebidos directamente (no depende del endpoint de Sheets)
-    const mallaData = MALLA_POR_MES[mesId];
-    if (mallaData) {
-      setMalla(mallaData);
-    } else {
-      setError("No hay malla cargada para este mes aún. Disponible desde Agosto 2026.");
-    }
+    const mallaData = MALLA_POR_MES[mesId] || null;
+    setMalla(mallaData);
+    setError(mallaData ? null : "No hay malla cargada para este mes aún. Disponible desde Agosto 2026.");
     setLoading(false);
   }, [mesId]);
 
@@ -2917,7 +2912,7 @@ function MallaTab({ mesId, store }) {
     </div>
   );
 
-  const hasDays = semanas && semanas.colDays && semanas.colDays.length > 0;
+  const hasDays = !!malla && !!semanas && !!malla.turnos && malla.turnos.length > 0;
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
