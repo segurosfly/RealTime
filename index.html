@@ -2732,7 +2732,7 @@ const MALLA_AGOSTO = {
     },
     {
       id:"4", horario:"22:00–08:00",
-      dias: Object.fromEntries(Array.from({length:31},(_,i)=>[(i+1).toString(),"Bot Madruga"]))
+      dias: {"1":"Bot Madruga","2":"Bot Madruga","3":"Bot Madruga","4":"Bot Madruga","5":"Bot Madruga","6":"Bot Madruga","7":"Bot Madruga","8":"Bot Madruga","9":"Bot Madruga","10":"Bot Madruga","11":"Bot Madruga","12":"Bot Madruga","13":"Bot Madruga","14":"Bot Madruga","15":"Bot Madruga","16":"Bot Madruga","17":"Bot Madruga","18":"Bot Madruga","19":"Bot Madruga","20":"Bot Madruga","21":"Bot Madruga","22":"Bot Madruga","23":"Bot Madruga","24":"Bot Madruga","25":"Bot Madruga","26":"Bot Madruga","27":"Bot Madruga","28":"Bot Madruga","29":"Bot Madruga","30":"Bot Madruga","31":"Bot Madruga"}
     }
   ],
   breaks: [
@@ -2833,7 +2833,7 @@ function MallaTab({ mesId, store }) {
 
   // Construir calendario desde datos embebidos
   const semanas = useMemo(function() {
-    if (!malla) return null;
+    if (!malla || !malla.turnos) return null;
     const year = parseInt(mesId.split("-")[0]);
     const daysInMonth = new Date(year, mesNum, 0).getDate();
     const firstDow = new Date(year, mesNum-1, 1).getDay(); // 0=Dom,6=Sáb
@@ -2850,8 +2850,7 @@ function MallaTab({ mesId, store }) {
 
   // Obtener asignación de un turno en un día específico
   function getAsign(turno, dayNum) {
-    if (!turno || !turno.dias) return "";
-    return turno.dias[String(dayNum)] || "";
+    try { return (turno && turno.dias && turno.dias[String(dayNum)]) || ""; } catch(e){ return ""; }
   }
 
   // Detect if day is weekend (Sab=6, Dom=0)
@@ -2897,7 +2896,7 @@ function MallaTab({ mesId, store }) {
     );
   }
 
-  if (loading) return (
+  if (loading && !malla) return (
     <div style={{textAlign:"center",padding:48,color:"#64748b"}}>
       <div style={{fontSize:32,marginBottom:12,animation:"spin 1s linear infinite",display:"inline-block"}}>⏳</div>
       <div style={{fontWeight:700}}>Cargando malla desde Google Sheets...</div>
@@ -2912,7 +2911,7 @@ function MallaTab({ mesId, store }) {
     </div>
   );
 
-  const hasDays = !!malla && !!semanas && !!malla.turnos && malla.turnos.length > 0;
+  const hasDays = !!(malla && malla.turnos && malla.turnos.length > 0 && semanas && semanas.weeks);
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
@@ -2957,7 +2956,7 @@ function MallaTab({ mesId, store }) {
         <div style={{display:"flex",flexDirection:"column",gap:14}}>
 
           {/* VISTA CALENDARIO POR SEMANA */}
-          {semanas.weeks.map(function(week, wi) {
+          {(semanas&&semanas.weeks?semanas.weeks:[]).map(function(week, wi) {
             const realDays = week.filter(Boolean);
             if (!realDays.length) return null;
             const hasWeekend = realDays.some(d=>isWeekend(d));
@@ -3004,7 +3003,8 @@ function MallaTab({ mesId, store }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {[...malla.turnos,...malla.breaks].map(function(turno, ti) {
+                      {(malla&&malla.turnos?[...malla.turnos,...(malla.breaks||[])]:[])
+                    .map(function(turno, ti) {
                         const tId = String(turno.id||"").trim();
                         const tHor = String(turno.horario||"").trim();
                         if (!tId) return null;
@@ -3054,7 +3054,7 @@ function MallaTab({ mesId, store }) {
                   // Quién trabaja los fines de semana en esta semana
                   const sociosDia = {};
                   fds.forEach(function(d) {
-                    const asigns = [...malla.turnos,...malla.breaks]
+                    const asigns = (malla&&malla.turnos?[...malla.turnos,...(malla.breaks||[])]:[])
                       .map(r=>getAsign(r,d))
                       .filter(a=>a&&a!=="N/A"&&a!==""&&a!=="Bot Madruga");
                     const uniq = [...new Set(asigns)];
@@ -3070,10 +3070,10 @@ function MallaTab({ mesId, store }) {
                       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:10}}>
                         {fds.map(function(d) {
                           const dow = getDow(d);
-                          const asigns = semanas.turnoRows
+                          const asigns = (malla&&malla.turnos?[...malla.turnos,...(malla.breaks||[])]:[] )
                             .map(r=>getAsign(r,d))
                             .filter(a=>a&&a!=="N/A"&&a!==""&&a!=="Bot Madruga");
-                          const uniq=[...new Set(asigns)];
+                          const uniq=[...new Set(asigns)].filter(Boolean);
                           return uniq.map(function(socio) {
                             const key = notaKey(socio,d);
                             const nota = notas[key]||"";
@@ -3141,7 +3141,7 @@ function MallaTab({ mesId, store }) {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
               {MALLA_AGENTES.map(function(agente) {
-                const diasDescanso = (malla.descansos||[])
+                const diasDescanso = ((malla&&malla.descansos)||[])
                 .filter(d=>d.agente===agente)
                 .flatMap(d=>d.dias||[]);
                 return (
