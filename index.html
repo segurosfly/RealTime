@@ -2813,357 +2813,456 @@ function saveNotas(n) {
 }
 
 function MallaTab({ mesId, store }) {
-  const [malla,    setMalla]    = useState(function(){ return MALLA_POR_MES[mesId]||null; });
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState(function(){ return MALLA_POR_MES[mesId]?null:"No hay malla cargada para este mes aún. Disponible desde Agosto 2026."; });
-  const [notas,    setNotas]    = useState(loadNotas);
-  const [editNota, setEditNota] = useState(null); // { key, value }
+  const [notas,       setNotas]       = useState(loadNotas);
+  const [editNota,    setEditNota]    = useState(null);
+  const [asesorVista, setAsesorVista] = useState(null); // null = vista equipo, string = vista personal
 
-  // Mes en texto para comparar con encabezados del Sheet
-  const mesInfo   = getMesInfo(mesId);
-  const mesNum    = parseInt(mesId.split("-")[1]); // ej: 8 para agosto
-  const mesLabel  = MESES_ES[mesNum-1];
+  const malla    = MALLA_POR_MES[mesId] || null;
+  const mesNum   = parseInt(mesId.split("-")[0] === "2026" ? mesId.split("-")[1] : mesId.split("-")[1]);
+  const year     = parseInt(mesId.split("-")[0]);
+  const mesLabel = MESES_ES[mesNum-1];
 
-  useEffect(function() {
-    const mallaData = MALLA_POR_MES[mesId] || null;
-    setMalla(mallaData);
-    setError(mallaData ? null : "No hay malla cargada para este mes aún. Disponible desde Agosto 2026.");
-    setLoading(false);
-  }, [mesId]);
-
-  // Construir calendario desde datos embebidos
-  const semanas = useMemo(function() {
-    if (!malla || !malla.turnos) return null;
-    const year = parseInt(mesId.split("-")[0]);
-    const daysInMonth = new Date(year, mesNum, 0).getDate();
-    const firstDow = new Date(year, mesNum-1, 1).getDay(); // 0=Dom,6=Sáb
-    const weeks = [];
-    let week = [];
-    for (let d=0; d<firstDow; d++) week.push(null);
-    for (let d=1; d<=daysInMonth; d++) {
-      week.push(d);
-      const dow = (firstDow + d - 1) % 7;
-      if (dow === 6 || d === daysInMonth) { weeks.push([...week]); week = []; }
-    }
-    return { weeks, daysInMonth, firstDow, year };
-  }, [malla, mesId, mesNum]);
-
-  // Obtener asignación de un turno en un día específico
+  // ── Helpers ──────────────────────────────────────────────────────────────────
   function getAsign(turno, dayNum) {
     try { return (turno && turno.dias && turno.dias[String(dayNum)]) || ""; } catch(e){ return ""; }
   }
+  function getDow(d) { return (new Date(year, mesNum-1, d)).getDay(); } // 0=Dom,6=Sáb
+  const isWeekend = d => { const dow=getDow(d); return dow===0||dow===6; };
+  const isSab     = d => getDow(d)===6;
+  const isDom     = d => getDow(d)===0;
+  const daysInMonth = new Date(year, mesNum, 0).getDate();
 
-  // Detect if day is weekend (Sab=6, Dom=0)
-  function getDow(dayNum) {
-    if (!semanas) return -1;
-    return (semanas.firstDow + dayNum - 1) % 7;
+  // Semanas Lun→Dom
+  const semanas = useMemo(function(){
+    if (!malla) return [];
+    const weeks=[], allDays=[];
+    for(let d=1;d<=daysInMonth;d++) allDays.push(d);
+    let week=[];
+    // find first Monday
+    const firstDay = new Date(year,mesNum-1,1).getDay(); // 0=Dom
+    // pad to Monday start
+    const padStart = firstDay===0?6:firstDay-1; // days before first Monday
+    for(let i=0;i<padStart;i++) week.push(null);
+    for(let d=1;d<=daysInMonth;d++){
+      week.push(d);
+      const dow=getDow(d);
+      if(dow===0||d===daysInMonth){ // domingo o último día
+        while(week.length<7) week.push(null);
+        weeks.push([...week]); week=[];
+      }
+    }
+    return weeks;
+  },[malla,mesId]);
+
+  // Turnos principales (sin breaks)
+  const TURNOS_PRINCIPALES = malla ? malla.turnos.filter(t=>["1","2","3"].includes(t.id)) : [];
+  // Turno labels correctos
+  const TURNO_META = {"1":{label:"Turno 1",h:"08:00–16:00",c:"#2563eb"},"2":{label:"Turno 2",h:"10:00–18:00",c:"#0f766e"},"3":{label:"Turno 3",h:"14:00–22:00",c:"#7c3aed"}};
+
+  // Get turno of an agent on a day
+  function getTurnoAgente(agente, dayNum){
+    if(!malla) return null;
+    for(const t of TURNOS_PRINCIPALES){
+      const a=getAsign(t,dayNum);
+      if(a===agente) return t;
+    }
+    // Check FDS turnos
+    for(const t of malla.turnos.filter(t=>["5","6"].includes(t.id))){
+      const a=getAsign(t,dayNum);
+      if(a===agente) return t;
+    }
+    return null;
   }
-  const isWeekend = (d) => { const dow=getDow(d); return dow===0||dow===6; };
-  const isSab = (d) => getDow(d) === 6;
-  const isDom = (d) => getDow(d) === 0;
 
-  // Nota key: socio+fecha
-  function notaKey(socio, dayNum) { return `${mesId}|${socio}|${dayNum}`; }
-  function saveNota(key, val) {
-    const n = {...notas, [key]: val};
-    setNotas(n); saveNotas(n);
-  }
+  // Notas
+  function notaKey(socio,dayNum){ return `${mesId}|${socio}|${dayNum}`; }
+  function saveNota(key,val){ const n={...notas,[key]:val}; setNotas(n); saveNotas(n); }
 
-  const DOW_LABELS = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
-  const TURNO_COLORS = {"1":"#2563eb","3":"#0f766e","2":"#7c3aed","5":"#b45309","6":"#be185d","4":"#475569"};
-  const AGENTE_COLORS = {
-    "Guillermo González":"#2563eb","Wilmary Antolinez":"#be185d","Daniel Romero":"#0f766e",
-    "Jhojan Torres":"#b45309","Wilker Casadiego":"#0891b2","Otoniel Martell":"#7c3aed","Ricardo Torres":"#059669",
-    "Bot Madruga":"#475569","N/A":""
-  };
+  // Colors
+  const AGENTE_COLORS={"Guillermo González":"#2563eb","Wilmary Antolinez":"#be185d","Daniel Romero":"#0f766e","Jhojan Torres":"#b45309","Wilker Casadiego":"#0891b2","Otoniel Martell":"#7c3aed","Ricardo Torres":"#059669","Bot Madruga":"#475569"};
+  const DOW = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
 
-  function PersonBadge({name}) {
-    if (!name || name==="N/A" || name==="") return <span style={{color:"#94a3b8",fontSize:11}}>—</span>;
-    const c = AGENTE_COLORS[name]||"#6366f1";
-    const isSocio = MALLA_SOCIOS.includes(name);
+  function AgenteBadge({name, size="md", onClick, active}){
+    if(!name||name==="N/A"||name==="") return <span style={{color:"#cbd5e1",fontSize:11}}>—</span>;
+    if(name==="Bot Madruga") return <span style={{fontSize:10,color:"#94a3b8"}}>🤖 Bot</span>;
+    const c=AGENTE_COLORS[name]||"#6366f1";
+    const isSocio=MALLA_SOCIOS.includes(name);
+    const firstName=name.split(" ")[0];
+    const sz=size==="sm"?{fs:10,pad:"2px 6px",av:14}:{fs:11,pad:"3px 9px",av:18};
     return (
-      <span style={{display:"inline-flex",alignItems:"center",gap:4,background:c+"15",
-        border:"1px solid "+c+"33",borderRadius:20,padding:"2px 8px",fontSize:11,
-        fontWeight:700,color:c,whiteSpace:"nowrap"}}>
-        <span style={{width:16,height:16,borderRadius:"50%",background:c,
+      <span onClick={onClick} style={{display:"inline-flex",alignItems:"center",gap:4,
+        background:active?c:c+"18",border:"1.5px solid "+c+(active?"":"44"),borderRadius:20,
+        padding:sz.pad,fontSize:sz.fs,fontWeight:700,color:active?"#fff":c,
+        cursor:onClick?"pointer":"default",transition:"all .15s",whiteSpace:"nowrap"}}>
+        <span style={{width:sz.av,height:sz.av,borderRadius:"50%",
+          background:active?"rgba(255,255,255,0.3)":c,
           display:"inline-flex",alignItems:"center",justifyContent:"center",
-          fontSize:8,color:"#fff",fontWeight:800,flexShrink:0}}>
+          fontSize:sz.av-8,color:"#fff",fontWeight:800,flexShrink:0}}>
           {name[0]}
         </span>
-        {name.split(" ")[0]}
-        {isSocio && <span style={{fontSize:9,opacity:0.7}}>·socio</span>}
+        {firstName}
+        {isSocio&&<span style={{fontSize:9,opacity:0.8}}>·socio</span>}
       </span>
     );
   }
 
-  if (loading && !malla) return (
-    <div style={{textAlign:"center",padding:48,color:"#64748b"}}>
-      <div style={{fontSize:32,marginBottom:12,animation:"spin 1s linear infinite",display:"inline-block"}}>⏳</div>
-      <div style={{fontWeight:700}}>Cargando malla desde Google Sheets...</div>
-    </div>
-  );
+  function TurnoBadge({turno}){
+    if(!turno) return <span style={{fontSize:10,color:"#e2e8f0",fontWeight:600}}>libre</span>;
+    const m=TURNO_META[turno.id]||{label:"T"+turno.id,h:turno.horario,c:"#64748b"};
+    return (
+      <span style={{display:"inline-flex",flexDirection:"column",alignItems:"center",
+        background:m.c+"15",border:"1px solid "+m.c+"44",borderRadius:8,
+        padding:"4px 8px",gap:1}}>
+        <span style={{fontSize:11,fontWeight:800,color:m.c}}>{m.label}</span>
+        <span style={{fontSize:9,color:m.c+"cc",fontWeight:600}}>{m.h}</span>
+      </span>
+    );
+  }
 
-  if (error) return (
-    <div style={{textAlign:"center",padding:48}}>
-      <div style={{fontSize:32,marginBottom:12}}>⚠️</div>
-      <div style={{color:"#ef4444",fontWeight:700}}>{error}</div>
-      <div style={{color:"#94a3b8",fontSize:13,marginTop:8}}>Verificá la conexión con Google Sheets</div>
-    </div>
-  );
+  // ── VISTA PERSONAL (clic en agente) ──────────────────────────────────────────
+  function VistaPersonal({agente}){
+    const c=AGENTE_COLORS[agente]||"#6366f1";
+    const firstName=agente.split(" ")[0];
+    let libres=0, trabajados=0, descansosDias=[];
 
-  const hasDays = !!(malla && malla.turnos && malla.turnos.length > 0 && semanas && semanas.weeks);
+    // Descansos del mes
+    if(malla&&malla.descansos){
+      const d=malla.descansos.find(d=>d.agente===agente);
+      if(d) descansosDias=d.dias||[];
+    }
 
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+    const semanaRows = semanas.map(function(week,wi){
+      const realDays=week.filter(Boolean);
+      const wkDays=realDays.filter(d=>!isWeekend(d));
+      const wkndDays=realDays.filter(d=>isWeekend(d));
 
-      {/* HEADER */}
-      <div style={{background:"linear-gradient(135deg,#3b0764,#6d28d9)",borderRadius:14,
-        padding:"18px 22px",display:"flex",alignItems:"center",gap:14}}>
-        <div style={{fontSize:32}}>📅</div>
-        <div style={{flex:1}}>
-          <div style={{fontSize:17,fontWeight:800,color:"#fff"}}>Malla SegurosFly — {mesLabel}</div>
-          <div style={{fontSize:12,color:"rgba(255,255,255,0.75)",marginTop:2}}>
-            Turnos, descansos y socios de fin de semana · sincronizado desde Google Sheets
+      // Contar fines de semana
+      wkndDays.forEach(d=>{
+        const t=getTurnoAgente(agente,d);
+        if(t||descansosDias.includes(d)===false) trabajados++;
+        else libres++;
+      });
+
+      return (
+        <div key={wi} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,overflow:"hidden",marginBottom:10}}>
+          {/* Header semana */}
+          <div style={{background:c+"0f",borderBottom:"1px solid "+c+"22",
+            padding:"8px 16px",display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:12,fontWeight:800,color:c}}>Semana {wi+1}</span>
+            <span style={{fontSize:11,color:"#94a3b8"}}>
+              {realDays[0]&&DOW[getDow(realDays[0])]+" "+realDays[0]} – {realDays[realDays.length-1]&&DOW[getDow(realDays[realDays.length-1])]+" "+realDays[realDays.length-1]}
+            </span>
           </div>
-        </div>
-        <div style={{textAlign:"right"}}>
-          <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",fontWeight:700,textTransform:"uppercase"}}>Equipo</div>
-          <div style={{fontSize:13,fontWeight:800,color:"#fff",marginTop:2}}>{MALLA_AGENTES.length} agentes · {MALLA_SOCIOS.length} socios</div>
-        </div>
-      </div>
-
-      {/* LEYENDA */}
-      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"12px 16px",
-        display:"flex",flexWrap:"wrap",gap:10,alignItems:"center"}}>
-        <span style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginRight:4}}>Leyenda:</span>
-        {[...MALLA_AGENTES,...MALLA_SOCIOS].map(n=>(
-          <PersonBadge key={n} name={n}/>
-        ))}
-        <span style={{display:"inline-flex",alignItems:"center",gap:4,background:"#f1f5f9",
-          border:"1px solid #e2e8f0",borderRadius:20,padding:"2px 8px",fontSize:11,color:"#94a3b8"}}>
-          N/A = libre
-        </span>
-      </div>
-
-      {!hasDays ? (
-        <div style={{textAlign:"center",padding:40,background:"#fff",borderRadius:14,
-          border:"1.5px dashed #e2e8f0",color:"#94a3b8"}}>
-          <div style={{fontSize:28,marginBottom:8}}>📭</div>
-          <div style={{fontWeight:700,fontSize:14}}>No hay malla cargada para {mesLabel}</div>
-          <div style={{fontSize:12,marginTop:6}}>La malla de agosto en adelante se cargará automáticamente desde el Sheet.</div>
-        </div>
-      ) : (
-        <div style={{display:"flex",flexDirection:"column",gap:14}}>
-
-          {/* VISTA CALENDARIO POR SEMANA */}
-          {(semanas&&semanas.weeks?semanas.weeks:[]).map(function(week, wi) {
-            const realDays = week.filter(Boolean);
-            if (!realDays.length) return null;
-            const hasWeekend = realDays.some(d=>isWeekend(d));
-
-            return (
-              <div key={wi} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden"}}>
-                {/* Semana header */}
-                <div style={{background:"#f8fafc",borderBottom:"1px solid #e2e8f0",
-                  padding:"10px 16px",display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:12,fontWeight:800,color:"#6d28d9"}}>Semana {wi+1}</span>
-                  <span style={{fontSize:11,color:"#94a3b8"}}>
-                    {mesLabel} {realDays[0]} – {realDays[realDays.length-1]}
-                  </span>
-                  {hasWeekend && (
-                    <span style={{background:"#fef3c7",border:"1px solid #fbbf24",borderRadius:20,
-                      padding:"2px 8px",fontSize:10,fontWeight:700,color:"#b45309",marginLeft:"auto"}}>
-                      🏖 Fin de semana incluido
-                    </span>
+          {/* Días Lun-Vie */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6,padding:"12px 14px"}}>
+            {week.filter(d=>d&&!isWeekend(d)).map(function(d){
+              const t=getTurnoAgente(agente,d);
+              const desc=descansosDias.includes(d);
+              return (
+                <div key={d} style={{textAlign:"center",background:desc?"#f0fdf4":t?TURNO_META[t.id]?.c+"0a"||"#f8fafc":"#f8fafc",
+                  border:"1px solid "+(desc?"#bbf7d0":t?TURNO_META[t.id]?.c+"33"||"#e2e8f0":"#e2e8f0"),
+                  borderRadius:10,padding:"8px 6px"}}>
+                  <div style={{fontSize:10,color:"#94a3b8",fontWeight:700}}>{DOW[getDow(d)]}</div>
+                  <div style={{fontSize:16,fontWeight:800,color:desc?"#059669":t?TURNO_META[t.id]?.c||c:"#1e293b",margin:"4px 0"}}>{d}</div>
+                  {desc?(
+                    <span style={{fontSize:9,fontWeight:700,color:"#059669",background:"#dcfce7",borderRadius:6,padding:"2px 6px"}}>🏖 Libre</span>
+                  ):t?(
+                    <TurnoBadge turno={t}/>
+                  ):(
+                    <span style={{fontSize:10,color:"#94a3b8"}}>—</span>
                   )}
                 </div>
-
-                {/* Grid días */}
-                <div style={{overflowX:"auto"}}>
-                  <table style={{width:"100%",borderCollapse:"collapse",minWidth:600}}>
-                    <thead>
-                      <tr>
-                        <th style={{padding:"8px 12px",fontSize:11,fontWeight:700,color:"#94a3b8",
-                          textAlign:"left",borderBottom:"1px solid #e2e8f0",background:"#f8fafc",
-                          whiteSpace:"nowrap",width:120}}>Turno</th>
-                        {week.map(function(d,di) {
-                          if (d===null) return <th key={di} style={{borderBottom:"1px solid #e2e8f0",background:"#f8fafc"}}/>;
-                          const dow = getDow(d);
-                          const wknd = isWeekend(d);
-                          return (
-                            <th key={di} style={{padding:"6px 8px",fontSize:11,fontWeight:700,
-                              color:wknd?"#be185d":"#475569",textAlign:"center",
-                              borderBottom:"1px solid #e2e8f0",minWidth:80,
-                              background:wknd?"#fff1f2":"#f8fafc"}}>
-                              <div style={{fontWeight:800}}>{DOW_LABELS[dow]}</div>
-                              <div style={{fontSize:13,color:wknd?"#be185d":"#1e293b",fontWeight:800}}>{d}</div>
-                            </th>
-                          );
-                        })}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(malla&&malla.turnos?[...malla.turnos,...(malla.breaks||[])]:[])
-                    .map(function(turno, ti) {
-                        const tId = String(turno.id||"").trim();
-                        const tHor = String(turno.horario||"").trim();
-                        if (!tId) return null;
-                        const isBreak = tId.toLowerCase().includes("break");
-                        const isDescanso = tId.toLowerCase().includes("descanso");
-                        const tColor = TURNO_COLORS[tId]||"#6366f1";
-
-                        return (
-                          <tr key={ti} style={{borderBottom:"1px solid #f1f5f9",
-                            background:isBreak?"#fffbeb":isDescanso?"#f0fdf4":"#fff"}}>
-                            <td style={{padding:"8px 12px",borderRight:"1px solid #f1f5f9"}}>
-                              <div style={{fontSize:11,fontWeight:800,
-                                color:isBreak?"#b45309":isDescanso?"#059669":tColor}}>
-                                {isBreak?"☕ "+tId:isDescanso?"🏖 Descanso":"⏰ Turno "+tId}
-                              </div>
-                              {tHor&&<div style={{fontSize:10,color:"#94a3b8",marginTop:2}}>{tHor}</div>}
-                            </td>
-                            {week.map(function(d,di) {
-                              if (d===null) return <td key={di}/>;
-                              const asign = getAsign(turno, d);
-                              const wknd = isWeekend(d);
-                              const isBotOrNA = asign==="N/A"||asign===""||asign==="Bot Madruga";
-                              return (
-                                <td key={di} style={{padding:"6px 8px",textAlign:"center",
-                                  background:wknd?"#fff8f8":"transparent",
-                                  verticalAlign:"middle"}}>
-                                  {isBotOrNA ? (
-                                    <span style={{fontSize:10,color:"#cbd5e1"}}>
-                                      {asign==="Bot Madruga"?"🤖 Bot":"—"}
-                                    </span>
-                                  ) : (
-                                    <PersonBadge name={asign}/>
-                                  )}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Socios de fin de semana + notas */}
-                {hasWeekend && (()=>{
-                  const fds = realDays.filter(d=>isWeekend(d));
-                  // Quién trabaja los fines de semana en esta semana
-                  const sociosDia = {};
-                  fds.forEach(function(d) {
-                    const asigns = (malla&&malla.turnos?[...malla.turnos,...(malla.breaks||[])]:[])
-                      .map(r=>getAsign(r,d))
-                      .filter(a=>a&&a!=="N/A"&&a!==""&&a!=="Bot Madruga");
-                    const uniq = [...new Set(asigns)];
-                    sociosDia[d] = uniq;
-                  });
-
-                  return (
-                    <div style={{borderTop:"1px solid #fecdd3",background:"#fff1f2",padding:"12px 16px"}}>
-                      <div style={{fontSize:11,fontWeight:800,color:"#be185d",marginBottom:10,
-                        textTransform:"uppercase",letterSpacing:"0.06em"}}>
-                        📋 Notas de socios · Fin de semana
-                      </div>
-                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:10}}>
-                        {fds.map(function(d) {
-                          const dow = getDow(d);
-                          const asigns = (malla&&malla.turnos?[...malla.turnos,...(malla.breaks||[])]:[] )
-                            .map(r=>getAsign(r,d))
-                            .filter(a=>a&&a!=="N/A"&&a!==""&&a!=="Bot Madruga");
-                          const uniq=[...new Set(asigns)].filter(Boolean);
-                          return uniq.map(function(socio) {
-                            const key = notaKey(socio,d);
-                            const nota = notas[key]||"";
-                            const isEditing = editNota && editNota.key===key;
-                            return (
-                              <div key={key} style={{background:"#fff",border:"1px solid #fecdd3",
-                                borderRadius:10,padding:"10px 12px"}}>
-                                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-                                  <PersonBadge name={socio}/>
-                                  <span style={{fontSize:10,color:"#94a3b8",fontWeight:700}}>
-                                    {DOW_LABELS[dow]} {d}/{mesNum}
-                                  </span>
-                                </div>
-                                {isEditing ? (
-                                  <div>
-                                    <textarea
-                                      autoFocus
-                                      defaultValue={editNota.value}
-                                      onChange={e=>setEditNota({...editNota,value:e.target.value})}
-                                      rows={3}
-                                      style={{width:"100%",border:"1.5px solid #6d28d9",borderRadius:8,
-                                        padding:"6px 10px",fontSize:12,fontFamily:"'Sora',sans-serif",
-                                        resize:"vertical",outline:"none"}}
-                                      placeholder="Pendientes, promesas, novedades del turno..."
-                                    />
-                                    <div style={{display:"flex",gap:6,marginTop:6}}>
-                                      <button onClick={()=>{saveNota(key,editNota.value);setEditNota(null);}}
-                                        style={{flex:1,height:30,borderRadius:8,border:"none",
-                                          background:"#6d28d9",color:"#fff",fontWeight:700,fontSize:11,cursor:"pointer"}}>
-                                        ✅ Guardar
-                                      </button>
-                                      <button onClick={()=>setEditNota(null)}
-                                        style={{height:30,padding:"0 10px",borderRadius:8,
-                                          border:"1px solid #e2e8f0",background:"#f8fafc",
-                                          color:"#64748b",fontWeight:700,fontSize:11,cursor:"pointer"}}>
-                                        ✕
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div onClick={()=>setEditNota({key,value:nota})}
-                                    style={{minHeight:40,padding:"6px 8px",borderRadius:8,
-                                      border:"1.5px dashed #e2e8f0",background:"#f8fafc",
-                                      fontSize:12,color:nota?"#1e293b":"#94a3b8",cursor:"pointer",
-                                      lineHeight:1.5}}>
-                                    {nota||"Tocá para agregar notas del turno..."}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          });
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            );
-          })}
-
-          {/* RESUMEN: ¿Quién descansa este mes? */}
-          <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:14,padding:"16px 20px"}}>
-            <div style={{fontSize:13,fontWeight:800,color:"#059669",marginBottom:12}}>
-              🏖 Descansos del mes — {mesLabel}
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8}}>
-              {MALLA_AGENTES.map(function(agente) {
-                const diasDescanso = ((malla&&malla.descansos)||[])
-                .filter(d=>d.agente===agente)
-                .flatMap(d=>d.dias||[]);
+              );
+            })}
+          </div>
+          {/* Fin de semana */}
+          {wkndDays.length>0&&(
+            <div style={{borderTop:"1px solid #fecdd3",background:"#fff1f2",
+              padding:"10px 14px",display:"flex",gap:10,flexWrap:"wrap"}}>
+              <span style={{fontSize:10,fontWeight:700,color:"#be185d",
+                textTransform:"uppercase",alignSelf:"center"}}>🏖 Fin de semana:</span>
+              {wkndDays.map(function(d){
+                const t=getTurnoAgente(agente,d);
+                const desc=descansosDias.includes(d);
                 return (
-                  <div key={agente} style={{background:"#fff",border:"1px solid #bbf7d0",
-                    borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
-                    <PersonBadge name={agente}/>
-                    <div>
-                      {diasDescanso.length>0 ? (
-                        <div style={{fontSize:11,color:"#059669",fontWeight:700}}>
-                          Descansa: {diasDescanso.map(d=>`${d}/${mesNum}`).join(", ")}
-                        </div>
-                      ) : (
-                        <div style={{fontSize:11,color:"#94a3b8"}}>Sin descanso registrado</div>
-                      )}
-                    </div>
+                  <div key={d} style={{display:"flex",alignItems:"center",gap:6,
+                    background:desc||!t?"#dcfce7":"#fff",border:"1px solid "+(desc||!t?"#bbf7d0":"#fecdd3"),
+                    borderRadius:10,padding:"6px 12px"}}>
+                    <span style={{fontSize:11,fontWeight:700,color:"#64748b"}}>{DOW[getDow(d)]} {d}</span>
+                    {desc||!t?(
+                      <span style={{fontSize:10,fontWeight:800,color:"#059669"}}>🟢 LIBRE</span>
+                    ):(
+                      <TurnoBadge turno={t}/>
+                    )}
                   </div>
                 );
               })}
             </div>
+          )}
+        </div>
+      );
+    });
+
+    // Resumen mes
+    const fdsTotal = Array.from({length:daysInMonth},(_,i)=>i+1).filter(d=>isWeekend(d)).length;
+    const fdsLibres= Array.from({length:daysInMonth},(_,i)=>i+1).filter(d=>isWeekend(d)&&!getTurnoAgente(agente,d)).length;
+    const fdsTrab  = fdsTotal-fdsLibres;
+
+    return (
+      <div>
+        {/* Header personal */}
+        <div style={{background:"linear-gradient(135deg,"+c+","+c+"cc)",borderRadius:14,
+          padding:"16px 20px",marginBottom:14,display:"flex",alignItems:"center",gap:14}}>
+          <div style={{width:48,height:48,borderRadius:"50%",background:"rgba(255,255,255,0.25)",
+            display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:"#fff"}}>
+            {agente[0]}
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:16,fontWeight:800,color:"#fff"}}>{agente} — {mesLabel}</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.8)",marginTop:2}}>
+              Mis turnos y descansos del mes
+            </div>
+          </div>
+          <div style={{display:"flex",gap:12,textAlign:"center"}}>
+            <div style={{background:"rgba(255,255,255,0.2)",borderRadius:10,padding:"8px 14px"}}>
+              <div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{fdsLibres}</div>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.8)",fontWeight:700}}>FDS libres</div>
+            </div>
+            <div style={{background:"rgba(255,255,255,0.2)",borderRadius:10,padding:"8px 14px"}}>
+              <div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{fdsTrab}</div>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.8)",fontWeight:700}}>FDS trabaja</div>
+            </div>
+            <div style={{background:"rgba(255,255,255,0.2)",borderRadius:10,padding:"8px 14px"}}>
+              <div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{descansosDias.length}</div>
+              <div style={{fontSize:9,color:"rgba(255,255,255,0.8)",fontWeight:700}}>días libre</div>
+            </div>
           </div>
         </div>
-      )}
+        {/* Aviso breaks */}
+        <div style={{background:"#fffbeb",border:"1px solid #fbbf24",borderRadius:10,
+          padding:"10px 16px",marginBottom:14,fontSize:12,color:"#92400e",fontWeight:600,
+          display:"flex",alignItems:"center",gap:8}}>
+          ☕ <strong>Breaks:</strong> Coordinalos con el equipo. No pueden salir dos personas al mismo tiempo al break ni al baño — siempre debe haber alguien disponible en Easydial y chat.
+        </div>
+        {/* Semanas */}
+        {semanaRows}
+      </div>
+    );
+  }
+
+  // ── VISTA EQUIPO (tabla simplificada) ────────────────────────────────────────
+  function VistaEquipo(){
+    if(!malla) return (
+      <div style={{textAlign:"center",padding:48,background:"#fff",borderRadius:14,
+        border:"1.5px dashed #e2e8f0",color:"#94a3b8"}}>
+        <div style={{fontSize:28,marginBottom:8}}>📭</div>
+        <div style={{fontWeight:700,fontSize:14}}>No hay malla cargada para {mesLabel}</div>
+        <div style={{fontSize:12,marginTop:6}}>Disponible desde Agosto 2026.</div>
+      </div>
+    );
+
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        {/* Aviso breaks */}
+        <div style={{background:"#fffbeb",border:"1px solid #fbbf24",borderRadius:10,
+          padding:"10px 16px",fontSize:12,color:"#92400e",fontWeight:600,
+          display:"flex",alignItems:"center",gap:8}}>
+          ☕ <strong>Regla de breaks:</strong> No pueden salir dos personas al mismo tiempo al break ni al auxiliar. Coordinalos entre el equipo para que siempre haya cobertura en Easydial y chat.
+        </div>
+
+        {semanas.map(function(week,wi){
+          const realDays=week.filter(Boolean);
+          if(!realDays.length) return null;
+          const wkndDays=realDays.filter(d=>isWeekend(d));
+
+          return (
+            <div key={wi} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden"}}>
+              {/* Header */}
+              <div style={{background:"#f8fafc",borderBottom:"1px solid #e2e8f0",
+                padding:"10px 16px",display:"flex",alignItems:"center",gap:10}}>
+                <span style={{fontSize:12,fontWeight:800,color:"#6d28d9"}}>Semana {wi+1}</span>
+                <span style={{fontSize:11,color:"#94a3b8"}}>
+                  {realDays.filter(d=>!isWeekend(d)).length} días hábiles
+                  {wkndDays.length>0&&" · "+wkndDays.length+" fin de semana"}
+                </span>
+                {wkndDays.length>0&&(
+                  <span style={{marginLeft:"auto",background:"#fef3c7",border:"1px solid #fbbf24",
+                    borderRadius:20,padding:"2px 10px",fontSize:10,fontWeight:700,color:"#b45309"}}>
+                    🏖 FDS incluido
+                  </span>
+                )}
+              </div>
+
+              {/* Días como columnas */}
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
+                  <thead>
+                    <tr style={{background:"#f8fafc"}}>
+                      <th style={{padding:"8px 14px",fontSize:11,fontWeight:700,color:"#94a3b8",
+                        textAlign:"left",borderBottom:"1px solid #e2e8f0",width:110}}>Turno</th>
+                      {week.map(function(d,di){
+                        if(d===null) return <th key={di} style={{borderBottom:"1px solid #e2e8f0",width:60}}/>;
+                        const wknd=isWeekend(d), dow=getDow(d);
+                        return (
+                          <th key={di} style={{padding:"6px 8px",fontSize:11,fontWeight:700,
+                            color:wknd?"#be185d":"#475569",textAlign:"center",
+                            borderBottom:"1px solid #e2e8f0",minWidth:70,
+                            background:wknd?"#fff1f2":"transparent"}}>
+                            <div>{DOW[dow]}</div>
+                            <div style={{fontSize:14,color:wknd?"#be185d":"#1e293b",fontWeight:800}}>{d}</div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {TURNOS_PRINCIPALES.map(function(turno,ti){
+                      const m=TURNO_META[turno.id]||{label:"T"+turno.id,h:turno.horario,c:"#64748b"};
+                      return (
+                        <tr key={ti} style={{borderBottom:"1px solid #f1f5f9"}}>
+                          <td style={{padding:"8px 14px",borderRight:"1px solid #f1f5f9"}}>
+                            <div style={{fontSize:11,fontWeight:800,color:m.c}}>{m.label}</div>
+                            <div style={{fontSize:10,color:"#94a3b8"}}>{m.h}</div>
+                          </td>
+                          {week.map(function(d,di){
+                            if(d===null) return <td key={di}/>;
+                            const asign=getAsign(turno,d);
+                            const wknd=isWeekend(d);
+                            return (
+                              <td key={di} style={{padding:"6px 8px",textAlign:"center",
+                                background:wknd?"#fff8f8":"transparent"}}>
+                                <AgenteBadge name={asign} size="sm"
+                                  onClick={asign&&asign!=="N/A"?()=>setAsesorVista(asign):null}/>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Fin de semana socios + notas */}
+              {wkndDays.length>0&&(()=>{
+                const socios=[];
+                wkndDays.forEach(d=>{
+                  malla.turnos.filter(t=>["5","6"].includes(t.id)).forEach(t=>{
+                    const a=getAsign(t,d);
+                    if(a&&a!=="N/A"&&a!=="") socios.push({socio:a,d,t});
+                  });
+                });
+                if(!socios.length) return null;
+                return (
+                  <div style={{borderTop:"1px solid #fecdd3",background:"#fff1f2",padding:"12px 16px"}}>
+                    <div style={{fontSize:11,fontWeight:800,color:"#be185d",marginBottom:10,
+                      textTransform:"uppercase",letterSpacing:"0.06em"}}>
+                      📋 Socios FDS · Notas de turno
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:8}}>
+                      {socios.map(function({socio,d,t}){
+                        const key=notaKey(socio,d);
+                        const nota=notas[key]||"";
+                        const isEditing=editNota&&editNota.key===key;
+                        return (
+                          <div key={key} style={{background:"#fff",border:"1px solid #fecdd3",
+                            borderRadius:10,padding:"10px 12px"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                              <AgenteBadge name={socio} size="sm"/>
+                              <span style={{fontSize:10,color:"#94a3b8",fontWeight:700}}>
+                                {DOW[getDow(d)]} {d}/{mesNum} · {t.horario}
+                              </span>
+                            </div>
+                            {isEditing?(
+                              <div>
+                                <textarea autoFocus defaultValue={editNota.value}
+                                  onChange={e=>setEditNota({...editNota,value:e.target.value})}
+                                  rows={3} placeholder="Pendientes, promesas, novedades..."
+                                  style={{width:"100%",border:"1.5px solid #6d28d9",borderRadius:8,
+                                    padding:"6px 10px",fontSize:12,fontFamily:"'Sora',sans-serif",
+                                    resize:"vertical",outline:"none"}}/>
+                                <div style={{display:"flex",gap:6,marginTop:6}}>
+                                  <button onClick={()=>{saveNota(key,editNota.value);setEditNota(null);}}
+                                    style={{flex:1,height:30,borderRadius:8,border:"none",
+                                      background:"#6d28d9",color:"#fff",fontWeight:700,fontSize:11,cursor:"pointer"}}>
+                                    ✅ Guardar
+                                  </button>
+                                  <button onClick={()=>setEditNota(null)}
+                                    style={{height:30,padding:"0 10px",borderRadius:8,
+                                      border:"1px solid #e2e8f0",background:"#f8fafc",
+                                      color:"#64748b",fontWeight:700,fontSize:11,cursor:"pointer"}}>✕</button>
+                                </div>
+                              </div>
+                            ):(
+                              <div onClick={()=>setEditNota({key,value:nota})}
+                                style={{minHeight:36,padding:"6px 8px",borderRadius:8,
+                                  border:"1.5px dashed #e2e8f0",background:"#f8fafc",
+                                  fontSize:12,color:nota?"#1e293b":"#94a3b8",cursor:"pointer",lineHeight:1.5}}>
+                                {nota||"Tocá para agregar notas del turno..."}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── RENDER ───────────────────────────────────────────────────────────────────
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {/* HEADER */}
+      <div style={{background:"linear-gradient(135deg,#3b0764,#6d28d9)",borderRadius:14,
+        padding:"16px 22px",display:"flex",alignItems:"center",gap:14}}>
+        <div style={{fontSize:28}}>📅</div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:16,fontWeight:800,color:"#fff"}}>
+            Malla SegurosFly — {mesLabel}
+            {asesorVista&&<span style={{fontSize:13,opacity:0.8}}> · {asesorVista.split(" ")[0]}</span>}
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.7)",marginTop:2}}>
+            {asesorVista?"Vista personal — tocá tu nombre para volver al equipo":"Tocá un nombre para ver tu malla personal"}
+          </div>
+        </div>
+        {asesorVista&&(
+          <button onClick={()=>setAsesorVista(null)}
+            style={{height:34,padding:"0 14px",borderRadius:10,border:"1.5px solid rgba(255,255,255,0.4)",
+              background:"rgba(255,255,255,0.15)",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+            ← Equipo
+          </button>
+        )}
+      </div>
+
+      {/* LEYENDA / SELECTOR DE AGENTE */}
+      <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"12px 16px"}}>
+        <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",
+          letterSpacing:"0.08em",marginBottom:8}}>
+          {asesorVista?"Cambiá de asesor:":"Tocá para ver tu malla personal:"}
+        </div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+          {MALLA_AGENTES.map(a=>(
+            <AgenteBadge key={a} name={a} active={asesorVista===a}
+              onClick={()=>setAsesorVista(asesorVista===a?null:a)}/>
+          ))}
+          <div style={{width:1,height:20,background:"#e2e8f0",margin:"0 4px"}}/>
+          {MALLA_SOCIOS.map(a=>(
+            <AgenteBadge key={a} name={a} size="sm"
+              onClick={()=>setAsesorVista(asesorVista===a?null:a)}
+              active={asesorVista===a}/>
+          ))}
+          <span style={{fontSize:10,color:"#94a3b8",marginLeft:"auto"}}>N/A = libre ese día</span>
+        </div>
+      </div>
+
+      {/* VISTA */}
+      {asesorVista ? <VistaPersonal agente={asesorVista}/> : <VistaEquipo/>}
     </div>
   );
 }
