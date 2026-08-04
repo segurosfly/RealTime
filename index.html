@@ -217,31 +217,53 @@ select:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3px var(--sky
 .pempty{font-size:11.5px;color:#8FB4DB;padding:4px 0}
 .fxi{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#6E9BC7;font-style:normal;opacity:.85}
 
-/* ══ TOOLTIP ══ */
+/* ══ TOOLTIP — panel fijo derecha, scrollable, no desaparece al hacer clic ══ */
 #tip{
-  position:fixed;z-index:300;pointer-events:none;opacity:0;visibility:hidden;
-  transition:opacity .13s;max-width:430px;
+  position:fixed;z-index:9999;top:70px;right:12px;width:390px;max-width:calc(100vw - 24px);
+  pointer-events:auto;opacity:0;visibility:hidden;
+  transition:opacity .18s,transform .18s;transform:translateX(16px);
+  display:flex;flex-direction:column;max-height:calc(100vh - 90px);
 }
-#tip.on{opacity:1;visibility:visible}
+#tip.on{opacity:1;visibility:visible;transform:translateX(0)}
 .tip-in{
-  background:var(--navy);color:#E4EFF9;border-radius:12px;padding:15px 17px;
-  box-shadow:0 12px 40px -8px rgba(14,42,71,.55);font-size:11.5px;line-height:1.55;
-  max-height:74vh;overflow:hidden;
+  background:var(--navy);color:#E4EFF9;border-radius:14px;
+  box-shadow:0 16px 48px -8px rgba(14,42,71,.65);font-size:11.5px;line-height:1.55;
+  display:flex;flex-direction:column;max-height:calc(100vh - 90px);overflow:hidden;
+  position:relative;
+}
+.tip-hdr{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
+  padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,.12);flex-shrink:0;
 }
 .tip-t{
   font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:#fff;
-  margin-bottom:7px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.14);
+  line-height:1.3;flex:1;
 }
-.tip-d{color:#C5DCF0;margin-bottom:11px}
-.tip-s{margin-bottom:10px}
+.tip-close{
+  width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.12);border:none;
+  color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:-2px;
+}
+.tip-close:hover{background:rgba(255,255,255,.22)}
+.tip-scroll{overflow-y:auto;padding:14px 16px 16px;flex:1}
+.tip-scroll::-webkit-scrollbar{width:4px}
+.tip-scroll::-webkit-scrollbar-track{background:rgba(255,255,255,.05);border-radius:2px}
+.tip-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:2px}
+.tip-d{color:#C5DCF0;margin-bottom:12px;line-height:1.6}
+.tip-s{margin-bottom:12px}
 .tip-s:last-child{margin-bottom:0}
 .tip-k{
   font-size:8.5px;text-transform:uppercase;letter-spacing:.11em;font-weight:700;
   color:var(--amber);margin-bottom:5px;
 }
 .tip-s ul{margin:0;padding-left:14px}
-.tip-s li{margin-bottom:3px;color:#B8D4EE}
+.tip-s li{margin-bottom:4px;color:#B8D4EE;line-height:1.5}
 .tip-s li::marker{color:#5B87B5}
+.tip-wm{
+  position:absolute;bottom:10px;right:14px;opacity:0.08;pointer-events:none;
+  font-size:10px;font-weight:800;color:#fff;letter-spacing:0.15em;text-transform:uppercase;
+  font-family:'Space Grotesk',sans-serif;
+}
 .up{position:relative}
 .up-i{
   position:absolute;top:9px;right:10px;width:15px;height:15px;border-radius:50%;
@@ -407,10 +429,10 @@ const UPG = [
   {id:1829,n:'Asistencia Mascotas',c:'USD 5.000 · 4 meses a 8 años',sf:30.80,t:'v',det:'pet'},
   {id:1830,n:'Asistencia Mascotas',c:'USD 10.000',sf:52.80,t:'v',det:'pet'},
   {id:1832,n:'Parque Temático WorldWide',c:'70% del ticket',sf:8.80,t:'v',det:'park'},
-  {id:1831,n:'Enfermedad preexistente',c:'Tope: Smart 9K · Plus 15K · Max/Elite/Infinity 30K · hasta 74 años',sf:0.40,t:'p',maxA:74,det:'pre'},
-  {id:1827,n:'Deporte Categoría 2',c:'Esquí acuático, ciclismo, maratón… · tope Smart 30K · Plus 50K · Max+ 100K · 15–65 años',sf:0.60,t:'p',minA:15,maxA:65,det:'d2'},
-  {id:1826,n:'Deporte Categoría 3',c:'Artes marciales, alpinismo, rafting 4-5… · tope Smart 30K · Plus 50K · Max+ 100K · 15–65 años',sf:2.00,t:'p',minA:15,maxA:65,det:'d3'},
-  {id:1828,n:'Deporte Categoría 4',c:'Paracaidismo, parapente, BMX, rugby… · tope Smart 30K · Plus 50K · Max+ 100K · 15–65 años',sf:2.60,t:'p',minA:15,maxA:65,det:'d4'},
+  {id:1831,n:'Enfermedad preexistente',c:'30% de la cobertura médica · hasta USD 30K · hasta 74 años · +40%',sf:0.40,t:'p',maxA:74,det:'pre'},
+  {id:1827,n:'Deporte Categoría 2',c:'Esquí acuático, fútbol, ciclismo, maratón… · hasta USD 100K · 15–65 años · +70%',sf:0.70,t:'p',minA:15,maxA:65,det:'d2'},
+  {id:1826,n:'Deporte Categoría 3',c:'Artes marciales, alpinismo, rafting 4-5… · hasta USD 100K · 15–65 años · +210%',sf:2.10,t:'p',minA:15,maxA:65,det:'d3'},
+  {id:1828,n:'Deporte Categoría 4',c:'Paracaidismo, parapente, BMX, rugby… · hasta USD 100K · 15–65 años · +280%',sf:2.80,t:'p',minA:15,maxA:65,det:'d4'},
 ];
 // ── DETALLE DE UPGRADES (tarifario V3 + Condiciones Generales) ──
 const DET={
@@ -868,63 +890,45 @@ function togUp(id,n){ S.ups[id]=S.ups[id]?0:1; calc(); }
 // ── TOOLTIP ──
 function tipHTML(k){
   const d=DET[k]; if(!d)return '';
-  return `<div class="tip-t">${d.t}</div><div class="tip-d">${d.d}</div>`+
-    d.s.map(([k2,items])=>`<div class="tip-s"><div class="tip-k">${k2}</div><ul>${items.map(i=>`<li>${i}</li>`).join('')}</ul></div>`).join('');
+  const body='<div class="tip-d">'+d.d+'</div>'+
+    d.s.map(([k2,items])=>'<div class="tip-s"><div class="tip-k">'+k2+'</div><ul>'+items.map(i=>'<li>'+i+'</li>').join('')+'</ul></div>').join('');
+  return '<div class="tip-hdr"><div class="tip-t">'+d.t+'</div><button class="tip-close" onclick="document.getElementById(\'tip\').classList.remove(\'on\')">×</button></div>'+
+    '<div class="tip-scroll">'+body+'<div class="tip-wm">SEGUROSFLY</div></div>';
 }
 function placeTip(e){
-  const TIP=document.getElementById('tip'); if(!TIP)return;
-  const r=TIP.getBoundingClientRect(), pad=14;
-  let x=e.clientX+18, y=e.clientY+18;
-  if(x+r.width>innerWidth-pad)  x=e.clientX-r.width-18;
-  if(y+r.height>innerHeight-pad) y=Math.max(pad,innerHeight-r.height-pad);
-  if(x<pad) x=pad;
-  TIP.style.left=x+'px'; TIP.style.top=y+'px';
+  // Panel is fixed to top-right via CSS — no dynamic positioning needed
 }
 // Tooltip — usa document para capturar aunque React re-renderice el contenido
 function attachTipListeners(){
-  document.addEventListener('mouseover',function ctzTipOver(e){
-    const c=e.target.closest('.up'); if(!c)return;
-    const k=c.dataset.det; if(!k||!DET[k])return;
-    const tip=document.getElementById('tip');
-    const tipin=tip&&tip.querySelector('.tip-in');
-    if(!tipin)return;
-    tipin.innerHTML=tipHTML(k); tip.classList.add('on'); placeTip(e);
-  });
-  document.addEventListener('mousemove',function ctzTipMove(e){
-    const tip=document.getElementById('tip');
-    if(tip&&tip.classList.contains('on')&&e.target.closest('.up')) placeTip(e);
-  });
-  document.addEventListener('mouseout',function ctzTipOut(e){
-    const c=e.target.closest('.up');
-    if(c&&!c.contains(e.relatedTarget)){
+  // Click en el botón .up-i para abrir/cerrar el panel derecho
+  document.addEventListener('click',function ctzTipClick(e){
+    const btn=e.target.closest('.up-i');
+    if(btn){
+      e.stopPropagation();
+      const card=btn.closest('.up'); if(!card)return;
+      const k=card.dataset.det; if(!k||!DET[k])return;
       const tip=document.getElementById('tip');
-      if(tip) tip.classList.remove('on');
+      const tipin=tip&&tip.querySelector('.tip-in');
+      if(!tipin)return;
+      // Toggle: si ya está abierto con mismo upgrade, cerrar
+      if(tip.classList.contains('on')&&tip.dataset.open===k){
+        tip.classList.remove('on'); tip.dataset.open=''; return;
+      }
+      tipin.innerHTML=tipHTML(k);
+      tip.dataset.open=k;
+      tip.classList.add('on');
+      return;
+    }
+    // Clic fuera del panel y de botones .up-i cierra el panel
+    const tip=document.getElementById('tip');
+    if(tip&&!tip.contains(e.target)&&!e.target.closest('.up-i')){
+      tip.classList.remove('on'); tip.dataset.open='';
     }
   });
-  document.addEventListener('scroll',function(){ 
-    const tip=document.getElementById('tip');
-    if(tip) tip.classList.remove('on');
-  },true);
 }
 attachTipListeners();
 // táctil: mantener presionado
-let tt=null;
-document.addEventListener('touchstart',e=>{
-  const c=e.target.closest('.up'); if(!c)return;
-  const k=c.dataset.det; if(!k||!DET[k])return;
-  tt=setTimeout(()=>{
-    const TIP=document.getElementById('tip');
-    const TIPIN=TIP&&TIP.querySelector('.tip-in');
-    if(!TIPIN)return;
-    const r=c.getBoundingClientRect();
-    TIPIN.innerHTML=tipHTML(k); TIP.classList.add('on');
-    placeTip({clientX:r.left+r.width/2-100,clientY:r.top-10});
-  },420);
-},{passive:true});
-document.addEventListener('touchend',()=>{
-  clearTimeout(tt);
-  setTimeout(()=>{const TIP=document.getElementById('tip');if(TIP)TIP.classList.remove('on');},2600);
-},{passive:true});
+// Touch: tap on .up-i button handles by the click listener above
 function setQ(id,q,n){ S.ups[id]=Math.max(1,Math.min(n,q)); calc(); } // n=maxQ=10
 
 initChips(); renderTravs(); calc();
@@ -953,7 +957,7 @@ function verificarPinAsesor(asesor) {
 }
 // CAMBIO #10: PIN actualizado a 2187
 const SYNC_PIN = "2187";
-const SHEETS_URL = "https://script.google.com/macros/s/AKfycbykftZrdM5wLdtqwm2N98I2y7yXMJgisJNai0sfB7JsYxYzikuep2B4KqdIlB3CBAau/exec";
+const SHEETS_URL = "https://script.google.com/macros/s/AKfycbykJDP_T1aOY9Kkk22ePOnLQk9e7E5aJdwH_SEpfd4Lhhgtr1OpyxzwIX7fE2jH8hL0/exec";
 
 // ── CONFIG REMOTA (pestaña Config de Google Sheets) ────────────────────────────
 // Cache en memoria: { "2026-05": { metaBase, pctBase, metaSfly, pctSfly, meta, comision }, ... }
@@ -1777,6 +1781,7 @@ function AsesorHeader({name, asesor, color, data, mesId, diaHoy}) {
     { icon:"🏆", label:"Día top revenue", value: topValorDia ? "D"+topValorDia+" "+dowDia(topValorDia,mesId)+" · "+usd(topValorAmt,0) : "Sin datos", c:"#d97706" },
     { icon:"🔥", label:"Día más ventas",  value: topVentasDia ? "D"+topVentasDia+" "+dowDia(topVentasDia,mesId)+" · "+topVentasN+" ventas" : "Sin datos", c:"#2563eb" },
     { icon:"💰", label:"Ticket promedio", value: avgTicket > 0 ? usd(avgTicket,0) : "Sin datos", c:"#10b981" },
+    { icon:"📊", label:"ASP (rev/ventas)", value: allRows.length > 0 ? usd(acum/allRows.length,2) : "Sin datos", c:"#0891b2" },
     { icon:"📦", label:"Plan top",        value: topPlan ? topPlan[0]+" ("+topPlan[1]+")" : "Sin datos", c:"#7c3aed" },
   ];
 
@@ -2474,14 +2479,14 @@ function GlobalTab({store,mesId,configSource}) {
       </div>
       <Card>
         <SLabel>Comparativa de Asesores</SLabel>
-        {[{name:"Guillermo",acum:gAcum,proy:gProy,prom:gProm,color:"#2563eb",ventas:gVentas},{name:"Carolina",acum:cAcum,proy:cProy,prom:cProm,color:"#7c3aed",ventas:cVentas},{name:"Daniel R.",acum:dAcum,proy:dProy,prom:dProm,color:"#0f766e",ventas:dVentas},{name:"Wilmary",acum:wAcum,proy:wProy,prom:wProm,color:"#be185d",ventas:wVentas}].map(a=>(
+        {[{name:"Guillermo",acum:gAcum,proy:gProy,prom:gProm,color:"#2563eb",ventas:gVentas},{name:"Carolina",acum:cAcum,proy:cProy,prom:cProm,color:"#7c3aed",ventas:cVentas},{name:"Daniel R.",acum:dAcum,proy:dProy,prom:dProm,color:"#0f766e",ventas:dVentas},{name:"Wilmary",acum:wAcum,proy:wProy,prom:wProm,color:"#be185d",ventas:wVentas}].sort((a,b)=>b.proy-a.proy).map((a,ai)=>(
           <div key={a.name} style={{marginBottom:16}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <div style={{width:32,height:32,borderRadius:"50%",background:a.color+"18",border:"2px solid "+a.color+"55",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:a.color}}>{a.name[0]}</div>
                 <div>
                   <div style={{fontSize:13,fontWeight:700,color:"#1e293b"}}>{a.name}</div>
-                  <div style={{fontSize:11,color:"#94a3b8"}}>{a.ventas} ventas · Prom {usd(a.prom,0)}/dia · {pc(total>0?a.acum/total*100:0)} del equipo</div>
+                  <div style={{fontSize:11,color:"#94a3b8"}}>{a.ventas} ventas · Prom {usd(a.prom,0)}/dia · {pc(total>0?a.acum/total*100:0)} del equipo</div>                  <div style={{fontSize:11,color:"#0891b2",fontWeight:700}}>ASP: {a.ventas>0?usd(a.acum/a.ventas,2):"—"}</div>
                 </div>
               </div>
               <div style={{textAlign:"right"}}>
@@ -2626,7 +2631,7 @@ function TrackerTab({store}) {
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <thead>
               <tr style={{borderBottom:"2px solid #f1f5f9"}}>
-                {["Mes","Meta Base","Meta SFly","% Com","Guillermo","G Vtas","Carolina","C Vtas","Daniel R.","D Vtas","Wilmary","W Vtas","Total","Cumpl."].map(h=>(
+                {["Mes","Meta Base","Meta SFly","% Com","Guillermo","G Vtas","Carolina","C Vtas","Daniel R.","D Vtas","Wilmary","W Vtas","Total","ASP","Cumpl."].map(h=>(
                   <th key={h} style={{padding:"8px 10px",color:"#94a3b8",fontWeight:700,textTransform:"uppercase",fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr>
@@ -2647,6 +2652,7 @@ function TrackerTab({store}) {
                   <td style={{padding:"9px 10px",textAlign:"right",color:"#be185d",fontWeight:700}}>{usd(r.wAcum||0,0)}</td>
                   <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8"}}>{r.wVentas||0}</td>
                   <td style={{padding:"9px 10px",textAlign:"right",fontWeight:800,color:"#1e293b"}}>{usd(r.total,0)}</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",color:"#0891b2",fontWeight:700}}>{(()=>{const tv=r.gVentas+r.cVentas+r.dVentas+(r.wVentas||0);return tv>0?usd(r.total/tv,2):"—"})()}</td>
                   <td style={{padding:"9px 10px",textAlign:"right"}}>
                     <Pill color={r.cumplimiento>=100?"#10b981":r.cumplimiento>=80?"#3b82f6":"#f97316"}
                           bg={r.cumplimiento>=100?"#ecfdf5":r.cumplimiento>=80?"#eff6ff":"#fff7ed"} size={10}>{pc(r.cumplimiento)}</Pill>
@@ -2664,6 +2670,10 @@ function TrackerTab({store}) {
                 <td style={{padding:"9px 10px",textAlign:"right",color:"#be185d",fontWeight:800}}>{usd(resumen.reduce((s,r)=>s+(r.wAcum||0),0),0)}</td>
                 <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8",fontWeight:700}}>{resumen.reduce((s,r)=>s+(r.wVentas||0),0)}</td>
                 <td style={{padding:"9px 10px",textAlign:"right",fontWeight:800,color:"#6366f1",fontSize:14}}>{usd(totalHistorico,0)}</td>
+                <td style={{padding:"9px 10px",textAlign:"right",color:"#0891b2",fontWeight:800}}>
+                  {resumen.reduce((s,r)=>s+r.gVentas+r.cVentas+r.dVentas+(r.wVentas||0),0)>0?
+                    usd(totalHistorico/resumen.reduce((s,r)=>s+r.gVentas+r.cVentas+r.dVentas+(r.wVentas||0),0),2):"—"}
+                </td>
                 <td></td>
               </tr>
             </tbody>
@@ -2679,39 +2689,47 @@ function TrackerTab({store}) {
 // ── DATOS MALLA EMBEBIDOS (sincronizados desde Sheet) ────────────────────────
 const MALLA_AGOSTO = {
   mes: "2026-08",
+  // Turnos de lunes a viernes — en orden T1, T2, T3 (independiente de rotación interna)
   turnos: [
     {
-      id:"1", horario:"08:00–16:00",
+      id:"T1", label:"Turno 1", horario:"08:00–16:00", color:"#2563eb",
       dias: {
-        "1":"N/A","2":"N/A","3":"Daniel Romero","4":"Daniel Romero","5":"Daniel Romero","6":"Daniel Romero","7":"Daniel Romero",
-        "8":"N/A","9":"N/A","10":"Wilmary Antolinez","11":"Wilmary Antolinez","12":"Wilmary Antolinez","13":"Wilmary Antolinez","14":"Wilmary Antolinez",
-        "15":"N/A","16":"N/A","17":"Guillermo González","18":"Guillermo González","19":"Guillermo González","20":"Guillermo González","21":"Guillermo González",
-        "22":"N/A","23":"N/A","24":"Daniel Romero","25":"Daniel Romero","26":"Daniel Romero","27":"Daniel Romero","28":"Daniel Romero",
-        "29":"N/A","30":"N/A","31":"Wilmary Antolinez"
+        "3":"Daniel Romero","4":"Daniel Romero","5":"Daniel Romero","6":"Daniel Romero","7":"Daniel Romero",
+        "10":"Wilmary Antolinez","11":"Wilmary Antolinez","12":"Wilmary Antolinez","13":"Wilmary Antolinez","14":"Wilmary Antolinez",
+        "17":"Guillermo González","18":"Guillermo González","19":"Guillermo González","20":"Guillermo González","21":"Guillermo González",
+        "24":"Daniel Romero","25":"Daniel Romero","26":"Daniel Romero","27":"Daniel Romero","28":"Daniel Romero",
+        "31":"Wilmary Antolinez"
       }
     },
     {
-      id:"3", horario:"10:00–18:00",
+      id:"T2", label:"Turno 2", horario:"10:00–18:00", color:"#0f766e",
       dias: {
-        "1":"N/A","2":"N/A","3":"Guillermo González","4":"Guillermo González","5":"Guillermo González","6":"Guillermo González","7":"Guillermo González",
-        "8":"N/A","9":"N/A","10":"Daniel Romero","11":"Daniel Romero","12":"Daniel Romero","13":"Daniel Romero","14":"Daniel Romero",
-        "15":"N/A","16":"N/A","17":"Wilmary Antolinez","18":"Wilmary Antolinez","19":"Wilmary Antolinez","20":"Wilmary Antolinez","21":"Wilmary Antolinez",
-        "22":"N/A","23":"N/A","24":"Guillermo González","25":"Guillermo González","26":"Guillermo González","27":"Guillermo González","28":"Guillermo González",
-        "29":"N/A","30":"N/A","31":"Daniel Romero"
+        "3":"Guillermo González","4":"Guillermo González","5":"Guillermo González","6":"Guillermo González","7":"Guillermo González",
+        "10":"Daniel Romero","11":"Daniel Romero","12":"Daniel Romero","13":"Daniel Romero","14":"Daniel Romero",
+        "17":"Wilmary Antolinez","18":"Wilmary Antolinez","19":"Wilmary Antolinez","20":"Wilmary Antolinez","21":"Wilmary Antolinez",
+        "24":"Guillermo González","25":"Guillermo González","26":"Guillermo González","27":"Guillermo González","28":"Guillermo González",
+        "31":"Daniel Romero"
       }
     },
     {
-      id:"2", horario:"14:00–22:00",
+      id:"T3", label:"Turno 3", horario:"14:00–22:00", color:"#7c3aed",
       dias: {
-        "1":"N/A","2":"N/A","3":"Wilmary Antolinez","4":"Wilmary Antolinez","5":"Wilmary Antolinez","6":"Wilmary Antolinez","7":"Wilmary Antolinez",
-        "8":"N/A","9":"N/A","10":"Guillermo González","11":"Guillermo González","12":"Guillermo González","13":"Guillermo González","14":"Guillermo González",
-        "15":"N/A","16":"N/A","17":"Daniel Romero","18":"Daniel Romero","19":"Daniel Romero","20":"Daniel Romero","21":"Daniel Romero",
-        "22":"N/A","23":"N/A","24":"Wilmary Antolinez","25":"Wilmary Antolinez","26":"Wilmary Antolinez","27":"Wilmary Antolinez","28":"Wilmary Antolinez",
-        "29":"N/A","30":"N/A","31":"Guillermo González"
+        "3":"Wilmary Antolinez","4":"Wilmary Antolinez","5":"Wilmary Antolinez","6":"Wilmary Antolinez","7":"Wilmary Antolinez",
+        "10":"Guillermo González","11":"Guillermo González","12":"Guillermo González","13":"Guillermo González","14":"Guillermo González",
+        "17":"Daniel Romero","18":"Daniel Romero","19":"Daniel Romero","20":"Daniel Romero","21":"Daniel Romero",
+        "24":"Wilmary Antolinez","25":"Wilmary Antolinez","26":"Wilmary Antolinez","27":"Wilmary Antolinez","28":"Wilmary Antolinez",
+        "31":"Guillermo González"
       }
     },
     {
-      id:"5", horario:"08:00–15:00",
+      id:"T4", label:"Nocturno", horario:"22:00–08:00", color:"#475569",
+      dias: {"1":"Bot Madruga","2":"Bot Madruga","3":"Bot Madruga","4":"Bot Madruga","5":"Bot Madruga","6":"Bot Madruga","7":"Bot Madruga","8":"Bot Madruga","9":"Bot Madruga","10":"Bot Madruga","11":"Bot Madruga","12":"Bot Madruga","13":"Bot Madruga","14":"Bot Madruga","15":"Bot Madruga","16":"Bot Madruga","17":"Bot Madruga","18":"Bot Madruga","19":"Bot Madruga","20":"Bot Madruga","21":"Bot Madruga","22":"Bot Madruga","23":"Bot Madruga","24":"Bot Madruga","25":"Bot Madruga","26":"Bot Madruga","27":"Bot Madruga","28":"Bot Madruga","29":"Bot Madruga","30":"Bot Madruga","31":"Bot Madruga"}
+    }
+  ],
+  // Fin de semana — dos turnos fijos (no numerados)
+  fds: [
+    {
+      id:"FDS1", label:"Fin de Semana", horario:"08:00–15:00", color:"#b45309",
       dias: {
         "1":"Guillermo González","2":"Wilker Casadiego",
         "8":"Daniel Romero","9":"Otoniel Martell",
@@ -2721,7 +2739,7 @@ const MALLA_AGOSTO = {
       }
     },
     {
-      id:"6", horario:"13:00–20:00",
+      id:"FDS2", label:"Fin de Semana", horario:"13:00–20:00", color:"#be185d",
       dias: {
         "1":"Daniel Romero","2":"Jhojan Torres",
         "8":"Wilmary Antolinez","9":"Ricardo Torres",
@@ -2729,18 +2747,16 @@ const MALLA_AGOSTO = {
         "22":"Daniel Romero","23":"Otoniel Martell",
         "29":"Wilmary Antolinez","30":"Jhojan Torres"
       }
-    },
-    {
-      id:"4", horario:"22:00–08:00",
-      dias: {"1":"Bot Madruga","2":"Bot Madruga","3":"Bot Madruga","4":"Bot Madruga","5":"Bot Madruga","6":"Bot Madruga","7":"Bot Madruga","8":"Bot Madruga","9":"Bot Madruga","10":"Bot Madruga","11":"Bot Madruga","12":"Bot Madruga","13":"Bot Madruga","14":"Bot Madruga","15":"Bot Madruga","16":"Bot Madruga","17":"Bot Madruga","18":"Bot Madruga","19":"Bot Madruga","20":"Bot Madruga","21":"Bot Madruga","22":"Bot Madruga","23":"Bot Madruga","24":"Bot Madruga","25":"Bot Madruga","26":"Bot Madruga","27":"Bot Madruga","28":"Bot Madruga","29":"Bot Madruga","30":"Bot Madruga","31":"Bot Madruga"}
     }
   ],
   breaks: [
     {
       id:"Break 1", horario:"12:30–13:00",
       dias: {
-        "1":"Guillermo González","3":"Daniel Romero","4":"Daniel Romero","5":"Daniel Romero","6":"Daniel Romero","7":"Daniel Romero",
-        "8":"Wilmary Antolinez","10":"Wilmary Antolinez","11":"Wilmary Antolinez","12":"Wilmary Antolinez","13":"Wilmary Antolinez","14":"Wilmary Antolinez","15":"Wilmary Antolinez",
+        "1":"Guillermo González",
+        "3":"Daniel Romero","4":"Daniel Romero","5":"Daniel Romero","6":"Daniel Romero","7":"Daniel Romero",
+        "8":"Wilmary Antolinez",
+        "10":"Wilmary Antolinez","11":"Wilmary Antolinez","12":"Wilmary Antolinez","13":"Wilmary Antolinez","14":"Wilmary Antolinez","15":"Wilmary Antolinez",
         "17":"Guillermo González","18":"Guillermo González","19":"Guillermo González","20":"Guillermo González","21":"Guillermo González","22":"Wilmary Antolinez",
         "24":"Daniel Romero","25":"Daniel Romero","26":"Daniel Romero","27":"Daniel Romero","28":"Daniel Romero","29":"Wilmary Antolinez","31":"Wilmary Antolinez"
       }
@@ -2748,8 +2764,10 @@ const MALLA_AGOSTO = {
     {
       id:"Break 2", horario:"15:30–16:00",
       dias: {
-        "1":"Daniel Romero","3":"Guillermo González","4":"Guillermo González","5":"Guillermo González","6":"Guillermo González","7":"Guillermo González",
-        "8":"Daniel Romero","10":"Daniel Romero","11":"Daniel Romero","12":"Daniel Romero","13":"Daniel Romero","14":"Daniel Romero","15":"Guillermo González",
+        "1":"Daniel Romero",
+        "3":"Guillermo González","4":"Guillermo González","5":"Guillermo González","6":"Guillermo González","7":"Guillermo González",
+        "8":"Daniel Romero",
+        "10":"Daniel Romero","11":"Daniel Romero","12":"Daniel Romero","13":"Daniel Romero","14":"Daniel Romero","15":"Guillermo González",
         "17":"Wilmary Antolinez","18":"Wilmary Antolinez","19":"Wilmary Antolinez","20":"Wilmary Antolinez","21":"Wilmary Antolinez","22":"Guillermo González",
         "24":"Guillermo González","25":"Guillermo González","26":"Guillermo González","27":"Guillermo González","28":"Guillermo González","29":"Daniel Romero","31":"Daniel Romero"
       }
@@ -2758,13 +2776,22 @@ const MALLA_AGOSTO = {
       id:"Break 3", horario:"17:30–18:00",
       dias: {
         "3":"Wilmary Antolinez","4":"Wilmary Antolinez","5":"Wilmary Antolinez","6":"Wilmary Antolinez","7":"Wilmary Antolinez",
-        "8":"Guillermo González","9":"Guillermo González","10":"Guillermo González","11":"Guillermo González","12":"Guillermo González","13":"Guillermo González","14":"Guillermo González",
-        "15":"Daniel Romero","16":"Daniel Romero","17":"Daniel Romero","18":"Daniel Romero","19":"Daniel Romero","20":"Daniel Romero","21":"Daniel Romero",
-        "22":"Wilmary Antolinez","23":"Wilmary Antolinez","24":"Wilmary Antolinez","25":"Wilmary Antolinez","26":"Wilmary Antolinez","27":"Wilmary Antolinez","28":"Wilmary Antolinez",
-        "29":"Guillermo González","30":"Guillermo González","31":"Guillermo González"
+        "8":"Guillermo González","9":"Guillermo González",
+        "10":"Guillermo González","11":"Guillermo González","12":"Guillermo González","13":"Guillermo González","14":"Guillermo González","15":"Daniel Romero","16":"Daniel Romero",
+        "17":"Daniel Romero","18":"Daniel Romero","19":"Daniel Romero","20":"Daniel Romero","21":"Daniel Romero","22":"Wilmary Antolinez","23":"Wilmary Antolinez",
+        "24":"Wilmary Antolinez","25":"Wilmary Antolinez","26":"Wilmary Antolinez","27":"Wilmary Antolinez","28":"Wilmary Antolinez","29":"Guillermo González","30":"Guillermo González","31":"Guillermo González"
       }
     }
   ],
+  // Descansos: quién está libre cada fin de semana (sáb+dom)
+  descansosFds: [
+    { dias:[1,2],  descansan:["Wilmary Antolinez"] },
+    { dias:[8,9],  descansan:["Guillermo González"] },
+    { dias:[15,16],descansan:["Daniel Romero"] },
+    { dias:[22,23],descansan:["Wilmary Antolinez"] },
+    { dias:[29,30],descansan:["Guillermo González"] },
+  ],
+  // Descansos generales (días de la semana libres por persona)
   descansos: [
     { agente:"Otoniel Martell",  dias:[1,2,9,10,17,18,25,26] },
     { agente:"Ricardo Torres",   dias:[1,2,9,10,17,18,25,26] },
@@ -2773,7 +2800,7 @@ const MALLA_AGOSTO = {
   ]
 };
 
-// Índice por mes — agregar aquí los meses futuros
+
 const MALLA_POR_MES = {
   "2026-08": MALLA_AGOSTO,
 };
@@ -2815,9 +2842,32 @@ function saveNotas(n) {
 function MallaTab({ mesId, store }) {
   const [notas,       setNotas]       = useState(loadNotas);
   const [editNota,    setEditNota]    = useState(null);
-  const [asesorVista, setAsesorVista] = useState(null); // null = vista equipo, string = vista personal
+  const [asesorVista, setAsesorVista] = useState(null);
+  const [semanaActiva,setSemanaActiva]= useState(0); // null = vista equipo, string = vista personal
 
   const malla    = MALLA_POR_MES[mesId] || null;
+  useEffect(function(){ setSemanaActiva(0); },[mesId]);
+
+  // Cargar notas desde Sheets al montar (compartidas entre todos)
+  useEffect(function(){
+    fetch(SHEETS_URL+"?accion=read&sheet=NotasMalla",{cache:"no-store"})
+      .then(r=>r.json())
+      .then(function(data){
+        if(data&&data.ok&&Array.isArray(data.rows)&&data.rows.length>0){
+          const n={};
+          data.rows.forEach(function(r){
+            if(r.nota&&r.nota!=="eliminado"){
+              const key=r.fecha+"|"+r.asesor+"|"+r.dia;
+              n[key]=r.nota;
+            }
+          });
+          if(Object.keys(n).length>0){
+            setNotas(prev=>({...prev,...n}));
+            saveNotas({...loadNotas(),...n});
+          }
+        }
+      }).catch(()=>{});
+  },[]);
   const mesNum   = parseInt(mesId.split("-")[0] === "2026" ? mesId.split("-")[1] : mesId.split("-")[1]);
   const year     = parseInt(mesId.split("-")[0]);
   const mesLabel = MESES_ES[mesNum-1];
@@ -2855,19 +2905,14 @@ function MallaTab({ mesId, store }) {
   },[malla,mesId]);
 
   // Turnos principales (sin breaks)
-  const TURNOS_PRINCIPALES = malla ? malla.turnos.filter(t=>["1","2","3"].includes(t.id)) : [];
+  const TURNOS_PRINCIPALES = malla ? malla.turnos.filter(t=>["T1","T2","T3"].includes(t.id)) : [];
   // Turno labels correctos
-  const TURNO_META = {"1":{label:"Turno 1",h:"08:00–16:00",c:"#2563eb"},"2":{label:"Turno 2",h:"10:00–18:00",c:"#0f766e"},"3":{label:"Turno 3",h:"14:00–22:00",c:"#7c3aed"}};
+  const TURNO_META = {"T1":{label:"Turno 1",h:"08:00–16:00",c:"#2563eb"},"T2":{label:"Turno 2",h:"10:00–18:00",c:"#0f766e"},"T3":{label:"Turno 3",h:"14:00–22:00",c:"#7c3aed"},"T4":{label:"Nocturno",h:"22:00–08:00",c:"#475569"},"FDS1":{label:"FDS",h:"08:00–15:00",c:"#b45309"},"FDS2":{label:"FDS",h:"13:00–20:00",c:"#be185d"}};
 
   // Get turno of an agent on a day
   function getTurnoAgente(agente, dayNum){
     if(!malla) return null;
-    for(const t of TURNOS_PRINCIPALES){
-      const a=getAsign(t,dayNum);
-      if(a===agente) return t;
-    }
-    // Check FDS turnos
-    for(const t of malla.turnos.filter(t=>["5","6"].includes(t.id))){
+    for(const t of [...TURNOS_PRINCIPALES,...(malla.fds||[])]){
       const a=getAsign(t,dayNum);
       if(a===agente) return t;
     }
@@ -2876,7 +2921,19 @@ function MallaTab({ mesId, store }) {
 
   // Notas
   function notaKey(socio,dayNum){ return `${mesId}|${socio}|${dayNum}`; }
-  function saveNota(key,val){ const n={...notas,[key]:val}; setNotas(n); saveNotas(n); }
+  function saveNota(key,val){
+    const n={...notas,[key]:val}; setNotas(n); saveNotas(n);
+    // Sincronizar nota al Sheet y disparar email
+    const parts=key.split("|"); // mesId|socio|dayNum
+    if(parts.length>=3){
+      const params=new URLSearchParams({
+        accion:"save_nota_malla",
+        mesId:parts[0], socio:parts[1], dia:parts[2],
+        nota:val, ts:new Date().toISOString()
+      });
+      fetch(SHEETS_URL+"?"+params.toString(),{method:"GET",mode:"no-cors"}).catch(()=>{});
+    }
+  }
 
   // Colors
   const AGENTE_COLORS={"Guillermo González":"#2563eb","Wilmary Antolinez":"#be185d","Daniel Romero":"#0f766e","Jhojan Torres":"#b45309","Wilker Casadiego":"#0891b2","Otoniel Martell":"#7c3aed","Ricardo Torres":"#059669","Bot Madruga":"#475569"};
@@ -2922,95 +2979,142 @@ function MallaTab({ mesId, store }) {
   // ── VISTA PERSONAL (clic en agente) ──────────────────────────────────────────
   function VistaPersonal({agente}){
     const c=AGENTE_COLORS[agente]||"#6366f1";
-    const firstName=agente.split(" ")[0];
-    let libres=0, trabajados=0, descansosDias=[];
-
-    // Descansos del mes
+    const isSocioVista = MALLA_SOCIOS.includes(agente);
+    let descansosDias=[];
     if(malla&&malla.descansos){
       const d=malla.descansos.find(d=>d.agente===agente);
       if(d) descansosDias=d.dias||[];
     }
 
+    // ── Resumen mes ────────────────────────────────────────────────────────────
+    const allDays = Array.from({length:daysInMonth},(_,i)=>i+1);
+    const fdsTotal  = allDays.filter(d=>isWeekend(d)).length;
+    const fdsTrab   = allDays.filter(d=>isWeekend(d)&&getTurnoAgente(agente,d)).length;
+    const fdsLibres = fdsTotal-fdsTrab;
+    const diasTrabLV= allDays.filter(d=>!isWeekend(d)&&getTurnoAgente(agente,d)).length;
+    const diasLibLV = allDays.filter(d=>!isWeekend(d)&&!getTurnoAgente(agente,d)).length;
+
+    // ── Vista SOCIO — solo muestra FDS ────────────────────────────────────────
+    if(isSocioVista){
+      const fdsList = allDays.filter(d=>isWeekend(d));
+      return (
+        <div>
+          <div style={{background:"linear-gradient(135deg,"+c+","+c+"bb)",borderRadius:14,
+            padding:"16px 20px",marginBottom:14,display:"flex",alignItems:"center",gap:14}}>
+            <div style={{width:48,height:48,borderRadius:"50%",background:"rgba(255,255,255,0.25)",
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:"#fff"}}>
+              {agente[0]}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:16,fontWeight:800,color:"#fff"}}>{agente} — {mesLabel}</div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,0.75)",marginTop:2}}>Socio · Fines de semana</div>
+            </div>
+            <div style={{display:"flex",gap:10,textAlign:"center"}}>
+              <div style={{background:"rgba(255,255,255,0.2)",borderRadius:10,padding:"8px 14px"}}>
+                <div style={{fontSize:20,fontWeight:800,color:"#fff"}}>{fdsTrab}</div>
+                <div style={{fontSize:9,color:"rgba(255,255,255,0.8)",fontWeight:700}}>FDS trabaja</div>
+              </div>
+              <div style={{background:"rgba(255,255,255,0.2)",borderRadius:10,padding:"8px 14px"}}>
+                <div style={{fontSize:20,fontWeight:800,color:"#fff"}}>{fdsLibres}</div>
+                <div style={{fontSize:9,color:"rgba(255,255,255,0.8)",fontWeight:700}}>FDS libres</div>
+              </div>
+            </div>
+          </div>
+          <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:14,padding:"16px 20px"}}>
+            <div style={{fontSize:12,fontWeight:800,color:"#64748b",marginBottom:12,textTransform:"uppercase",letterSpacing:"0.06em"}}>
+              📅 Días de trabajo — Fines de semana {mesLabel}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10}}>
+              {fdsList.map(function(d){
+                const t=getTurnoAgente(agente,d);
+                const isLibre=!t;
+                return (
+                  <div key={d} style={{background:isLibre?"#f0fdf4":c+"0d",
+                    border:"1.5px solid "+(isLibre?"#bbf7d0":c+"44"),
+                    borderRadius:12,padding:"12px 14px",textAlign:"center"}}>
+                    <div style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>{DOW[getDow(d)]}</div>
+                    <div style={{fontSize:22,fontWeight:800,color:isLibre?"#059669":c,margin:"6px 0"}}>{d}</div>
+                    {isLibre?(
+                      <span style={{fontSize:11,fontWeight:700,color:"#059669"}}>🟢 LIBRE</span>
+                    ):(
+                      <div>
+                        <div style={{fontSize:10,fontWeight:800,color:c}}>{t.label||"FDS"}</div>
+                        <div style={{fontSize:10,color:c+"99"}}>{t.horario}</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Vista AGENTE PRINCIPAL — semana + FDS + resumen ───────────────────────
     const semanaRows = semanas.map(function(week,wi){
       const realDays=week.filter(Boolean);
       const wkDays=realDays.filter(d=>!isWeekend(d));
       const wkndDays=realDays.filter(d=>isWeekend(d));
-
-      // Contar fines de semana
-      wkndDays.forEach(d=>{
-        const t=getTurnoAgente(agente,d);
-        if(t||descansosDias.includes(d)===false) trabajados++;
-        else libres++;
-      });
-
       return (
         <div key={wi} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,overflow:"hidden",marginBottom:10}}>
-          {/* Header semana */}
           <div style={{background:c+"0f",borderBottom:"1px solid "+c+"22",
             padding:"8px 16px",display:"flex",alignItems:"center",gap:10}}>
             <span style={{fontSize:12,fontWeight:800,color:c}}>Semana {wi+1}</span>
             <span style={{fontSize:11,color:"#94a3b8"}}>
               {realDays[0]&&DOW[getDow(realDays[0])]+" "+realDays[0]} – {realDays[realDays.length-1]&&DOW[getDow(realDays[realDays.length-1])]+" "+realDays[realDays.length-1]}
             </span>
+            <span style={{marginLeft:"auto",fontSize:10,color:"#94a3b8"}}>
+              {wkDays.filter(d=>getTurnoAgente(agente,d)).length} días trabajados
+            </span>
           </div>
-          {/* Días Lun-Vie */}
+          {/* Lun-Vie */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6,padding:"12px 14px"}}>
             {week.filter(d=>d&&!isWeekend(d)).map(function(d){
               const t=getTurnoAgente(agente,d);
               const desc=descansosDias.includes(d);
               return (
-                <div key={d} style={{textAlign:"center",background:desc?"#f0fdf4":t?TURNO_META[t.id]?.c+"0a"||"#f8fafc":"#f8fafc",
-                  border:"1px solid "+(desc?"#bbf7d0":t?TURNO_META[t.id]?.c+"33"||"#e2e8f0":"#e2e8f0"),
+                <div key={d} style={{textAlign:"center",
+                  background:desc?"#f0fdf4":t?(TURNO_META[t.id]?.c||c)+"0d":"#f8fafc",
+                  border:"1px solid "+(desc?"#bbf7d0":t?(TURNO_META[t.id]?.c||c)+"33":"#e2e8f0"),
                   borderRadius:10,padding:"8px 6px"}}>
                   <div style={{fontSize:10,color:"#94a3b8",fontWeight:700}}>{DOW[getDow(d)]}</div>
-                  <div style={{fontSize:16,fontWeight:800,color:desc?"#059669":t?TURNO_META[t.id]?.c||c:"#1e293b",margin:"4px 0"}}>{d}</div>
-                  {desc?(
-                    <span style={{fontSize:9,fontWeight:700,color:"#059669",background:"#dcfce7",borderRadius:6,padding:"2px 6px"}}>🏖 Libre</span>
-                  ):t?(
-                    <TurnoBadge turno={t}/>
-                  ):(
-                    <span style={{fontSize:10,color:"#94a3b8"}}>—</span>
-                  )}
+                  <div style={{fontSize:16,fontWeight:800,color:desc?"#059669":t?TURNO_META[t.id]?.c||c:"#94a3b8",margin:"4px 0"}}>{d}</div>
+                  {desc?<span style={{fontSize:9,fontWeight:700,color:"#059669",background:"#dcfce7",borderRadius:6,padding:"2px 5px"}}>🏖 Libre</span>
+                  :t?<TurnoBadge turno={t}/>
+                  :<span style={{fontSize:10,color:"#cbd5e1"}}>—</span>}
                 </div>
               );
             })}
           </div>
-          {/* Fin de semana */}
+          {/* FDS */}
           {wkndDays.length>0&&(
-            <div style={{borderTop:"1px solid #fecdd3",background:"#fff1f2",
-              padding:"10px 14px",display:"flex",gap:10,flexWrap:"wrap"}}>
-              <span style={{fontSize:10,fontWeight:700,color:"#be185d",
-                textTransform:"uppercase",alignSelf:"center"}}>🏖 Fin de semana:</span>
+            <div style={{borderTop:"1px solid #fecdd3",background:"#fff1f2",padding:"10px 14px",display:"flex",flexDirection:"column",gap:8}}>
+              <span style={{fontSize:10,fontWeight:700,color:"#be185d",textTransform:"uppercase"}}>🏖 Fin de semana</span>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {wkndDays.map(function(d){
                 const t=getTurnoAgente(agente,d);
-                const desc=descansosDias.includes(d);
+                const fdsDesc=(malla.descansosFds||[]).find(fd=>fd.dias.includes(d)&&(fd.descansan||[]).includes(agente));
+                const isLibre=fdsDesc||!t;
                 return (
                   <div key={d} style={{display:"flex",alignItems:"center",gap:6,
-                    background:desc||!t?"#dcfce7":"#fff",border:"1px solid "+(desc||!t?"#bbf7d0":"#fecdd3"),
-                    borderRadius:10,padding:"6px 12px"}}>
+                    background:isLibre?"#dcfce7":"#fff",border:"1px solid "+(isLibre?"#bbf7d0":"#fecdd3"),
+                    borderRadius:10,padding:"8px 12px"}}>
                     <span style={{fontSize:11,fontWeight:700,color:"#64748b"}}>{DOW[getDow(d)]} {d}</span>
-                    {desc||!t?(
-                      <span style={{fontSize:10,fontWeight:800,color:"#059669"}}>🟢 LIBRE</span>
-                    ):(
-                      <TurnoBadge turno={t}/>
-                    )}
+                    {isLibre?<span style={{fontSize:11,fontWeight:800,color:"#059669"}}>🟢 LIBRE</span>:<TurnoBadge turno={t}/>}
                   </div>
                 );
               })}
+              </div>
             </div>
           )}
         </div>
       );
     });
 
-    // Resumen mes
-    const fdsTotal = Array.from({length:daysInMonth},(_,i)=>i+1).filter(d=>isWeekend(d)).length;
-    const fdsLibres= Array.from({length:daysInMonth},(_,i)=>i+1).filter(d=>isWeekend(d)&&!getTurnoAgente(agente,d)).length;
-    const fdsTrab  = fdsTotal-fdsLibres;
-
     return (
       <div>
-        {/* Header personal */}
+        {/* Header con métricas */}
         <div style={{background:"linear-gradient(135deg,"+c+","+c+"cc)",borderRadius:14,
           padding:"16px 20px",marginBottom:14,display:"flex",alignItems:"center",gap:14}}>
           <div style={{width:48,height:48,borderRadius:"50%",background:"rgba(255,255,255,0.25)",
@@ -3019,32 +3123,27 @@ function MallaTab({ mesId, store }) {
           </div>
           <div style={{flex:1}}>
             <div style={{fontSize:16,fontWeight:800,color:"#fff"}}>{agente} — {mesLabel}</div>
-            <div style={{fontSize:12,color:"rgba(255,255,255,0.8)",marginTop:2}}>
-              Mis turnos y descansos del mes
-            </div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.75)",marginTop:2}}>Mis turnos del mes</div>
           </div>
-          <div style={{display:"flex",gap:12,textAlign:"center"}}>
-            <div style={{background:"rgba(255,255,255,0.2)",borderRadius:10,padding:"8px 14px"}}>
-              <div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{fdsLibres}</div>
-              <div style={{fontSize:9,color:"rgba(255,255,255,0.8)",fontWeight:700}}>FDS libres</div>
-            </div>
-            <div style={{background:"rgba(255,255,255,0.2)",borderRadius:10,padding:"8px 14px"}}>
-              <div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{fdsTrab}</div>
-              <div style={{fontSize:9,color:"rgba(255,255,255,0.8)",fontWeight:700}}>FDS trabaja</div>
-            </div>
-            <div style={{background:"rgba(255,255,255,0.2)",borderRadius:10,padding:"8px 14px"}}>
-              <div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{descansosDias.length}</div>
-              <div style={{fontSize:9,color:"rgba(255,255,255,0.8)",fontWeight:700}}>días libre</div>
-            </div>
+          <div style={{display:"flex",gap:8,textAlign:"center",flexWrap:"wrap",justifyContent:"flex-end"}}>
+            {[
+              {v:diasTrabLV,label:"Días L-V"},
+              {v:diasLibLV, label:"Días libres"},
+              {v:fdsTrab,   label:"FDS trabaja"},
+              {v:fdsLibres, label:"FDS libres"},
+            ].map(m=>(
+              <div key={m.label} style={{background:"rgba(255,255,255,0.2)",borderRadius:10,padding:"7px 12px"}}>
+                <div style={{fontSize:18,fontWeight:800,color:"#fff"}}>{m.v}</div>
+                <div style={{fontSize:8,color:"rgba(255,255,255,0.8)",fontWeight:700,textTransform:"uppercase"}}>{m.label}</div>
+              </div>
+            ))}
           </div>
         </div>
-        {/* Aviso breaks */}
         <div style={{background:"#fffbeb",border:"1px solid #fbbf24",borderRadius:10,
           padding:"10px 16px",marginBottom:14,fontSize:12,color:"#92400e",fontWeight:600,
           display:"flex",alignItems:"center",gap:8}}>
-          ☕ <strong>Breaks:</strong> Coordinalos con el equipo. No pueden salir dos personas al mismo tiempo al break ni al baño — siempre debe haber alguien disponible en Easydial y chat.
+          ☕ <strong>Breaks:</strong> Coordinalos. No pueden salir dos personas al mismo tiempo — siempre debe haber cobertura en Easydial y chat.
         </div>
-        {/* Semanas */}
         {semanaRows}
       </div>
     );
@@ -3070,15 +3169,38 @@ function MallaTab({ mesId, store }) {
           ☕ <strong>Regla de breaks:</strong> No pueden salir dos personas al mismo tiempo al break ni al auxiliar. Coordinalos entre el equipo para que siempre haya cobertura en Easydial y chat.
         </div>
 
+        {/* Selector de semanas */}
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:4}}>
+          {semanas.map(function(week,wi){
+            const realDays=week.filter(Boolean);
+            if(!realDays.length) return null;
+            const wkndDays=realDays.filter(d=>isWeekend(d));
+            const lunes=realDays.find(d=>!isWeekend(d));
+            const vie=realDays.filter(d=>!isWeekend(d)).pop();
+            return (
+              <button key={wi}
+                onClick={()=>setSemanaActiva(wi)}
+                style={{height:32,padding:"0 14px",borderRadius:20,fontWeight:700,fontSize:11,
+                  cursor:"pointer",border:"1.5px solid "+(semanaActiva===wi?"#6d28d9":"#e2e8f0"),
+                  background:semanaActiva===wi?"#6d28d9":"#fff",
+                  color:semanaActiva===wi?"#fff":"#64748b",transition:"all .15s"}}>
+                S{wi+1} {lunes&&mesNum+"/"+lunes}–{vie&&mesNum+"/"+vie}
+                {wkndDays.length>0&&" 🏖"}
+              </button>
+            );
+          })}
+        </div>
+
         {semanas.map(function(week,wi){
+          if(wi!==semanaActiva) return null;
           const realDays=week.filter(Boolean);
           if(!realDays.length) return null;
           const wkndDays=realDays.filter(d=>isWeekend(d));
 
           return (
-            <div key={wi} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:14,overflow:"hidden"}}>
+            <div key={wi} style={{background:"#fff",border:"1.5px solid #6d28d9",borderRadius:14,overflow:"hidden"}}>
               {/* Header */}
-              <div style={{background:"#f8fafc",borderBottom:"1px solid #e2e8f0",
+              <div style={{background:"#f5f3ff",borderBottom:"1px solid #e2e8f0",
                 padding:"10px 16px",display:"flex",alignItems:"center",gap:10}}>
                 <span style={{fontSize:12,fontWeight:800,color:"#6d28d9"}}>Semana {wi+1}</span>
                 <span style={{fontSize:11,color:"#94a3b8"}}>
@@ -3116,8 +3238,9 @@ function MallaTab({ mesId, store }) {
                     </tr>
                   </thead>
                   <tbody>
+                    {/* Turnos semana L-V */}
                     {TURNOS_PRINCIPALES.map(function(turno,ti){
-                      const m=TURNO_META[turno.id]||{label:"T"+turno.id,h:turno.horario,c:"#64748b"};
+                      const m=TURNO_META[turno.id]||{label:turno.label,h:turno.horario,c:"#64748b"};
                       return (
                         <tr key={ti} style={{borderBottom:"1px solid #f1f5f9"}}>
                           <td style={{padding:"8px 14px",borderRight:"1px solid #f1f5f9"}}>
@@ -3130,7 +3253,34 @@ function MallaTab({ mesId, store }) {
                             const wknd=isWeekend(d);
                             return (
                               <td key={di} style={{padding:"6px 8px",textAlign:"center",
-                                background:wknd?"#fff8f8":"transparent"}}>
+                                background:wknd?"#f8fafc":"transparent"}}>
+                                {wknd?<span style={{color:"#e2e8f0",fontSize:10}}>—</span>:
+                                  <AgenteBadge name={asign} size="sm"
+                                    onClick={asign&&asign!=="N/A"?()=>setAsesorVista(asign):null}/>}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                    {/* FDS rows — solo en días sáb/dom */}
+                    {wkndDays.length>0&&(malla.fds||[]).map(function(fds,fi){
+                      const m=TURNO_META[fds.id]||{label:fds.label,h:fds.horario,c:"#b45309"};
+                      const hasFds=week.some(d=>d&&isWeekend(d)&&getAsign(fds,d));
+                      if(!hasFds) return null;
+                      return (
+                        <tr key={"fds"+fi} style={{borderBottom:"1px solid #fecdd3",background:"#fff8f8"}}>
+                          <td style={{padding:"8px 14px",borderRight:"1px solid #fecdd3"}}>
+                            <div style={{fontSize:11,fontWeight:800,color:m.c}}>{m.label}</div>
+                            <div style={{fontSize:10,color:m.c+"99"}}>{m.h}</div>
+                          </td>
+                          {week.map(function(d,di){
+                            if(d===null) return <td key={di} style={{background:"#fff8f8"}}/>;
+                            const wknd=isWeekend(d);
+                            if(!wknd) return <td key={di} style={{background:"#f8fafc",padding:"6px 8px",textAlign:"center"}}><span style={{color:"#e2e8f0",fontSize:10}}>—</span></td>;
+                            const asign=getAsign(fds,d);
+                            return (
+                              <td key={di} style={{padding:"6px 8px",textAlign:"center",background:"#fff8f8"}}>
                                 <AgenteBadge name={asign} size="sm"
                                   onClick={asign&&asign!=="N/A"?()=>setAsesorVista(asign):null}/>
                               </td>
@@ -3139,6 +3289,30 @@ function MallaTab({ mesId, store }) {
                         </tr>
                       );
                     })}
+                    {/* Descanso FDS — quién libra */}
+                    {wkndDays.length>0&&(()=>{
+                      const desc=(malla.descansosFds||[]).find(d=>wkndDays.some(w=>d.dias.includes(w)));
+                      if(!desc||!desc.descansan||!desc.descansan.length) return null;
+                      return (
+                        <tr style={{background:"#f0fdf4",borderBottom:"1px solid #bbf7d0"}}>
+                          <td style={{padding:"8px 14px",borderRight:"1px solid #bbf7d0"}}>
+                            <div style={{fontSize:11,fontWeight:800,color:"#059669"}}>🏖 Descansa</div>
+                            <div style={{fontSize:10,color:"#94a3b8"}}>libre este FDS</div>
+                          </td>
+                          {week.map(function(d,di){
+                            if(d===null) return <td key={di} style={{background:"#f0fdf4"}}/>;
+                            if(!isWeekend(d)) return <td key={di} style={{background:"#f0fdf4"}}/>;
+                            return (
+                              <td key={di} colSpan={1} style={{padding:"6px 8px",textAlign:"center",background:"#f0fdf4"}}>
+                                {desc.descansan.map(a=>(
+                                  <AgenteBadge key={a} name={a} size="sm"/>
+                                ))}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -3147,7 +3321,7 @@ function MallaTab({ mesId, store }) {
               {wkndDays.length>0&&(()=>{
                 const socios=[];
                 wkndDays.forEach(d=>{
-                  malla.turnos.filter(t=>["5","6"].includes(t.id)).forEach(t=>{
+                  (malla.fds||[]).forEach(function(t){
                     const a=getAsign(t,d);
                     if(a&&a!=="N/A"&&a!=="") socios.push({socio:a,d,t});
                   });
@@ -3267,6 +3441,288 @@ function MallaTab({ mesId, store }) {
   );
 }
 
+
+// ── ALIANZAS PANEL ───────────────────────────────────────────────────────────
+function AlianzasPanel() {
+  const ALIANZAS = [
+    {
+      nombre: "AirHelp",
+      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/AirHelp_logo.svg/1200px-AirHelp_logo.svg.png",
+      color: "#1B3F8B",
+      descripcion: "Reclamaciones por vuelos retrasados, cancelados o con overbooking. El cliente puede reclamar hasta €600 por pasajero. SegurosFly lo refiere y AirHelp gestiona todo el proceso legal.",
+      como: "Compartí el link con el cliente si tuvo inconvenientes con su vuelo. AirHelp cobra solo si ganan el caso (sin costo inicial para el cliente).",
+      link: "https://funnel.airhelp.es/claims/new/trip-details?lang=es",
+      cta: "Abrir formulario"
+    },
+    {
+      nombre: "Rentcars",
+      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Rentcars.com_Logo.svg/2560px-Rentcars.com_Logo.svg.png",
+      color: "#F5A623",
+      descripcion: "Alquiler de autos en más de 140 países. El cliente compara precios y reserva directamente. SegurosFly tiene una landing page especial para sus clientes.",
+      como: "Compartí el link de alianza para que el cliente vea los precios. Se puede combinar con el seguro de viaje para proteger el alquiler.",
+      link: "https://www.rentcars.com/es-co/lp/segurosfly",
+      cta: "Ver alianza Rentcars"
+    },
+    {
+      nombre: "Airalo eSIM",
+      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Airalo_logo.svg/1200px-Airalo_logo.svg.png",
+      color: "#E65C4F",
+      descripcion: "eSIM digital para viajes internacionales. El viajero activa datos móviles en más de 200 países sin cambiar de SIM física. Planes desde $5 USD.",
+      como: "Recomendalo a clientes que viajen al exterior. Pueden comprar y activar desde el celular antes de salir. Complemento ideal al seguro de viaje.",
+      link: "https://www.airalo.com/",
+      cta: "Ver planes Airalo"
+    },
+    {
+      nombre: "Priority Pass",
+      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Priority_Pass_logo.svg/2560px-Priority_Pass_logo.svg.png",
+      color: "#9B8A5A",
+      descripcion: "Acceso a más de 1,400 salas VIP en aeropuertos de todo el mundo. Ideal para viajeros frecuentes. Incluye bebidas, comida, WiFi y zonas de descanso.",
+      como: "Recomendalo a clientes premium o viajeros frecuentes. La membresía anual se amortiza rápidamente con los viajes.",
+      link: "https://www.prioritypass.com/es-LA/join-prioritypass",
+      cta: "Unirse a Priority Pass"
+    },
+    {
+      nombre: "Travel Registration",
+      logo: null,
+      color: "#0891b2",
+      descripcion: "Registro de viajeros ante autoridades. Permite a los consulados contactar al viajero en caso de emergencia en el destino. Recomendado para zonas de riesgo.",
+      como: "Sugerilo a clientes que viajan a destinos con alertas o zonas de conflicto. Es gratuito y toma menos de 5 minutos.",
+      link: "https://travelregistration.online/",
+      cta: "Registrar viaje"
+    },
+  ];
+
+  const [expandido, setExpandido] = useState(null);
+
+  return (
+    <div style={{marginTop:16}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <span style={{fontSize:20}}>🤝</span>
+        <div>
+          <div style={{fontSize:15,fontWeight:800,color:"#1e293b"}}>Alianzas SegurosFly</div>
+          <div style={{fontSize:12,color:"#94a3b8"}}>Servicios complementarios para ofrecer a tus clientes</div>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
+        {ALIANZAS.map(function(a){
+          const open = expandido===a.nombre;
+          return (
+            <div key={a.nombre} style={{background:"#fff",border:"1.5px solid "+(open?a.color+"66":"#e2e8f0"),
+              borderRadius:14,overflow:"hidden",transition:"border-color .2s",
+              boxShadow:open?"0 4px 20px "+a.color+"18":"0 1px 4px rgba(0,0,0,0.05)"}}>
+              {/* Header */}
+              <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",
+                background:open?a.color+"08":"#fff"}}
+                onClick={()=>setExpandido(open?null:a.nombre)}>
+                <div style={{width:44,height:44,borderRadius:10,background:a.color+"12",
+                  border:"1.5px solid "+a.color+"33",display:"flex",alignItems:"center",
+                  justifyContent:"center",flexShrink:0,overflow:"hidden"}}>
+                  {a.logo?(
+                    <img src={a.logo} alt={a.nombre}
+                      style={{width:38,height:38,objectFit:"contain"}}
+                      onError={e=>{e.target.style.display="none";}}/>
+                  ):(
+                    <span style={{fontSize:16,fontWeight:800,color:a.color}}>{a.nombre[0]}</span>
+                  )}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#1e293b"}}>{a.nombre}</div>
+                  <div style={{fontSize:11,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",
+                    whiteSpace:"nowrap"}}>{a.descripcion.slice(0,55)}...</div>
+                </div>
+                <span style={{fontSize:16,color:a.color,fontWeight:700,flexShrink:0,
+                  transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform .2s"}}>▾</span>
+              </div>
+              {/* Expandido */}
+              {open&&(
+                <div style={{borderTop:"1px solid "+a.color+"22",padding:"14px 16px",
+                  background:a.color+"05"}}>
+                  <div style={{fontSize:12,color:"#374151",lineHeight:1.6,marginBottom:10}}>
+                    {a.descripcion}
+                  </div>
+                  <div style={{background:"#fff",border:"1px solid "+a.color+"33",borderRadius:8,
+                    padding:"10px 12px",marginBottom:12}}>
+                    <div style={{fontSize:10,fontWeight:700,color:a.color,textTransform:"uppercase",
+                      letterSpacing:"0.06em",marginBottom:4}}>💡 Cómo usarlo con tu cliente</div>
+                    <div style={{fontSize:12,color:"#374151",lineHeight:1.5}}>{a.como}</div>
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <a href={a.link} target="_blank" rel="noopener noreferrer"
+                      style={{flex:1,height:36,borderRadius:8,border:"none",
+                        background:a.color,color:"#fff",fontWeight:700,fontSize:12,
+                        cursor:"pointer",textDecoration:"none",display:"flex",
+                        alignItems:"center",justifyContent:"center",gap:6}}>
+                      {a.cta} ↗
+                    </a>
+                    <button onClick={()=>{navigator.clipboard.writeText(a.link).catch(()=>{});}}
+                      style={{height:36,padding:"0 12px",borderRadius:8,
+                        border:"1.5px solid "+a.color+"44",background:"#fff",
+                        color:a.color,fontWeight:700,fontSize:11,cursor:"pointer"}}>
+                      📋 Copiar link
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── DOCUMENTOS SEGUROSFLY ─────────────────────────────────────────────────────
+function DocumentosTab() {
+  const DOCS = [
+    {
+      categoria: "📄 Documentos",
+      items: [
+        {
+          titulo: "Manual de Procesos SegurosFly",
+          descripcion: "Documento maestro con procesos, procedimientos y guías operativas del equipo.",
+          link: "https://docs.google.com/document/d/1Ldh30KuSGC8kUuCZxUsivA1deQp63nKxliEw_Qe396M/edit?tab=t.0",
+          tipo: "Google Doc",
+          color: "#2563eb",
+          icon: "📄"
+        }
+      ]
+    },
+    {
+      categoria: "🎬 Videos de capacitación — Vicidial",
+      items: [
+        {
+          titulo: "Llamada Manual Vicidial",
+          descripcion: "Cómo realizar llamadas manuales desde Vicidial paso a paso.",
+          link: "https://www.loom.com/share/5ee6a817f4d4473ebff952b1534ff1ad",
+          tipo: "Video Loom",
+          color: "#7c3aed",
+          icon: "🎬",
+          duracion: "~3 min"
+        },
+        {
+          titulo: "Conexión Agente Vicidial",
+          descripcion: "Proceso para conectarse como agente en Vicidial correctamente.",
+          link: "https://www.loom.com/share/f591868dfad74cd99f0053330cf5f20c",
+          tipo: "Video Loom",
+          color: "#7c3aed",
+          icon: "🎬",
+          duracion: "~3 min"
+        },
+        {
+          titulo: "Transferencia Vicidial",
+          descripcion: "Cómo transferir llamadas dentro de Vicidial.",
+          link: "https://www.loom.com/share/317a039a9e53441ab765b97c3370e2cc",
+          tipo: "Video Loom",
+          color: "#7c3aed",
+          icon: "🎬",
+          duracion: "~3 min"
+        }
+      ]
+    }
+  ];
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {/* Header */}
+      <div style={{background:"linear-gradient(135deg,#1e3a5f,#2563eb)",borderRadius:14,
+        padding:"18px 22px",display:"flex",alignItems:"center",gap:14}}>
+        <div style={{fontSize:32}}>📁</div>
+        <div>
+          <div style={{fontSize:17,fontWeight:800,color:"#fff"}}>Documentos SegurosFly</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.75)",marginTop:2}}>
+            Recursos, manuales y videos de capacitación del equipo
+          </div>
+        </div>
+      </div>
+
+      {/* Secciones */}
+      {DOCS.map(function(sec){
+        return (
+          <div key={sec.categoria}>
+            <div style={{fontSize:13,fontWeight:800,color:"#374151",marginBottom:10,
+              paddingBottom:6,borderBottom:"1.5px solid #e2e8f0"}}>
+              {sec.categoria}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:10}}>
+              {sec.items.map(function(doc){
+                return (
+                  <div key={doc.titulo} style={{background:"#fff",border:"1.5px solid "+doc.color+"33",
+                    borderRadius:14,padding:"16px 18px",display:"flex",flexDirection:"column",gap:10,
+                    boxShadow:"0 2px 8px "+doc.color+"10"}}>
+                    <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                      <div style={{width:40,height:40,borderRadius:10,background:doc.color+"12",
+                        display:"flex",alignItems:"center",justifyContent:"center",
+                        fontSize:20,flexShrink:0}}>
+                        {doc.icon}
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:800,color:"#1e293b",marginBottom:2}}>
+                          {doc.titulo}
+                        </div>
+                        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                          <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,
+                            background:doc.color+"15",color:doc.color}}>
+                            {doc.tipo}
+                          </span>
+                          {doc.duracion&&(
+                            <span style={{fontSize:10,color:"#94a3b8"}}>{doc.duracion}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{fontSize:12,color:"#64748b",lineHeight:1.5}}>
+                      {doc.descripcion}
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <a href={doc.link} target="_blank" rel="noopener noreferrer"
+                        style={{flex:1,height:36,borderRadius:8,border:"none",
+                          background:doc.color,color:"#fff",fontWeight:700,fontSize:12,
+                          cursor:"pointer",textDecoration:"none",display:"flex",
+                          alignItems:"center",justifyContent:"center",gap:5}}>
+                        {doc.tipo.includes("Video")?"▶ Ver video":"📄 Abrir documento"}
+                      </a>
+                      <button onClick={()=>{try{navigator.clipboard.writeText(doc.link);}catch(e){}}}
+                        style={{height:36,padding:"0 12px",borderRadius:8,
+                          border:"1.5px solid "+doc.color+"44",background:"#fff",
+                          color:doc.color,fontWeight:700,fontSize:11,cursor:"pointer"}}>
+                        📋
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
+// ── ALIANZAS TAB ─────────────────────────────────────────────────────────────
+function AlianzasTab() {
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      {/* Header */}
+      <div style={{background:"linear-gradient(135deg,#0c4a6e,#0891b2)",borderRadius:14,
+        padding:"18px 22px",display:"flex",alignItems:"center",gap:14}}>
+        <div style={{fontSize:32}}>🤝</div>
+        <div>
+          <div style={{fontSize:17,fontWeight:800,color:"#fff"}}>Alianzas SegurosFly</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.75)",marginTop:2}}>
+            Servicios complementarios · eSIM, reclamos, autos, salas VIP y más
+          </div>
+        </div>
+      </div>
+      {/* eSIM */}
+      <EsimCalc />
+      {/* Alianzas */}
+      <AlianzasPanel />
+    </div>
+  );
+}
+
 // ── CALCULADORAS DE VIAJE ──────────────────────────────────────────────────────
 function CalcCard({ index, label, color, accent, pasajeros, dias, onPasajerosChange, onDiasChange, link }) {
   const [valor, setValor] = useState("");
@@ -3366,6 +3822,180 @@ function CalcCard({ index, label, color, accent, pasajeros, dias, onPasajerosCha
     </div>
   );
 }
+// Datos eSIM embebidos + sync desde Sheets (pestaña "Discover Global Esim")
+const ESIM_DEFAULT = [
+  {plan:"1 GB - 5 días",  precio:7},
+  {plan:"1 GB - 7 días",  precio:14},
+  {plan:"2 GB - 15 días", precio:20},
+  {plan:"3 GB - 30 días", precio:30},
+  {plan:"5 GB - 30 días", precio:38},
+  {plan:"5 GB - 60 días", precio:38},
+  {plan:"10 GB - 180 días",precio:68},
+  {plan:"10 GB - 30 días", precio:68},
+  {plan:"20 GB - 30 días", precio:76},
+  {plan:"20 GB - 365 días",precio:76},
+];
+
+function EsimCalc() {
+  const [planes,  setPlanes]  = useState(ESIM_DEFAULT);
+  const [loading, setLoading] = useState(false);
+  const [qty,     setQty]     = useState({});  // {plan: cantidad}
+  const [moneda,  setMoneda]  = useState("USD");
+  const [tasa,    setTasa]    = useState(1);   // tasa respecto a USD
+
+  const MONEDAS = [
+    {code:"USD", label:"USD — Dólar", tasa:1},
+    {code:"COP", label:"COP — Peso Colombiano", tasa:4200},
+    {code:"MXN", label:"MXN — Peso Mexicano",  tasa:19.5},
+    {code:"ARS", label:"ARS — Peso Argentino",  tasa:950},
+    {code:"EUR", label:"EUR — Euro",            tasa:0.92},
+  ];
+
+  // Cargar desde Sheets al montar
+  useEffect(function(){
+    setLoading(true);
+    fetch(SHEETS_URL+"?accion=read&sheet=Discover%20Global%20Esim",{cache:"no-store"})
+      .then(r=>r.json())
+      .then(function(data){
+        if(data&&data.ok&&Array.isArray(data.rows)&&data.rows.length>0){
+          const mapped=data.rows
+            .filter(r=>r.asesor&&r.valorUsd>0)
+            .map(r=>({plan:String(r.asesor||"").trim(), precio:parseFloat(r.valorUsd)||0}));
+          if(mapped.length>0) setPlanes(mapped);
+        }
+        setLoading(false);
+      }).catch(()=>setLoading(false));
+  },[]);
+
+  const total = planes.reduce((s,p)=>{
+    const q=qty[p.plan]||0;
+    return s+q*p.precio;
+  },0);
+  const totalMoneda = total*tasa;
+
+  function fmtM(v){
+    if(moneda==="USD") return "$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+    return v.toLocaleString("es-CO",{minimumFractionDigits:0,maximumFractionDigits:0})+" "+moneda;
+  }
+
+  function setQ(plan,v){
+    setQty(prev=>({...prev,[plan]:Math.max(0,v)}));
+  }
+
+  const hasItems = Object.values(qty).some(v=>v>0);
+
+  return (
+    <div style={{background:"#fff",border:"1.5px solid #0891b222",borderRadius:16,overflow:"hidden",marginTop:16}}>
+      {/* Header */}
+      <div style={{background:"linear-gradient(135deg,#0c4a6e,#0891b2)",padding:"14px 20px",
+        display:"flex",alignItems:"center",gap:12,justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:26}}>📡</span>
+          <div>
+            <div style={{fontSize:15,fontWeight:800,color:"#fff"}}>Discover Global eSIM</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.75)"}}>
+              {loading?"Sincronizando con Sheet...":"Precios sincronizados · "+planes.length+" planes disponibles"}
+            </div>
+          </div>
+        </div>
+        {/* Selector moneda */}
+        <select value={moneda}
+          onChange={e=>{
+            const m=MONEDAS.find(x=>x.code===e.target.value);
+            setMoneda(e.target.value);
+            setTasa(m?m.tasa:1);
+          }}
+          style={{height:32,borderRadius:8,border:"1px solid rgba(255,255,255,0.3)",
+            background:"rgba(255,255,255,0.15)",color:"#fff",fontSize:12,fontWeight:700,
+            padding:"0 10px",cursor:"pointer"}}>
+          {MONEDAS.map(m=><option key={m.code} value={m.code} style={{color:"#1e293b"}}>{m.label}</option>)}
+        </select>
+      </div>
+
+      {/* Tabla de planes */}
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead>
+            <tr style={{background:"#f0f9ff",borderBottom:"1px solid #e0f2fe"}}>
+              {["Plan","Precio USD","Precio "+moneda,"Cant.","Subtotal"].map(h=>(
+                <th key={h} style={{padding:"10px 14px",fontSize:11,fontWeight:700,
+                  color:"#0891b2",textTransform:"uppercase",letterSpacing:"0.06em",
+                  textAlign:h==="Plan"?"left":"center"}}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {planes.map(function(p,i){
+              const q=qty[p.plan]||0;
+              const sub=q*p.precio*tasa;
+              return (
+                <tr key={i} style={{borderBottom:"1px solid #f0f9ff",
+                  background:q>0?"#e0f2fe22":"#fff",transition:"background .15s"}}>
+                  <td style={{padding:"10px 14px",fontSize:13,fontWeight:600,color:"#1e293b"}}>
+                    {p.plan}
+                  </td>
+                  <td style={{padding:"10px 14px",textAlign:"center",fontWeight:700,color:"#0891b2"}}>
+                    ${p.precio}
+                  </td>
+                  <td style={{padding:"10px 14px",textAlign:"center",color:"#64748b",fontWeight:600}}>
+                    {moneda==="USD"?"—":fmtM(p.precio*tasa)}
+                  </td>
+                  <td style={{padding:"10px 14px",textAlign:"center"}}>
+                    <div style={{display:"flex",gap:6,alignItems:"center",justifyContent:"center"}}>
+                      <button onClick={()=>setQ(p.plan,q-1)}
+                        style={{width:28,height:28,borderRadius:7,border:"1.5px solid #e2e8f0",
+                          background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:14,
+                          cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                      <span style={{minWidth:24,textAlign:"center",fontSize:14,fontWeight:700,color:q>0?"#0891b2":"#1e293b"}}>{q}</span>
+                      <button onClick={()=>setQ(p.plan,q+1)}
+                        style={{width:28,height:28,borderRadius:7,border:"1.5px solid #e2e8f0",
+                          background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:14,
+                          cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                    </div>
+                  </td>
+                  <td style={{padding:"10px 14px",textAlign:"center",fontWeight:800,
+                    color:q>0?"#0891b2":"#94a3b8",fontSize:q>0?14:12}}>
+                    {q>0?fmtM(sub):"—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Total */}
+      {hasItems&&(
+        <div style={{borderTop:"2px solid #e0f2fe",padding:"14px 20px",
+          display:"flex",justifyContent:"space-between",alignItems:"center",
+          background:"#f0f9ff"}}>
+          <div>
+            <div style={{fontSize:12,color:"#0891b2",fontWeight:700,textTransform:"uppercase"}}>Total seleccionado</div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
+              {Object.entries(qty).filter(([,v])=>v>0).map(([k,v])=>v+"x "+k).join(" · ")}
+            </div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:24,fontWeight:800,color:"#0891b2"}}>{fmtM(totalMoneda)}</div>
+            {moneda!=="USD"&&<div style={{fontSize:12,color:"#94a3b8"}}>USD ${total.toFixed(2)}</div>}
+          </div>
+        </div>
+      )}
+      {hasItems&&(
+        <div style={{padding:"0 20px 14px",display:"flex",justifyContent:"flex-end"}}>
+          <button onClick={()=>setQty({})}
+            style={{height:30,padding:"0 14px",borderRadius:8,border:"1px solid #fca5a5",
+              background:"#fff5f5",color:"#ef4444",fontWeight:700,fontSize:11,cursor:"pointer"}}>
+            🗑️ Limpiar selección
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CalcTab() {
   const [pasajeros,setPasajeros]=useState(2), [dias,setDias]=useState(7);
   const [syncPax,setSyncPax]=useState(true), [syncDias,setSyncDias]=useState(true);
@@ -3935,6 +4565,7 @@ function TosspileTab({ store, onUpdate }) {
           </div>
         </div>
       )}
+
     </div>
   );
 }
@@ -4043,8 +4674,10 @@ const MAIN_TABS = [
   { id:"tracker",   label:"Tracker",       color:"#0d9488" },
   { id:"calc",      label:"Calculadoras",  color:"#b45309" },
   { id:"malla",      label:"Malla SF",       color:"#6d28d9" },
+  { id:"alianzas",   label:"Alianzas",       color:"#0891b2" },
   { id:"cotizador",  label:"Cotizador",      color:"#1B72C4" },
   { id:"tosspile",  label:"Trustpilot",    color:"#00b67a" },
+  { id:"docs",       label:"Documentos",    color:"#2563eb" },
 ];
 
 function App() {
@@ -4297,7 +4930,7 @@ function App() {
         <div style={{display:"flex",flexDirection:"column",gap:3,flex:1,overflow:"hidden"}}>
           {/* Fila 1 — Secciones principales */}
           <div style={{display:"flex",gap:3,overflowX:"auto",justifyContent:"center"}}>
-            {[{id:"global",label:"✈️ Equipo",color:"#1e3a5f"},{id:"tracker",label:"📊 Tracker",color:"#0d9488"},{id:"calc",label:"🧮 Calculadoras",color:"#b45309"},{id:"malla",label:"📅 Malla SF",color:"#6d28d9"},{id:"cotizador",label:"💼 Cotizador",color:"#1B72C4"},{id:"tosspile",label:"⭐ Trustpilot",color:"#00b67a"}].map(t=>(
+            {[{id:"global",label:"✈️ Equipo",color:"#1e3a5f"},{id:"tracker",label:"📊 Tracker",color:"#0d9488"},{id:"calc",label:"🧮 Calculadoras",color:"#b45309"},{id:"malla",label:"📅 Malla SF",color:"#6d28d9"},{id:"alianzas",label:"🤝 Alianzas",color:"#0891b2"},{id:"cotizador",label:"💼 Cotizador",color:"#1B72C4"},{id:"tosspile",label:"⭐ Trustpilot",color:"#00b67a"},{id:"docs",label:"📁 Documentos",color:"#2563eb"}].map(t=>(
               <button key={t.id} onClick={()=>setTab(t.id)}
                 style={{background:tab===t.id?t.color:"transparent",color:tab===t.id?"#fff":"#64748b",
                   border:"1px solid "+(tab===t.id?t.color:"#e2e8f0"),borderRadius:7,
@@ -4336,7 +4969,7 @@ function App() {
           </div>
         </div>
       </div>
-      <div className="mob-pad" style={{maxWidth:1100,margin:"0 auto",padding:"16px 18px 48px"}}>
+      <div className="mob-pad" style={{maxWidth:1340,margin:"0 auto",padding:"16px 18px 48px"}}>
         {tab==="global"    &&<GlobalTab store={store} mesId={mesId} configSource={configSource} />}
         {tab==="guillermo" &&<AdvisorTab name="Guillermo" asesor="guillermo" color="#2563eb" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
         {tab==="carolina"  &&<AdvisorTab name="Carolina"  asesor="carolina"  color="#7c3aed" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
@@ -4344,8 +4977,10 @@ function App() {
         {tab==="wilmary"   &&<AdvisorTab name="Wilmary Antolinez" asesor="wilmary" color="#be185d" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
         {tab==="tracker"   &&<TrackerTab store={store} />}
         {tab==="tosspile"  &&<TosspileTab store={store} onUpdate={onUpdate} />}
+        {tab==="docs"       &&<DocumentosTab />}
         {tab==="calc"      &&<CalcTab />}
         {tab==="malla"     &&<MallaTab mesId={mesId} store={store} />}
+        {tab==="alianzas"  &&<AlianzasTab />}
         {tab==="cotizador" &&<CotizadorTab />}
       </div>
     </div>
