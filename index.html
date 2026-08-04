@@ -541,9 +541,9 @@ function fc(usd){
 function isUSD(){ return mon().v===1; }
 // formatea un valor que YA viene expresado en la moneda seleccionada
 function fm(v){
-  const m=mon();
+  let m=mon();
   if(m.v===1) return '$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const dec=m.v>=100?0:2;
+  let dec=m.v>=100?0:2;
   return m.c+' '+v.toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec});
 }
 // convierte de la moneda seleccionada a USD
@@ -570,13 +570,13 @@ function initChips(){
   });
   const mc=document.getElementById('chips-mv');
   if(mc&&!mc.hasChildNodes())[30,45,60,90].forEach(d=>{
-    const b=document.createElement('button'); b.className='chip'+(d===30?' on':''); b.textContent=d+' días';
+    let b=document.createElement('button'); b.className='chip'+(d===30?' on':''); b.textContent=d+' días';
     b.onclick=()=>{S.mvDias=d;[...mc.children].forEach(c=>c.classList.remove('on'));b.classList.add('on');calc();};
     mc.appendChild(b);
   });
   const dc2=document.getElementById('chips-desc');
   if(dc2&&!dc2.hasChildNodes())DESCS.forEach(d=>{
-    const b=document.createElement('button'); b.className='chip dsc'+(d===0?' on':'');
+    let b=document.createElement('button'); b.className='chip dsc'+(d===0?' on':'');
     b.textContent=d===0?'Sin desc.':d+'%';
     b.onclick=()=>{S.desc=d;[...dc2.children].forEach(c=>c.classList.remove('on'));b.classList.add('on');calc();};
     dc2.appendChild(b);
@@ -593,7 +593,7 @@ function setMon(k){ S.mon=k; updFx(); calc(); }
 function setPrev(v){ S.prev=Math.max(0,+v||0); calc(); }
 function clearPrev(){ S.prev=0; document.getElementById('prev').value=''; calc(); }
 function updFx(){
-  const m=mon();
+  let m=mon();
   const fn=document.getElementById('fx-note');
   if(fn) fn.textContent = m.v===1 ? 'Cotización directa en dólares' : '1 USD = '+m.v.toLocaleString('en-US',{maximumFractionDigits:4})+' '+m.c;
   const pc=document.getElementById('prev-cur'); if(pc) pc.textContent=m.c;
@@ -639,25 +639,25 @@ function priceVP(planKey,dias,age){
   const aid=String(ageId(age));
   if(dias>p.max[aid])return null;
   const rows=p.p[aid]; if(!rows||!rows.length)return null;
-  const r=look(rows,dias); if(!r)return null;
+  let r=look(rows,dias); if(!r)return null;
   return {sf:r[1],pvp:r[2],id:p.id};
 }
 function priceMV(planKey,mvDias,age){
   const s=DATA.mv[planKey]; if(!s)return null;
   const byAge=s[String(mvDias)]; if(!byAge)return null;
-  const r=byAge[String(ageId(age))]; if(!r)return null;
+  let r=byAge[String(ageId(age))]; if(!r)return null;
   return {sf:r[0],pvp:r[1],id:r[2]};
 }
 function priceNac(dias,age){
-  const aid=String(ageId(age));
+  let aid=String(ageId(age));
   if(dias>DATA.maxNac[aid])return null;
-  const rows=DATA.nacional[aid]; if(!rows)return null;
-  const r=look(rows,dias); if(!r)return null;
+  let rows=DATA.nacional[aid]; if(!rows)return null;
+  let r=look(rows,dias); if(!r)return null;
   return {sf:r[1],pvp:r[2],id:95346};
 }
 function priceSenior(dias){
   if(dias>DATA.maxSenior)return null;
-  const r=look(DATA.senior,dias); if(!r)return null;
+  let r=look(DATA.senior,dias); if(!r)return null;
   return {sf:r[1],pvp:r[2],id:95152};
 }
 
@@ -797,7 +797,7 @@ function calc(){
       <div class="ups">`;
     UPG.forEach(u=>{
       if(S.travs.some(t=>(u.minA&&t.age<u.minA)||(u.maxA&&t.age>u.maxA)))return;
-      const q=S.ups[u.id]||0;
+      let q=S.ups[u.id]||0;
       const unit = upUnit(u,pctBase);
       const maxQ = 10; // hasta 10 personas por upgrade, independiente de viajeros configurados
       html+=`<div class="up${q?' on':''}" data-det="${u.det||''}" onclick="togUp(${u.id},${maxQ})">
@@ -927,7 +927,7 @@ function attachTipListeners(){
       return;
     }
     // Clic fuera del panel y de botones .up-i cierra el panel
-    const tip=document.getElementById('tip');
+    let tip=document.getElementById('tip');
     if(tip&&!tip.contains(e.target)&&!e.target.closest('.up-i')){
       tip.classList.remove('on'); tip.dataset.open='';
     }
@@ -938,7 +938,7 @@ attachTipListeners();
 // Touch: tap on .up-i button handles by the click listener above
 function setQ(id,q,n){ S.ups[id]=Math.max(1,Math.min(n,q)); calc(); } // n=maxQ=10
 
-// initChips/renderTravs/calc se llaman desde CotizadorTab useEffect
+// initChips llamado desde CotizadorTab
 
 </script>
 <script type="text/babel">
@@ -950,11 +950,11 @@ const LOGO_SQ_SRC  = "https://raw.githubusercontent.com/segurosfly/RealTime/main
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────────
 const DOW      = ["Dom","Lun","Mar","Mie","Jue","Vie","Sab"];
-var ASESORES = ["guillermo","carolina","daniel","wilmary"];
-var ASESORES_NOMBRES = {guillermo:"Guillermo González",carolina:"Carolina",daniel:"Daniel Romero",wilmary:"Wilmary Antolinez"};
-var ASESORES_COLORES  = {guillermo:"#2563eb",carolina:"#7c3aed",daniel:"#0f766e",wilmary:"#be185d"};
+var ASESORES = ["guillermo","carolina","daniel","wilmary","christian"];
+var ASESORES_NOMBRES = {guillermo:"Guillermo González",carolina:"Carolina",daniel:"Daniel Romero",wilmary:"Wilmary Antolinez",christian:"Christian Torres"};
+var ASESORES_COLORES  = {guillermo:"#2563eb",carolina:"#7c3aed",daniel:"#0f766e",wilmary:"#be185d",christian:"#0891b2"};
 // PROTECCION POR ASESOR: contrasenas requeridas para Guardar/Eliminar
-var PIN_ASESORES = { guillermo: "2026", carolina: "2027", daniel: "2028", wilmary: "2029" };
+var PIN_ASESORES = { guillermo: "2026", carolina: "2027", daniel: "2028", wilmary: "2029", christian: "2030" };
 
 // verificarPinAsesor ahora es async y usa modal React (ver ModalPinAsesor)
 // Se resuelve a true/false via window.__pinAsesorResolve
@@ -1029,9 +1029,9 @@ async function fetchRemoteConfig() {
   _remoteConfigLoading = true;
   try {
     // Intento 1: endpoint dedicado get_config
-    let url = SHEETS_URL + "?accion=get_config";
-    let res = await fetch(url, { method:"GET", cache:"no-store" });
-    let data = await res.json();
+    const url = SHEETS_URL + "?accion=get_config";
+    const res = await fetch(url, { method:"GET", cache:"no-store" });
+    const data = await res.json();
     if (data && data.ok && data.configs && typeof data.configs === "object" && Object.keys(data.configs).length > 0) {
       // Formato: { ok:true, configs: { "2026-05": { metaBase, pctBase, metaSfly, pctSfly } } }
       Object.keys(data.configs).forEach(function(mid) {
@@ -1137,13 +1137,13 @@ const MESES = [
 ];
 
 const getMesActual = () => {
-  const n = new Date();
+  let n = new Date();
   return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0");
 };
 const getDiaHoy = () => new Date().getDate();
 const getMesInfo = (mesId) => MESES.find(m=>m.id===mesId) || MESES[4];
 const dowDia = (dia, mesId) => {
-  const m = getMesInfo(mesId);
+  let m = getMesInfo(mesId);
   return DOW[(m.dow0 + dia - 1) % 7];
 };
 
@@ -1177,7 +1177,7 @@ const pushDeleted = (store, fila) => {
 
 // ── UTILS ──────────────────────────────────────────────────────────────────────
 const usd  = (n,d=2) => "$"+Number(n||0).toLocaleString("es-CO",{minimumFractionDigits:d,maximumFractionDigits:d});
-const pc   = (n) => Number(n||0).toFixed(1)+"%";
+let pc   = (n) => Number(n||0).toFixed(1)+"%";
 const uid  = () => Math.random().toString(36).slice(2,9);
 const sumR = (rows) => (rows||[]).reduce((s,r) => s+(parseFloat(r.valor)||0), 0);
 const cap  = (s) => s.charAt(0).toUpperCase()+s.slice(1);
@@ -1195,12 +1195,12 @@ const LogoSVG = ({size=32, dark=false}) => <LogoImg height={size} dark={dark} />
 // ── SHEETS SYNC ────────────────────────────────────────────────────────────────
 // CAMBIO #1: Sync ahora guarda TODOS los meses
 const sincronizarConSheets = async (store, silent) => {
-  const rows  = [];
+  let rows  = [];
   const ts    = new Date().toISOString();
   const fecha = new Date().toLocaleDateString("es-CO");
 
   MESES.forEach(mes => {
-    let mesLabel = mes.label;
+    const mesLabel = mes.label;
     ASESORES.forEach(asesor => {
       let data = getMonthData(store, mes.id, asesor);
       Object.entries(data).forEach(function(entry) {
@@ -1214,7 +1214,7 @@ const sincronizarConSheets = async (store, silent) => {
 
   if (!rows.length) { if (!silent) alert("Sin datos para sincronizar."); return false; }
   try {
-    let params = new URLSearchParams({ bulk: JSON.stringify(rows), sheet: "Sync", accion: "sync_bulk" });
+    const params = new URLSearchParams({ bulk: JSON.stringify(rows), sheet: "Sync", accion: "sync_bulk" });
     await fetch(SHEETS_URL+"?"+params.toString(), { method:"GET", mode:"no-cors" });
     if (!silent) alert("✅ Sincronizadas "+rows.length+" filas → hoja 'Sync' (todos los meses)\n\n📌 Guardar individual → RealTime\n☁️ Sync masivo → Sync");
     return true;
@@ -1255,7 +1255,7 @@ const enviarEliminacion = async (fila, mesId) => {
 const enviarConfigRT = async (cfg, mesId, who, updatedAtIso) => {
   // FIX METAS: reintentos para sobrevivir a fallos de red transitorios
   const upd = updatedAtIso || new Date().toISOString();
-  const params = new URLSearchParams({
+  let params = new URLSearchParams({
     accion: "save_config",
     mesId: String(mesId||""),
     meta: String(cfg.meta||0),
@@ -1267,7 +1267,7 @@ const enviarConfigRT = async (cfg, mesId, who, updatedAtIso) => {
     updatedAt: upd,
     updatedBy: who || ""
   });
-  const url = SHEETS_URL+"?"+params.toString();
+  let url = SHEETS_URL+"?"+params.toString();
   const intentos = [0, 1500, 4000, 10000, 25000];
   for (var idx = 0; idx < intentos.length; idx++) {
     if (idx > 0) await new Promise(r => setTimeout(r, intentos[idx]));
@@ -1277,7 +1277,7 @@ const enviarConfigRT = async (cfg, mesId, who, updatedAtIso) => {
 };
 
 const descargarCSV = (store, mesId) => {
-  const mesLabel = getMesInfo(mesId).label;
+  let mesLabel = getMesInfo(mesId).label;
   const header   = "Mes,Asesor,Dia,Dia semana,Orden,Plan,Valor USD";
   let rows     = [];
   ASESORES.forEach(asesor => {
@@ -1413,7 +1413,7 @@ function ModalPinAsesor() {
 
   const cancel = function() { resolve(false); };
 
-  const color = asesor === "guillermo" ? "#2563eb" : asesor === "carolina" ? "#7c3aed" : asesor === "daniel" ? "#0f766e" : "#be185d";
+  const color = asesor === "guillermo" ? "#2563eb" : asesor === "carolina" ? "#7c3aed" : asesor === "daniel" ? "#0f766e" : asesor === "wilmary" ? "#be185d" : "#0891b2";
   const inicial = asesor ? asesor[0].toUpperCase() : "?";
 
   if (!visible) return null;
@@ -1535,10 +1535,10 @@ function ConfigMes({config,onSave}) {
   };
 
   const save = () => {
-    let mb = parseFloat(metaBase)||12500;
-    let pb = parseFloat(pctBase)||10;
+    const mb = parseFloat(metaBase)||12500;
+    const pb = parseFloat(pctBase)||10;
     let ms = parseFloat(metaSfly)||18000;
-    let ps = parseFloat(pctSfly)||15;
+    const ps = parseFloat(pctSfly)||15;
     onSave({ meta: mb, comision: pb, metaBase: mb, pctBase: pb, metaSfly: ms, pctSfly: ps });
     setOpen(false);
   };
@@ -1614,7 +1614,7 @@ function ConfigMes({config,onSave}) {
 // ── META BAR ───────────────────────────────────────────────────────────────────
 function MetaBar({acum,metaVal,label,color,bg,proy}) {
   if (!metaVal) return null;
-  const p    = Math.min(100,(acum/metaVal)*100);
+  let p    = Math.min(100,(acum/metaVal)*100);
   const falt = Math.max(0,metaVal-acum);
   return (
     <div style={{marginBottom:14}}>
@@ -1794,11 +1794,11 @@ function AsesorHeader({name, asesor, color, data, mesId, diaHoy}) {
 
   diasKeys.forEach(d => {
     let rows = data[d] || [];
-    let dayTotal = sumR(rows);
+    const dayTotal = sumR(rows);
     if (dayTotal > topValorAmt) { topValorAmt = dayTotal; topValorDia = +d; }
     if (rows.length > topVentasN) { topVentasN = rows.length; topVentasDia = +d; }
     rows.forEach(r => {
-      let v = parseFloat(r.valor)||0;
+      const v = parseFloat(r.valor)||0;
       allVals.push(v);
       planCount[r.plan||"N/A"] = (planCount[r.plan||"N/A"]||0)+1;
     });
@@ -1811,7 +1811,7 @@ function AsesorHeader({name, asesor, color, data, mesId, diaHoy}) {
     { icon:"🏆", label:"Día top revenue", value: topValorDia ? "D"+topValorDia+" "+dowDia(topValorDia,mesId)+" · "+usd(topValorAmt,0) : "Sin datos", c:"#d97706" },
     { icon:"🔥", label:"Día más ventas",  value: topVentasDia ? "D"+topVentasDia+" "+dowDia(topVentasDia,mesId)+" · "+topVentasN+" ventas" : "Sin datos", c:"#2563eb" },
     { icon:"💰", label:"Ticket promedio", value: avgTicket > 0 ? usd(avgTicket,0) : "Sin datos", c:"#10b981" },
-    { icon:"📊", label:"ASP (rev/ventas)", value: allRows.length > 0 ? usd(acum/allRows.length,2) : "Sin datos", c:"#0891b2" },
+    { icon:"📊", label:"ASP (rev/ventas)", value: allVals.length > 0 ? usd(allVals.reduce((s,v)=>s+v,0)/allVals.length,2) : "Sin datos", c:"#0891b2" },
     { icon:"📦", label:"Plan top",        value: topPlan ? topPlan[0]+" ("+topPlan[1]+")" : "Sin datos", c:"#7c3aed" },
   ];
 
@@ -1842,14 +1842,14 @@ function AsesorHeader({name, asesor, color, data, mesId, diaHoy}) {
 
 // ── GLOBAL DAY STATS (reemplaza BloqueOperativo en Global) ────────────────────
 // Tique promedio · ventas · día top · revenue top · barra por día semana
-function GlobalDayStats({gData, cData, dData, wData, mesId, total, gVentas, cVentas, dVentas, wVentas, gAcum, cAcum, dAcum, wAcum}) {
+function GlobalDayStats({gData, cData, dData, wData, chData, mesId, total, gVentas, cVentas, dVentas, wVentas, chVentas, gAcum, cAcum, dAcum, wAcum, chAcum}) {
   const DOW_LABELS = ["Dom","Lun","Mar","Mie","Jue","Vie","Sab"];
   const DOW_FULL   = ["Dom","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
 
   // Aggregate all rows
   const allRows = [];
-  [gData, cData, dData, wData].forEach(d => Object.values(d).forEach(arr => arr.forEach(r => allRows.push(r))));
-  const totalVentas = gVentas + cVentas + dVentas + wVentas;
+  [gData, cData, dData, wData, chData].forEach(d => Object.values(d).forEach(arr => arr.forEach(r => allRows.push(r))));
+  const totalVentas = gVentas + cVentas + dVentas + wVentas + chVentas;
   let avgTicket = totalVentas > 0 ? total / totalVentas : 0;
 
   // Day totals
@@ -1873,7 +1873,7 @@ function GlobalDayStats({gData, cData, dData, wData, mesId, total, gVentas, cVen
   [gData, cData, dData, wData].forEach(d => {
     Object.entries(d).forEach(([dia, rows]) => {
       let mesInfo = getMesInfo(mesId);
-      let dow = (mesInfo.dow0 + (+dia) - 1) % 7;
+      const dow = (mesInfo.dow0 + (+dia) - 1) % 7;
       dowRev[dow] = (dowRev[dow]||0) + sumR(rows);
       dowCnt[dow] = (dowCnt[dow]||0) + (rows||[]).length;
     });
@@ -1901,17 +1901,17 @@ function GlobalDayStats({gData, cData, dData, wData, mesId, total, gVentas, cVen
       <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"16px 18px"}}>
         <div style={{fontSize:11,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:700,marginBottom:14}}>📅 Revenue por Día de Semana</div>
         {(()=>{
-          let W=560, H=120, PAD_L=10, PAD_R=10, PAD_T=28, PAD_B=38;
-          let points = [0,1,2,3,4,5,6].map((dow,i)=>({
+          const W=560, H=120, PAD_L=10, PAD_R=10, PAD_T=28, PAD_B=38;
+          const points = [0,1,2,3,4,5,6].map((dow,i)=>({
             dow, i,
             x: PAD_L + i * ((W-PAD_L-PAD_R)/6),
             rev: dowRev[dow]||0,
             cnt: dowCnt[dow]||0,
           }));
-          let maxR = Math.max(...points.map(p=>p.rev), 1);
-          let getY = (r) => PAD_T + (1 - r/maxR) * (H - PAD_T - PAD_B);
-          let polyline = points.map(p=>p.x+","+getY(p.rev)).join(" ");
-          let topDow = points.reduce((a,b)=>b.rev>a.rev?b:a, points[0]);
+          const maxR = Math.max(...points.map(p=>p.rev), 1);
+          const getY = (r) => PAD_T + (1 - r/maxR) * (H - PAD_T - PAD_B);
+          const polyline = points.map(p=>p.x+","+getY(p.rev)).join(" ");
+          const topDow = points.reduce((a,b)=>b.rev>a.rev?b:a, points[0]);
           return (
             <svg viewBox={"0 0 "+W+" "+H} style={{width:"100%",height:"auto",overflow:"visible",display:"block"}}>
               <defs>
@@ -1930,8 +1930,8 @@ function GlobalDayStats({gData, cData, dData, wData, mesId, total, gVentas, cVen
               <polyline points={polyline} fill="none" stroke="#2563eb" strokeWidth="2.5"
                 strokeLinejoin="round" strokeLinecap="round"/>
               {points.map(p=>{
-                let y = getY(p.rev);
-                let isTop = p.rev===topDow.rev && maxR>0 && p.rev>0;
+                const y = getY(p.rev);
+                const isTop = p.rev===topDow.rev && maxR>0 && p.rev>0;
                 return (
                   <g key={p.dow}>
                     {p.rev>0&&(
@@ -2248,7 +2248,7 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
 
   useEffect(()=>{ setDia(mesId===getMesActual()?getDiaHoy():1); },[mesId]);
 
-  const data    = getMonthData(store,mesId,asesor);
+  let data    = getMonthData(store,mesId,asesor);
   let cfg     = getConfig(store,mesId);
   const metaInd = cfg.metaBase/2;
   const metaBaseSolo = cfg.metaBase/2;
@@ -2274,13 +2274,13 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
   // CAMBIO #2: guardar también envía a RealTime
   const saveRow = async () => {
     if (!form.valor) return;
-    let pinOk = await verificarPinAsesor(asesor);
+    const pinOk = await verificarPinAsesor(asesor);
     if (!pinOk) { return; }
     setStatus("saving");
-    let day    = data[dia]||[];
-    let newRow = {id:uid(),orden:form.orden,valor:form.valor,plan:form.plan,ts:Date.now()};
-    let updated = editId ? day.map(r=>r.id===editId?Object.assign({},r,form):r) : day.concat([newRow]);
-    let newData = Object.assign({},data,{[dia]:updated});
+    const day    = data[dia]||[];
+    const newRow = {id:uid(),orden:form.orden,valor:form.valor,plan:form.plan,ts:Date.now()};
+    const updated = editId ? day.map(r=>r.id===editId?Object.assign({},r,form):r) : day.concat([newRow]);
+    const newData = Object.assign({},data,{[dia]:updated});
     onUpdate(setMonthData(store,mesId,asesor,newData));
     setForm({orden:"",valor:"",plan:"Plan Smart"}); setEditId(null);
     // Enviar a RealTime
@@ -2292,11 +2292,11 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
 
   const confirmDelete = async () => {
     if (!confirmDel) return;
-    let pinOk2 = await verificarPinAsesor(asesor);
+    const pinOk2 = await verificarPinAsesor(asesor);
     if (!pinOk2) { setConfirmDel(null); return; }
     let updated    = (data[confirmDel.dia]||[]).filter(r=>r.id!==confirmDel.id);
     let newData    = Object.assign({},data,{[confirmDel.dia]:updated});
-    let deletedFila = Object.assign({},confirmDel,{deletedAt:new Date().toISOString()});
+    const deletedFila = Object.assign({},confirmDel,{deletedAt:new Date().toISOString()});
     let newStore = setMonthData(store,mesId,asesor,newData);
     newStore     = pushDeleted(newStore,deletedFila);
     onUpdate(newStore);
@@ -2337,8 +2337,8 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
         <SLabel>📅 Registro Diario — {name}</SLabel>
         <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:14}}>
           {Array.from({length:mesInfo.dias},(_,i)=>i+1).map(d=>{
-            let tiene=(data[d]||[]).length>0, sel=d===dia, esHoy=d===diaHoyMes;
-            let sinRegistro = d<=diaHoy && !tiene;
+            const tiene=(data[d]||[]).length>0, sel=d===dia, esHoy=d===diaHoyMes;
+            const sinRegistro = d<=diaHoy && !tiene;
             return (
               <button key={d} onClick={()=>setDia(d)} style={{width:33,height:33,borderRadius:7,cursor:"pointer",
                 border:sel?"2px solid "+color:esHoy?"2px dashed "+color+"88":sinRegistro?"1.5px solid #fb923c":"1px solid #e2e8f0",
@@ -2354,13 +2354,13 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
         </div>
         {/* BANNER: mes y día activo — para que el asesor siempre sepa dónde está registrando */}
         {(()=>{
-          let esHoy = dia===diaHoyMes && mesId===getMesActual();
-          let esMesActual = mesId===getMesActual();
+          const esHoy = dia===diaHoyMes && mesId===getMesActual();
+          const esMesActual = mesId===getMesActual();
           let mesLabel = getMesInfo(mesId).label;
-          let bannerBg = !esMesActual ? "#fff7ed" : esHoy ? "#f0fdf4" : "#eff6ff";
-          let bannerBorder = !esMesActual ? "#fb923c" : esHoy ? "#10b981" : "#2563eb";
-          let bannerIcon = !esMesActual ? "⚠️" : esHoy ? "📍" : "📅";
-          let bannerMsg = !esMesActual
+          const bannerBg = !esMesActual ? "#fff7ed" : esHoy ? "#f0fdf4" : "#eff6ff";
+          const bannerBorder = !esMesActual ? "#fb923c" : esHoy ? "#10b981" : "#2563eb";
+          const bannerIcon = !esMesActual ? "⚠️" : esHoy ? "📍" : "📅";
+          const bannerMsg = !esMesActual
             ? `Estás registrando en ${mesLabel} — ¡no es el mes actual!`
             : esHoy
             ? `Registrando en ${mesLabel} · Día ${dia} (hoy)`
@@ -2439,18 +2439,21 @@ function GlobalTab({store,mesId,configSource}) {
   const cData    = getMonthData(store,mesId,"carolina");
   const dData    = getMonthData(store,mesId,"daniel");
   const wData    = getMonthData(store,mesId,"wilmary");
+  const chData   = getMonthData(store,mesId,"christian");
   const gRows    = Object.values(gData).reduce((a,b)=>a.concat(b),[]);
   const cRows    = Object.values(cData).reduce((a,b)=>a.concat(b),[]);
   const dRows    = Object.values(dData).reduce((a,b)=>a.concat(b),[]);
   const wRows    = Object.values(wData).reduce((a,b)=>a.concat(b),[]);
-  const gAcum    = sumR(gRows), cAcum = sumR(cRows), dAcum = sumR(dRows), wAcum = sumR(wRows), total = gAcum+cAcum+dAcum+wAcum;
-  const gVentas  = gRows.length, cVentas = cRows.length, dVentas = dRows.length, wVentas = wRows.length;
+  const chRows   = Object.values(chData).reduce((a,b)=>a.concat(b),[]);
+  const gAcum    = sumR(gRows), cAcum = sumR(cRows), dAcum = sumR(dRows), wAcum = sumR(wRows), chAcum = sumR(chRows), total = gAcum+cAcum+dAcum+wAcum+chAcum;
+  const gVentas  = gRows.length, cVentas = cRows.length, dVentas = dRows.length, wVentas = wRows.length, chVentas = chRows.length;
   const gDias    = Object.keys(gData).filter(d=>gData[d]&&gData[d].length>0).length;
   const cDias    = Object.keys(cData).filter(d=>cData[d]&&cData[d].length>0).length;
   const dDias    = Object.keys(dData).filter(d=>dData[d]&&dData[d].length>0).length;
   const wDias    = Object.keys(wData).filter(d=>wData[d]&&wData[d].length>0).length;
-  const gProm    = gDias>0?gAcum/gDias:0, cProm = cDias>0?cAcum/cDias:0, dProm = dDias>0?dAcum/dDias:0, wProm = wDias>0?wAcum/wDias:0;
-  const gProy    = gAcum+gProm*diasRest, cProy = cAcum+cProm*diasRest, dProy = dAcum+dProm*diasRest, wProy = wAcum+wProm*diasRest, totProy = gProy+cProy+dProy+wProy;
+  const chDias   = Object.keys(chData).filter(d=>chData[d]&&chData[d].length>0).length;
+  const gProm    = gDias>0?gAcum/gDias:0, cProm = cDias>0?cAcum/cDias:0, dProm = dDias>0?dAcum/dDias:0, wProm = wDias>0?wAcum/wDias:0, chProm = chDias>0?chAcum/chDias:0;
+  const gProy    = gAcum+gProm*diasRest, cProy = cAcum+cProm*diasRest, dProy = dAcum+dProm*diasRest, wProy = wAcum+wProm*diasRest, chProy = chAcum+chProm*diasRest, totProy = gProy+cProy+dProy+wProy+chProy;
   const metaEq   = cfg.metaBase;
   let metaInd  = cfg.metaBase/2;
   // comPct = piso actual del equipo según total acumulado
@@ -2460,19 +2463,19 @@ function GlobalTab({store,mesId,configSource}) {
   const pct3eq = normalizePct(cfg.pctSfly||12)/100;
   const pisoEq = total >= (cfg.metaSfly||13000) ? 3 : total >= (cfg.metaBase||10000) ? 2 : 1;
   const comPct = pisoEq===3 ? pct3eq : pisoEq===2 ? pct2eq : pct1eq;
-  const maxBar   = Math.max(gAcum,cAcum,dAcum,wAcum,1);
-  const liderAcum = Math.max(gAcum,cAcum,dAcum,wAcum);
-  const lider    = liderAcum===gAcum?"Guillermo":liderAcum===cAcum?"Carolina":liderAcum===dAcum?"Daniel R.":"Wilmary";
-  const liderC   = liderAcum===gAcum?"#2563eb":liderAcum===cAcum?"#7c3aed":liderAcum===dAcum?"#0f766e":"#be185d";
+  const maxBar   = Math.max(gAcum,cAcum,dAcum,wAcum,chAcum,1);
+  const liderAcum = Math.max(gAcum,cAcum,dAcum,wAcum,chAcum);
+  const lider    = liderAcum===gAcum?"Guillermo":liderAcum===cAcum?"Carolina":liderAcum===dAcum?"Daniel R.":liderAcum===wAcum?"Wilmary":"Christian";
+  const liderC   = liderAcum===gAcum?"#2563eb":liderAcum===cAcum?"#7c3aed":liderAcum===dAcum?"#0f766e":liderAcum===wAcum?"#be185d":"#0891b2";
   const revPorDia = {};
-  [gData,cData,dData,wData].forEach(d=>Object.entries(d).forEach(function(e){ revPorDia[e[0]]=(revPorDia[e[0]]||0)+sumR(e[1]); }));
+  [gData,cData,dData,wData,chData].forEach(d=>Object.entries(d).forEach(function(e){ revPorDia[e[0]]=(revPorDia[e[0]]||0)+sumR(e[1]); }));
   const diasOrd = Object.keys(revPorDia).sort((a,b)=>+a-+b);
   const maxDia  = Math.max.apply(null,Object.values(revPorDia).concat([1]));
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       {/* STATS GLOBALES: TIQUE PROMEDIO + DIAS */}
-      <GlobalDayStats gData={gData} cData={cData} dData={dData} wData={wData} mesId={mesId} total={total} gVentas={gVentas} cVentas={cVentas} dVentas={dVentas} wVentas={wVentas} gAcum={gAcum} cAcum={cAcum} dAcum={dAcum} wAcum={wAcum} />
+      <GlobalDayStats gData={gData} cData={cData} dData={dData} wData={wData} chData={chData} mesId={mesId} total={total} gVentas={gVentas} cVentas={cVentas} dVentas={dVentas} wVentas={wVentas} chVentas={chVentas} gAcum={gAcum} cAcum={cAcum} dAcum={dAcum} wAcum={wAcum} chAcum={chAcum} />
 
       {/* CABECERA LOGO GLOBAL */}
       <div style={{background:"linear-gradient(135deg,#1e3a5f,#2c5282)",borderRadius:14,padding:"18px 24px",display:"flex",alignItems:"center",gap:16}}>
@@ -2494,7 +2497,7 @@ function GlobalTab({store,mesId,configSource}) {
         <span style={{fontSize:26}}>🏆</span>
         <div style={{flex:1}}>
           <div style={{fontSize:14,fontWeight:800,color:liderC}}>{lider} lidera por {usd(liderAcum-Math.max(...[gAcum,cAcum,dAcum].filter(v=>v!==liderAcum)),0)}</div>
-          <div style={{fontSize:12,color:"#64748b",marginTop:3}}>G: {usd(gAcum,0)} ({gVentas}v) · C: {usd(cAcum,0)} ({cVentas}v) · D: {usd(dAcum,0)} ({dVentas}v) · W: {usd(wAcum,0)} ({wVentas}v)</div>
+          <div style={{fontSize:12,color:"#64748b",marginTop:3}}>G: {usd(gAcum,0)} ({gVentas}v) · C: {usd(cAcum,0)} ({cVentas}v) · D: {usd(dAcum,0)} ({dVentas}v) · W: {usd(wAcum,0)} ({wVentas}v) · Ch: {usd(chAcum,0)} ({chVentas}v)</div>
         </div>
         <div style={{textAlign:"right"}}>
           <div style={{fontSize:11,color:"#94a3b8"}}>Proyeccion equipo</div>
@@ -2509,7 +2512,7 @@ function GlobalTab({store,mesId,configSource}) {
       </div>
       <Card>
         <SLabel>Comparativa de Asesores</SLabel>
-        {[{name:"Guillermo",acum:gAcum,proy:gProy,prom:gProm,color:"#2563eb",ventas:gVentas},{name:"Carolina",acum:cAcum,proy:cProy,prom:cProm,color:"#7c3aed",ventas:cVentas},{name:"Daniel R.",acum:dAcum,proy:dProy,prom:dProm,color:"#0f766e",ventas:dVentas},{name:"Wilmary",acum:wAcum,proy:wProy,prom:wProm,color:"#be185d",ventas:wVentas}].sort((a,b)=>b.proy-a.proy).map((a,ai)=>(
+        {[{name:"Guillermo",acum:gAcum,proy:gProy,prom:gProm,color:"#2563eb",ventas:gVentas},{name:"Carolina",acum:cAcum,proy:cProy,prom:cProm,color:"#7c3aed",ventas:cVentas},{name:"Daniel R.",acum:dAcum,proy:dProy,prom:dProm,color:"#0f766e",ventas:dVentas},{name:"Wilmary",acum:wAcum,proy:wProy,prom:wProm,color:"#be185d",ventas:wVentas},{name:"Christian",acum:chAcum,proy:chProy,prom:chProm,color:"#0891b2",ventas:chVentas}].sort((a,b)=>b.proy-a.proy).map((a,ai)=>(
           <div key={a.name} style={{marginBottom:16}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -2541,11 +2544,12 @@ function GlobalTab({store,mesId,configSource}) {
           {(()=>{
             // Piso proyectado — si el equipo proyecta superar la meta, usa el % del piso siguiente
             let pisoProy = totProy>=(cfg.metaSfly||13000)?3:totProy>=(cfg.metaBase||10000)?2:1;
-            let comProy  = pisoProy===3?pct3eq:pisoProy===2?pct2eq:pct1eq;
+            const comProy  = pisoProy===3?pct3eq:pisoProy===2?pct2eq:pct1eq;
             return [{l:"G actual",v:gAcum*comPct,c:"#2563eb"},{l:"G proyectada",v:gProy*comProy,c:"#2563eb"},
               {l:"C actual",v:cAcum*comPct,c:"#7c3aed"},{l:"C proyectada",v:cProy*comProy,c:"#7c3aed"},
               {l:"D actual",v:dAcum*comPct,c:"#0f766e"},{l:"D proyectada",v:dProy*comProy,c:"#0f766e"},
-              {l:"W actual",v:wAcum*comPct,c:"#be185d"},{l:"W proyectada",v:wProy*comProy,c:"#be185d"}];
+              {l:"W actual",v:wAcum*comPct,c:"#be185d"},{l:"W proyectada",v:wProy*comProy,c:"#be185d"},
+              {l:"Ch actual",v:chAcum*comPct,c:"#0891b2"},{l:"Ch proyectada",v:chProy*comProy,c:"#0891b2"}];
           })().map(x=>(
             <div key={x.l} style={{background:x.c+"08",border:"1px solid "+x.c+"22",borderRadius:10,padding:"12px 14px"}}>
               <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>{x.l}</div>
@@ -2557,7 +2561,7 @@ function GlobalTab({store,mesId,configSource}) {
           <span style={{fontSize:12,fontWeight:700,color:"#059669"}}>Total comisiones equipo proyectadas</span>
           <span style={{fontSize:17,fontWeight:800,color:"#059669"}}>{usd((()=>{
             let pisoProy=totProy>=(cfg.metaSfly||13000)?3:totProy>=(cfg.metaBase||10000)?2:1;
-            let cp=pisoProy===3?pct3eq:pisoProy===2?pct2eq:pct1eq;
+            const cp=pisoProy===3?pct3eq:pisoProy===2?pct2eq:pct1eq;
             return (gProy+cProy+dProy+wProy)*cp;
           })(),0)}</span>
         </div>
@@ -2567,7 +2571,7 @@ function GlobalTab({store,mesId,configSource}) {
           <SLabel>Revenue por Dia — Equipo</SLabel>
           <div style={{display:"flex",flexDirection:"column",gap:5}}>
             {diasOrd.map(d=>{
-              let gV=sumR(gData[d]||[]), cV=sumR(cData[d]||[]), dV=sumR(dData[d]||[]), wV=sumR(wData[d]||[]);
+              const gV=sumR(gData[d]||[]), cV=sumR(cData[d]||[]), dV=sumR(dData[d]||[]), wV=sumR(wData[d]||[]), chV=sumR(chData[d]||[]);
               return (
                 <div key={d} style={{display:"flex",alignItems:"center",gap:10}}>
                   <span style={{fontSize:11,color:"#94a3b8",minWidth:60}}>D{d} {dowDia(+d,mesId)}</span>
@@ -2576,8 +2580,9 @@ function GlobalTab({store,mesId,configSource}) {
                     <div style={{width:((cV/maxDia)*100)+"%",height:"100%",background:"#7c3aed"}} />
                     <div style={{width:((dV/maxDia)*100)+"%",height:"100%",background:"#0f766e"}} />
                     <div style={{width:((wV/maxDia)*100)+"%",height:"100%",background:"#be185d"}} />
+                    <div style={{width:((chV/maxDia)*100)+"%",height:"100%",background:"#0891b2"}} />
                   </div>
-                  <span style={{fontSize:12,fontWeight:700,color:"#334155",minWidth:80,textAlign:"right"}}>{usd(gV+cV+dV+wV,0)}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:"#334155",minWidth:80,textAlign:"right"}}>{usd(gV+cV+dV+wV+chV,0)}</span>
                 </div>
               );
             })}
@@ -2587,6 +2592,7 @@ function GlobalTab({store,mesId,configSource}) {
             <span><span style={{color:"#7c3aed",fontWeight:700}}>■</span> Carolina</span>
             <span><span style={{color:"#0f766e",fontWeight:700}}>■</span> Daniel R.</span>
             <span><span style={{color:"#be185d",fontWeight:700}}>■</span> Wilmary</span>
+            <span><span style={{color:"#0891b2",fontWeight:700}}>■</span> Christian</span>
           </div>
         </Card>
       )}
@@ -2612,14 +2618,16 @@ function TrackerTab({store}) {
     let cData=getMonthData(store,m.id,"carolina");
     let dData=getMonthData(store,m.id,"daniel");
     let wData=getMonthData(store,m.id,"wilmary");
+    let chData=getMonthData(store,m.id,"christian");
     let gRows=Object.values(gData).reduce((a,b)=>a.concat(b),[]);
     let cRows=Object.values(cData).reduce((a,b)=>a.concat(b),[]);
     let dRows=Object.values(dData).reduce((a,b)=>a.concat(b),[]);
     let wRows=Object.values(wData).reduce((a,b)=>a.concat(b),[]);
-    let gAcum=sumR(gRows), cAcum=sumR(cRows), dAcum=sumR(dRows), wAcum=sumR(wRows), total=gAcum+cAcum+dAcum+wAcum;
+    let chRows=Object.values(chData).reduce((a,b)=>a.concat(b),[]);
+    let gAcum=sumR(gRows), cAcum=sumR(cRows), dAcum=sumR(dRows), wAcum=sumR(wRows), chAcum=sumR(chRows), total=gAcum+cAcum+dAcum+wAcum+chAcum;
     let cfg=getConfig(store,m.id);
-    let cumplimiento=cfg.metaBase>0?(total/cfg.metaBase)*100:0;
-    return Object.assign({},m,{gAcum,cAcum,dAcum,wAcum,total,gVentas:gRows.length,cVentas:cRows.length,dVentas:dRows.length,wVentas:wRows.length,cfg,cumplimiento});
+    const cumplimiento=cfg.metaBase>0?(total/cfg.metaBase)*100:0;
+    return Object.assign({},m,{gAcum,cAcum,dAcum,wAcum,chAcum,total,gVentas:gRows.length,cVentas:cRows.length,dVentas:dRows.length,wVentas:wRows.length,chVentas:chRows.length,cfg,cumplimiento});
   });
   const totalHistorico = resumen.reduce((s,r)=>s+r.total,0);
   const maxTotal = Math.max.apply(null,resumen.map(r=>r.total).concat([1]));
@@ -2641,6 +2649,7 @@ function TrackerTab({store}) {
                 <div style={{width:((r.cAcum/maxTotal)*100)+"%",height:"100%",background:"#7c3aed66",position:"absolute",left:((r.gAcum/maxTotal)*100)+"%"}} />
                 <div style={{width:((r.dAcum/maxTotal)*100)+"%",height:"100%",background:"#0f766e88",position:"absolute",left:(((r.gAcum+r.cAcum)/maxTotal)*100)+"%"}} />
                 <div style={{width:(((r.wAcum||0)/maxTotal)*100)+"%",height:"100%",background:"#be185d88",position:"absolute",left:(((r.gAcum+r.cAcum+r.dAcum)/maxTotal)*100)+"%"}} />
+                <div style={{width:(((r.chAcum||0)/maxTotal)*100)+"%",height:"100%",background:"#0891b288",position:"absolute",left:(((r.gAcum+r.cAcum+r.dAcum+(r.wAcum||0))/maxTotal)*100)+"%"}} />
               </div>
               <span style={{fontSize:13,fontWeight:800,color:"#1e293b",minWidth:90,textAlign:"right"}}>{usd(r.total,0)}</span>
               <Pill color={r.cumplimiento>=100?"#10b981":r.cumplimiento>=80?"#3b82f6":"#f97316"}
@@ -2653,6 +2662,7 @@ function TrackerTab({store}) {
           <span><span style={{color:"#7c3aed",fontWeight:700}}>■</span> Carolina</span>
           <span><span style={{color:"#0f766e",fontWeight:700}}>■</span> Daniel R.</span>
           <span><span style={{color:"#be185d",fontWeight:700}}>■</span> Wilmary</span>
+          <span><span style={{color:"#0891b2",fontWeight:700}}>■</span> Christian</span>
         </div>
       </Card>
       <Card>
@@ -2661,7 +2671,7 @@ function TrackerTab({store}) {
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <thead>
               <tr style={{borderBottom:"2px solid #f1f5f9"}}>
-                {["Mes","Meta Base","Meta SFly","% Com","Guillermo","G Vtas","Carolina","C Vtas","Daniel R.","D Vtas","Wilmary","W Vtas","Total","ASP","Cumpl."].map(h=>(
+                {["Mes","Meta Base","Meta SFly","% Com","Guillermo","G Vtas","Carolina","C Vtas","Daniel R.","D Vtas","Wilmary","W Vtas","Christian","Ch Vtas","Total","ASP","Cumpl."].map(h=>(
                   <th key={h} style={{padding:"8px 10px",color:"#94a3b8",fontWeight:700,textTransform:"uppercase",fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
                 ))}
               </tr>
@@ -2681,6 +2691,8 @@ function TrackerTab({store}) {
                   <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8"}}>{r.dVentas}</td>
                   <td style={{padding:"9px 10px",textAlign:"right",color:"#be185d",fontWeight:700}}>{usd(r.wAcum||0,0)}</td>
                   <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8"}}>{r.wVentas||0}</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",color:"#0891b2",fontWeight:700}}>{usd(r.chAcum||0,0)}</td>
+                  <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8"}}>{r.chVentas||0}</td>
                   <td style={{padding:"9px 10px",textAlign:"right",fontWeight:800,color:"#1e293b"}}>{usd(r.total,0)}</td>
                   <td style={{padding:"9px 10px",textAlign:"right",color:"#0891b2",fontWeight:700}}>{(()=>{const tv=r.gVentas+r.cVentas+r.dVentas+(r.wVentas||0);return tv>0?usd(r.total/tv,2):"—"})()}</td>
                   <td style={{padding:"9px 10px",textAlign:"right"}}>
@@ -2699,6 +2711,8 @@ function TrackerTab({store}) {
                 <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8",fontWeight:700}}>{resumen.reduce((s,r)=>s+r.dVentas,0)}</td>
                 <td style={{padding:"9px 10px",textAlign:"right",color:"#be185d",fontWeight:800}}>{usd(resumen.reduce((s,r)=>s+(r.wAcum||0),0),0)}</td>
                 <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8",fontWeight:700}}>{resumen.reduce((s,r)=>s+(r.wVentas||0),0)}</td>
+                <td style={{padding:"9px 10px",textAlign:"right",color:"#0891b2",fontWeight:800}}>{usd(resumen.reduce((s,r)=>s+(r.chAcum||0),0),0)}</td>
+                <td style={{padding:"9px 10px",textAlign:"right",color:"#94a3b8",fontWeight:700}}>{resumen.reduce((s,r)=>s+(r.chVentas||0),0)}</td>
                 <td style={{padding:"9px 10px",textAlign:"right",fontWeight:800,color:"#6366f1",fontSize:14}}>{usd(totalHistorico,0)}</td>
                 <td style={{padding:"9px 10px",textAlign:"right",color:"#0891b2",fontWeight:800}}>
                   {resumen.reduce((s,r)=>s+r.gVentas+r.cVentas+r.dVentas+(r.wVentas||0),0)>0?
@@ -2887,7 +2901,7 @@ function MallaTab({ mesId, store }) {
           let n={};
           data.rows.forEach(function(r){
             if(r.nota&&r.nota!=="eliminado"){
-              let key=r.fecha+"|"+r.asesor+"|"+r.dia;
+              const key=r.fecha+"|"+r.asesor+"|"+r.dia;
               n[key]=r.nota;
             }
           });
@@ -2915,13 +2929,13 @@ function MallaTab({ mesId, store }) {
   // Semanas Lun→Dom
   const semanas = useMemo(function(){
     if (!malla) return [];
-    let weeks=[], allDays=[];
+    const weeks=[], allDays=[];
     for(let d=1;d<=daysInMonth;d++) allDays.push(d);
     let week=[];
     // find first Monday
-    let firstDay = new Date(year,mesNum-1,1).getDay(); // 0=Dom
+    const firstDay = new Date(year,mesNum-1,1).getDay(); // 0=Dom
     // pad to Monday start
-    let padStart = firstDay===0?6:firstDay-1; // days before first Monday
+    const padStart = firstDay===0?6:firstDay-1; // days before first Monday
     for(let i=0;i<padStart;i++) week.push(null);
     for(let d=1;d<=daysInMonth;d++){
       week.push(d);
@@ -2972,7 +2986,7 @@ function MallaTab({ mesId, store }) {
   function AgenteBadge({name, size="md", onClick, active}){
     if(!name||name==="N/A"||name==="") return <span style={{color:"#cbd5e1",fontSize:11}}>—</span>;
     if(name==="Bot Madruga") return <span style={{fontSize:10,color:"#94a3b8"}}>🤖 Bot</span>;
-    const c=AGENTE_COLORS[name]||"#6366f1";
+    let c=AGENTE_COLORS[name]||"#6366f1";
     const isSocio=MALLA_SOCIOS.includes(name);
     const firstName=name.split(" ")[0];
     const sz=size==="sm"?{fs:10,pad:"2px 6px",av:14}:{fs:11,pad:"3px 9px",av:18};
@@ -3026,7 +3040,7 @@ function MallaTab({ mesId, store }) {
 
     // ── Vista SOCIO — solo muestra FDS ────────────────────────────────────────
     if(isSocioVista){
-      let fdsList = allDays.filter(d=>isWeekend(d));
+      const fdsList = allDays.filter(d=>isWeekend(d));
       return (
         <div>
           <div style={{background:"linear-gradient(135deg,"+c+","+c+"bb)",borderRadius:14,
@@ -3056,8 +3070,8 @@ function MallaTab({ mesId, store }) {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10}}>
               {fdsList.map(function(d){
-                let t=getTurnoAgente(agente,d);
-                let isLibre=!t;
+                const t=getTurnoAgente(agente,d);
+                const isLibre=!t;
                 return (
                   <div key={d} style={{background:isLibre?"#f0fdf4":c+"0d",
                     border:"1.5px solid "+(isLibre?"#bbf7d0":c+"44"),
@@ -3083,9 +3097,9 @@ function MallaTab({ mesId, store }) {
 
     // ── Vista AGENTE PRINCIPAL — semana + FDS + resumen ───────────────────────
     const semanaRows = semanas.map(function(week,wi){
-      let realDays=week.filter(Boolean);
-      let wkDays=realDays.filter(d=>!isWeekend(d));
-      let wkndDays=realDays.filter(d=>isWeekend(d));
+      const realDays=week.filter(Boolean);
+      const wkDays=realDays.filter(d=>!isWeekend(d));
+      const wkndDays=realDays.filter(d=>isWeekend(d));
       return (
         <div key={wi} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,overflow:"hidden",marginBottom:10}}>
           <div style={{background:c+"0f",borderBottom:"1px solid "+c+"22",
@@ -3102,7 +3116,7 @@ function MallaTab({ mesId, store }) {
           <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6,padding:"12px 14px"}}>
             {week.filter(d=>d&&!isWeekend(d)).map(function(d){
               let t=getTurnoAgente(agente,d);
-              let desc=descansosDias.includes(d);
+              const desc=descansosDias.includes(d);
               return (
                 <div key={d} style={{textAlign:"center",
                   background:desc?"#f0fdf4":t?(TURNO_META[t.id]?.c||c)+"0d":"#f8fafc",
@@ -3124,7 +3138,7 @@ function MallaTab({ mesId, store }) {
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {wkndDays.map(function(d){
                 let t=getTurnoAgente(agente,d);
-                let fdsDesc=(malla.descansosFds||[]).find(fd=>fd.dias.includes(d)&&(fd.descansan||[]).includes(agente));
+                const fdsDesc=(malla.descansosFds||[]).find(fd=>fd.dias.includes(d)&&(fd.descansan||[]).includes(agente));
                 let isLibre=fdsDesc||!t;
                 return (
                   <div key={d} style={{display:"flex",alignItems:"center",gap:6,
@@ -3205,8 +3219,8 @@ function MallaTab({ mesId, store }) {
             let realDays=week.filter(Boolean);
             if(!realDays.length) return null;
             let wkndDays=realDays.filter(d=>isWeekend(d));
-            let lunes=realDays.find(d=>!isWeekend(d));
-            let vie=realDays.filter(d=>!isWeekend(d)).pop();
+            const lunes=realDays.find(d=>!isWeekend(d));
+            const vie=realDays.filter(d=>!isWeekend(d)).pop();
             return (
               <button key={wi}
                 onClick={()=>setSemanaActiva(wi)}
@@ -3254,7 +3268,7 @@ function MallaTab({ mesId, store }) {
                         textAlign:"left",borderBottom:"1px solid #e2e8f0",width:110}}>Turno</th>
                       {week.map(function(d,di){
                         if(d===null) return <th key={di} style={{borderBottom:"1px solid #e2e8f0",width:60}}/>;
-                        let wknd=isWeekend(d), dow=getDow(d);
+                        const wknd=isWeekend(d), dow=getDow(d);
                         return (
                           <th key={di} style={{padding:"6px 8px",fontSize:11,fontWeight:700,
                             color:wknd?"#be185d":"#475569",textAlign:"center",
@@ -3279,7 +3293,7 @@ function MallaTab({ mesId, store }) {
                           </td>
                           {week.map(function(d,di){
                             if(d===null) return <td key={di}/>;
-                            let asign=getAsign(turno,d);
+                            const asign=getAsign(turno,d);
                             let wknd=isWeekend(d);
                             return (
                               <td key={di} style={{padding:"6px 8px",textAlign:"center",
@@ -3296,7 +3310,7 @@ function MallaTab({ mesId, store }) {
                     {/* FDS rows — solo en días sáb/dom */}
                     {wkndDays.length>0&&(malla.fds||[]).map(function(fds,fi){
                       let m=TURNO_META[fds.id]||{label:fds.label,h:fds.horario,c:"#b45309"};
-                      let hasFds=week.some(d=>d&&isWeekend(d)&&getAsign(fds,d));
+                      const hasFds=week.some(d=>d&&isWeekend(d)&&getAsign(fds,d));
                       if(!hasFds) return null;
                       return (
                         <tr key={"fds"+fi} style={{borderBottom:"1px solid #fecdd3",background:"#fff8f8"}}>
@@ -3349,7 +3363,7 @@ function MallaTab({ mesId, store }) {
 
               {/* Fin de semana socios + notas */}
               {wkndDays.length>0&&(()=>{
-                let socios=[];
+                const socios=[];
                 wkndDays.forEach(d=>{
                   (malla.fds||[]).forEach(function(t){
                     let a=getAsign(t,d);
@@ -3366,8 +3380,8 @@ function MallaTab({ mesId, store }) {
                     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:8}}>
                       {socios.map(function({socio,d,t}){
                         let key=notaKey(socio,d);
-                        let nota=notas[key]||"";
-                        let isEditing=editNota&&editNota.key===key;
+                        const nota=notas[key]||"";
+                        const isEditing=editNota&&editNota.key===key;
                         return (
                           <div key={key} style={{background:"#fff",border:"1px solid #fecdd3",
                             borderRadius:10,padding:"10px 12px"}}>
@@ -3537,7 +3551,7 @@ function AlianzasPanel() {
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
         {ALIANZAS.map(function(a){
-          let open = expandido===a.nombre;
+          const open = expandido===a.nombre;
           return (
             <div key={a.nombre} style={{background:"#fff",border:"1.5px solid "+(open?a.color+"66":"#e2e8f0"),
               borderRadius:14,overflow:"hidden",transition:"border-color .2s",
@@ -3758,7 +3772,7 @@ function AlianzasTab() {
 // ── CALCULADORAS DE VIAJE ──────────────────────────────────────────────────────
 function CalcCard({ index, label, color, accent, pasajeros, dias, onPasajerosChange, onDiasChange, link }) {
   const [valor, setValor] = useState("");
-  const v=parseFloat(valor)||0, p=parseInt(pasajeros)||1, d=parseInt(dias)||1;
+  let v=parseFloat(valor)||0, p=parseInt(pasajeros)||1, d=parseInt(dias)||1;
   const porPasajero=p>0?v/p:0, porDia=d>0?v/d:0, porPaxDia=(p>0&&d>0)?v/p/d:0;
   const fmtUSD=(n)=>n>0?"$"+n.toLocaleString("es-CO",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
   const inputBase={height:40,border:"2px solid #e2e8f0",borderRadius:10,padding:"0 12px",fontSize:14,color:"#1e293b",background:"#fff",outline:"none",width:"100%",fontFamily:"'Sora',sans-serif",fontWeight:600,transition:"border-color .15s"};
@@ -3817,12 +3831,12 @@ function CalcCard({ index, label, color, accent, pasajeros, dias, onPasajerosCha
 
         {/* Botón copiar link — disponible en las 3 opciones */}
         {link&&(()=>{
-          let [copied,setCopied]=useState(false);
-          let planName=(label.split("·")[1]||label).trim();
-          let doCopy=()=>{
+          const [copied,setCopied]=useState(false);
+          const planName=(label.split("·")[1]||label).trim();
+          const doCopy=()=>{
             try{navigator.clipboard.writeText(link).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2200);});}
             catch(e){
-              let el=document.createElement("textarea");el.value=link;document.body.appendChild(el);el.select();
+              const el=document.createElement("textarea");el.value=link;document.body.appendChild(el);el.select();
               document.execCommand("copy");document.body.removeChild(el);
               setCopied(true);setTimeout(()=>setCopied(false),2200);
             }
@@ -3876,7 +3890,7 @@ function EsimCalc() {
   const [tasa,    setTasa]    = useState(1);
   const [copied,  setCopied]  = useState(null);
 
-  const MONEDAS = [
+  let MONEDAS = [
     {code:"USD", label:"Dólar (USD)", tasa:1},
     {code:"COP", label:"Peso Col (COP)", tasa:4200},
     {code:"MXN", label:"Peso Mex (MXN)", tasa:19.5},
@@ -3892,7 +3906,7 @@ function EsimCalc() {
       .then(r=>r.json())
       .then(function(data){
         if(data&&data.ok&&Array.isArray(data.rows)&&data.rows.length>0){
-          let mapped=data.rows.filter(r=>r.asesor&&r.valorUsd>0)
+          const mapped=data.rows.filter(r=>r.asesor&&r.valorUsd>0)
             .map(r=>({plan:String(r.asesor||"").trim(),precio:parseFloat(r.valorUsd)||0}));
           if(mapped.length>0) setPlanes(mapped);
         }
@@ -3915,7 +3929,7 @@ function EsimCalc() {
     .map(p=>qty[p.plan]+"x "+p.plan+" = $"+p.precio+" USD").join(" · ");
 
   function copyResumen(){
-    let txt = planes.filter(p=>(qty[p.plan]||0)>0)
+    const txt = planes.filter(p=>(qty[p.plan]||0)>0)
       .map(p=>qty[p.plan]+"x "+p.plan+": "+fmtM(qty[p.plan]*p.precio*tasa))
       .join("\n")+"\nTotal: "+fmtM(totalM);
     try{ navigator.clipboard.writeText(txt).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500);}); }
@@ -4045,560 +4059,6 @@ function EsimCalc() {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-
-function AlianzasPanel() {
-  let ALIANZAS = [
-    {
-      nombre: "AirHelp",
-      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/AirHelp_logo.svg/1200px-AirHelp_logo.svg.png",
-      color: "#1B3F8B",
-      descripcion: "Reclamaciones por vuelos retrasados, cancelados o con overbooking. El cliente puede reclamar hasta €600 por pasajero. SegurosFly lo refiere y AirHelp gestiona todo el proceso legal.",
-      como: "Compartí el link con el cliente si tuvo inconvenientes con su vuelo. AirHelp cobra solo si ganan el caso (sin costo inicial para el cliente).",
-      link: "https://funnel.airhelp.es/claims/new/trip-details?lang=es",
-      cta: "Abrir formulario"
-    },
-    {
-      nombre: "Rentcars",
-      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Rentcars.com_Logo.svg/2560px-Rentcars.com_Logo.svg.png",
-      color: "#F5A623",
-      descripcion: "Alquiler de autos en más de 140 países. El cliente compara precios y reserva directamente. SegurosFly tiene una landing page especial para sus clientes.",
-      como: "Compartí el link de alianza para que el cliente vea los precios. Se puede combinar con el seguro de viaje para proteger el alquiler.",
-      link: "https://www.rentcars.com/es-co/lp/segurosfly",
-      cta: "Ver alianza Rentcars"
-    },
-    {
-      nombre: "Airalo eSIM",
-      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Airalo_logo.svg/1200px-Airalo_logo.svg.png",
-      color: "#E65C4F",
-      descripcion: "eSIM digital para viajes internacionales. El viajero activa datos móviles en más de 200 países sin cambiar de SIM física. Planes desde $5 USD.",
-      como: "Recomendalo a clientes que viajen al exterior. Pueden comprar y activar desde el celular antes de salir. Complemento ideal al seguro de viaje.",
-      link: "https://www.airalo.com/",
-      cta: "Ver planes Airalo"
-    },
-    {
-      nombre: "Priority Pass",
-      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Priority_Pass_logo.svg/2560px-Priority_Pass_logo.svg.png",
-      color: "#9B8A5A",
-      descripcion: "Acceso a más de 1,400 salas VIP en aeropuertos de todo el mundo. Ideal para viajeros frecuentes. Incluye bebidas, comida, WiFi y zonas de descanso.",
-      como: "Recomendalo a clientes premium o viajeros frecuentes. La membresía anual se amortiza rápidamente con los viajes.",
-      link: "https://www.prioritypass.com/es-LA/join-prioritypass",
-      cta: "Unirse a Priority Pass"
-    },
-    {
-      nombre: "Travel Registration",
-      logo: null,
-      color: "#0891b2",
-      descripcion: "Registro de viajeros ante autoridades. Permite a los consulados contactar al viajero en caso de emergencia en el destino. Recomendado para zonas de riesgo.",
-      como: "Sugerilo a clientes que viajan a destinos con alertas o zonas de conflicto. Es gratuito y toma menos de 5 minutos.",
-      link: "https://travelregistration.online/",
-      cta: "Registrar viaje"
-    },
-  ];
-
-  const [expandido, setExpandido] = useState(null);
-
-  return (
-    <div style={{marginTop:16}}>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-        <span style={{fontSize:20}}>🤝</span>
-        <div>
-          <div style={{fontSize:15,fontWeight:800,color:"#1e293b"}}>Alianzas SegurosFly</div>
-          <div style={{fontSize:12,color:"#94a3b8"}}>Servicios complementarios para ofrecer a tus clientes</div>
-        </div>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
-        {ALIANZAS.map(function(a){
-          let open = expandido===a.nombre;
-          return (
-            <div key={a.nombre} style={{background:"#fff",border:"1.5px solid "+(open?a.color+"66":"#e2e8f0"),
-              borderRadius:14,overflow:"hidden",transition:"border-color .2s",
-              boxShadow:open?"0 4px 20px "+a.color+"18":"0 1px 4px rgba(0,0,0,0.05)"}}>
-              {/* Header */}
-              <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",
-                background:open?a.color+"08":"#fff"}}
-                onClick={()=>setExpandido(open?null:a.nombre)}>
-                <div style={{width:44,height:44,borderRadius:10,background:a.color+"12",
-                  border:"1.5px solid "+a.color+"33",display:"flex",alignItems:"center",
-                  justifyContent:"center",flexShrink:0,overflow:"hidden"}}>
-                  {a.logo?(
-                    <img src={a.logo} alt={a.nombre}
-                      style={{width:38,height:38,objectFit:"contain"}}
-                      onError={e=>{e.target.style.display="none";}}/>
-                  ):(
-                    <span style={{fontSize:16,fontWeight:800,color:a.color}}>{a.nombre[0]}</span>
-                  )}
-                </div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:800,color:"#1e293b"}}>{a.nombre}</div>
-                  <div style={{fontSize:11,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",
-                    whiteSpace:"nowrap"}}>{a.descripcion.slice(0,55)}...</div>
-                </div>
-                <span style={{fontSize:16,color:a.color,fontWeight:700,flexShrink:0,
-                  transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform .2s"}}>▾</span>
-              </div>
-              {/* Expandido */}
-              {open&&(
-                <div style={{borderTop:"1px solid "+a.color+"22",padding:"14px 16px",
-                  background:a.color+"05"}}>
-                  <div style={{fontSize:12,color:"#374151",lineHeight:1.6,marginBottom:10}}>
-                    {a.descripcion}
-                  </div>
-                  <div style={{background:"#fff",border:"1px solid "+a.color+"33",borderRadius:8,
-                    padding:"10px 12px",marginBottom:12}}>
-                    <div style={{fontSize:10,fontWeight:700,color:a.color,textTransform:"uppercase",
-                      letterSpacing:"0.06em",marginBottom:4}}>💡 Cómo usarlo con tu cliente</div>
-                    <div style={{fontSize:12,color:"#374151",lineHeight:1.5}}>{a.como}</div>
-                  </div>
-                  <div style={{display:"flex",gap:8}}>
-                    <a href={a.link} target="_blank" rel="noopener noreferrer"
-                      style={{flex:1,height:36,borderRadius:8,border:"none",
-                        background:a.color,color:"#fff",fontWeight:700,fontSize:12,
-                        cursor:"pointer",textDecoration:"none",display:"flex",
-                        alignItems:"center",justifyContent:"center",gap:6}}>
-                      {a.cta} ↗
-                    </a>
-                    <button onClick={()=>{navigator.clipboard.writeText(a.link).catch(()=>{});}}
-                      style={{height:36,padding:"0 12px",borderRadius:8,
-                        border:"1.5px solid "+a.color+"44",background:"#fff",
-                        color:a.color,fontWeight:700,fontSize:11,cursor:"pointer"}}>
-                      📋 Copiar link
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ── DOCUMENTOS SEGUROSFLY ─────────────────────────────────────────────────────
-function DocumentosTab() {
-  let DOCS = [
-    {
-      categoria: "📄 Documentos",
-      items: [
-        {
-          titulo: "Manual de Procesos SegurosFly",
-          descripcion: "Documento maestro con procesos, procedimientos y guías operativas del equipo.",
-          link: "https://docs.google.com/document/d/1Ldh30KuSGC8kUuCZxUsivA1deQp63nKxliEw_Qe396M/edit?tab=t.0",
-          tipo: "Google Doc",
-          color: "#2563eb",
-          icon: "📄"
-        }
-      ]
-    },
-    {
-      categoria: "🎬 Videos de capacitación — Vicidial",
-      items: [
-        {
-          titulo: "Llamada Manual Vicidial",
-          descripcion: "Cómo realizar llamadas manuales desde Vicidial paso a paso.",
-          link: "https://www.loom.com/share/5ee6a817f4d4473ebff952b1534ff1ad",
-          tipo: "Video Loom",
-          color: "#7c3aed",
-          icon: "🎬",
-          duracion: "~3 min"
-        },
-        {
-          titulo: "Conexión Agente Vicidial",
-          descripcion: "Proceso para conectarse como agente en Vicidial correctamente.",
-          link: "https://www.loom.com/share/f591868dfad74cd99f0053330cf5f20c",
-          tipo: "Video Loom",
-          color: "#7c3aed",
-          icon: "🎬",
-          duracion: "~3 min"
-        },
-        {
-          titulo: "Transferencia Vicidial",
-          descripcion: "Cómo transferir llamadas dentro de Vicidial.",
-          link: "https://www.loom.com/share/317a039a9e53441ab765b97c3370e2cc",
-          tipo: "Video Loom",
-          color: "#7c3aed",
-          icon: "🎬",
-          duracion: "~3 min"
-        }
-      ]
-    }
-  ];
-
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:14}}>
-      {/* Header */}
-      <div style={{background:"linear-gradient(135deg,#1e3a5f,#2563eb)",borderRadius:14,
-        padding:"18px 22px",display:"flex",alignItems:"center",gap:14}}>
-        <div style={{fontSize:32}}>📁</div>
-        <div>
-          <div style={{fontSize:17,fontWeight:800,color:"#fff"}}>Documentos SegurosFly</div>
-          <div style={{fontSize:12,color:"rgba(255,255,255,0.75)",marginTop:2}}>
-            Recursos, manuales y videos de capacitación del equipo
-          </div>
-        </div>
-      </div>
-
-      {/* Secciones */}
-      {DOCS.map(function(sec){
-        return (
-          <div key={sec.categoria}>
-            <div style={{fontSize:13,fontWeight:800,color:"#374151",marginBottom:10,
-              paddingBottom:6,borderBottom:"1.5px solid #e2e8f0"}}>
-              {sec.categoria}
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:10}}>
-              {sec.items.map(function(doc){
-                return (
-                  <div key={doc.titulo} style={{background:"#fff",border:"1.5px solid "+doc.color+"33",
-                    borderRadius:14,padding:"16px 18px",display:"flex",flexDirection:"column",gap:10,
-                    boxShadow:"0 2px 8px "+doc.color+"10"}}>
-                    <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-                      <div style={{width:40,height:40,borderRadius:10,background:doc.color+"12",
-                        display:"flex",alignItems:"center",justifyContent:"center",
-                        fontSize:20,flexShrink:0}}>
-                        {doc.icon}
-                      </div>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:13,fontWeight:800,color:"#1e293b",marginBottom:2}}>
-                          {doc.titulo}
-                        </div>
-                        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                          <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,
-                            background:doc.color+"15",color:doc.color}}>
-                            {doc.tipo}
-                          </span>
-                          {doc.duracion&&(
-                            <span style={{fontSize:10,color:"#94a3b8"}}>{doc.duracion}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{fontSize:12,color:"#64748b",lineHeight:1.5}}>
-                      {doc.descripcion}
-                    </div>
-                    <div style={{display:"flex",gap:8}}>
-                      <a href={doc.link} target="_blank" rel="noopener noreferrer"
-                        style={{flex:1,height:36,borderRadius:8,border:"none",
-                          background:doc.color,color:"#fff",fontWeight:700,fontSize:12,
-                          cursor:"pointer",textDecoration:"none",display:"flex",
-                          alignItems:"center",justifyContent:"center",gap:5}}>
-                        {doc.tipo.includes("Video")?"▶ Ver video":"📄 Abrir documento"}
-                      </a>
-                      <button onClick={()=>{try{navigator.clipboard.writeText(doc.link);}catch(e){}}}
-                        style={{height:36,padding:"0 12px",borderRadius:8,
-                          border:"1.5px solid "+doc.color+"44",background:"#fff",
-                          color:doc.color,fontWeight:700,fontSize:11,cursor:"pointer"}}>
-                        📋
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-
-// ── ALIANZAS TAB ─────────────────────────────────────────────────────────────
-function AlianzasTab() {
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
-      {/* Header */}
-      <div style={{background:"linear-gradient(135deg,#0c4a6e,#0891b2)",borderRadius:14,
-        padding:"18px 22px",display:"flex",alignItems:"center",gap:14}}>
-        <div style={{fontSize:32}}>🤝</div>
-        <div>
-          <div style={{fontSize:17,fontWeight:800,color:"#fff"}}>Alianzas SegurosFly</div>
-          <div style={{fontSize:12,color:"rgba(255,255,255,0.75)",marginTop:2}}>
-            Servicios complementarios · eSIM, reclamos, autos, salas VIP y más
-          </div>
-        </div>
-      </div>
-      {/* eSIM */}
-      <EsimCalc />
-      {/* Alianzas */}
-      <AlianzasPanel />
-    </div>
-  );
-}
-
-// ── CALCULADORAS DE VIAJE ──────────────────────────────────────────────────────
-function CalcCard({ index, label, color, accent, pasajeros, dias, onPasajerosChange, onDiasChange, link }) {
-  const [valor, setValor] = useState("");
-  let v=parseFloat(valor)||0, p=parseInt(pasajeros)||1, d=parseInt(dias)||1;
-  let porPasajero=p>0?v/p:0, porDia=d>0?v/d:0, porPaxDia=(p>0&&d>0)?v/p/d:0;
-  let fmtUSD=(n)=>n>0?"$"+n.toLocaleString("es-CO",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
-  let inputBase={height:40,border:"2px solid #e2e8f0",borderRadius:10,padding:"0 12px",fontSize:14,color:"#1e293b",background:"#fff",outline:"none",width:"100%",fontFamily:"'Sora',sans-serif",fontWeight:600,transition:"border-color .15s"};
-  return (
-    <div style={{background:"#fff",border:"2px solid "+accent+"44",borderRadius:16,overflow:"hidden",boxShadow:"0 4px 20px "+accent+"18",flex:1,minWidth:260,display:"flex",flexDirection:"column"}}>
-      <div style={{background:"linear-gradient(135deg,"+color+" 0%,"+accent+" 100%)",padding:"12px 18px",display:"flex",alignItems:"center",gap:10}}>
-        <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:800,color:"#fff",flexShrink:0}}>{index}</div>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{label}</div>
-          <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",fontWeight:600}}>Calculadora de inversión</div>
-        </div>
-        <img src={LOGO_WEB_SRC} alt="Seguros Fly"
-          style={{height:28,objectFit:"contain",opacity:0.92,filter:"brightness(0) invert(1)",flexShrink:0}} />
-      </div>
-      <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12,flex:1}}>
-        <div>
-          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>💰 Valor Total</div>
-          <div style={{position:"relative"}}>
-            <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"#64748b",fontWeight:700,fontSize:14,pointerEvents:"none"}}>$</span>
-            <input type="number" min="0" placeholder="0.00" value={valor} onChange={e=>setValor(e.target.value)}
-              style={Object.assign({},inputBase,{paddingLeft:24,borderColor:v>0?accent:"#e2e8f0",boxShadow:v>0?"0 0 0 3px "+accent+"18":"none",fontSize:16,fontWeight:700})} />
-          </div>
-        </div>
-        <div>
-          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>👥 Pasajeros</div>
-          <div style={{display:"flex",gap:6,alignItems:"center"}}>
-            <button onClick={()=>onPasajerosChange(Math.max(1,p-1))} style={{width:34,height:34,border:"2px solid #e2e8f0",borderRadius:8,background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:16,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-            <input type="number" min="1" max="20" value={pasajeros} onChange={e=>onPasajerosChange(Math.max(1,parseInt(e.target.value)||1))}
-              style={Object.assign({},inputBase,{textAlign:"center",fontWeight:700,fontSize:15})} />
-            <button onClick={()=>onPasajerosChange(Math.min(20,p+1))} style={{width:34,height:34,border:"2px solid #e2e8f0",borderRadius:8,background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:16,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-          </div>
-        </div>
-        <div>
-          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>📅 Días de viaje</div>
-          <div style={{display:"flex",gap:6,alignItems:"center"}}>
-            <button onClick={()=>onDiasChange(Math.max(1,d-1))} style={{width:34,height:34,border:"2px solid #e2e8f0",borderRadius:8,background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:16,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-            <input type="number" min="1" max="365" value={dias} onChange={e=>onDiasChange(Math.max(1,parseInt(e.target.value)||1))}
-              style={Object.assign({},inputBase,{textAlign:"center",fontWeight:700,fontSize:15})} />
-            <button onClick={()=>onDiasChange(Math.min(365,d+1))} style={{width:34,height:34,border:"2px solid #e2e8f0",borderRadius:8,background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:16,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-          </div>
-        </div>
-        <div style={{borderTop:"1px dashed #e2e8f0",margin:"4px 0"}} />
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>✅ Resultados</div>
-          {[{label:"por pasajero",val:porPasajero,color:accent,icon:"👤"},{label:"por día",val:porDia,color:"#0891b2",icon:"📆"},{label:"por pax / por día",val:porPaxDia,color:"#7c3aed",icon:"🧮"}].map(r=>(
-            <div key={r.label} style={{background:v>0?r.color+"0f":"#f8fafc",border:"1px solid "+(v>0?r.color+"33":"#e2e8f0"),borderRadius:10,padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div>
-                <div style={{fontSize:10,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em"}}>{r.label}</div>
-                <div style={{fontSize:20,fontWeight:800,color:v>0?r.color:"#94a3b8",lineHeight:1.1,marginTop:2}}>{fmtUSD(r.val)}</div>
-              </div>
-              <div style={{fontSize:22,opacity:0.35}}>{r.icon}</div>
-            </div>
-          ))}
-        </div>
-        {v>0&&<button onClick={()=>setValor("")} style={{height:32,border:"1px solid #fca5a5",borderRadius:8,background:"#fff5f5",color:"#ef4444",fontWeight:700,fontSize:11,cursor:"pointer",marginTop:2}}>🗑️ Limpiar</button>}
-
-        {/* Botón copiar link — disponible en las 3 opciones */}
-        {link&&(()=>{
-          let [copied,setCopied]=useState(false);
-          let planName=(label.split("·")[1]||label).trim();
-          let doCopy=()=>{
-            try{navigator.clipboard.writeText(link).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2200);});}
-            catch(e){
-              let el=document.createElement("textarea");el.value=link;document.body.appendChild(el);el.select();
-              document.execCommand("copy");document.body.removeChild(el);
-              setCopied(true);setTimeout(()=>setCopied(false),2200);
-            }
-          };
-          return (
-            <div style={{marginTop:4,borderTop:"1px dashed #e2e8f0",paddingTop:10,display:"flex",flexDirection:"column",gap:6}}>
-              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em"}}>
-                🔗 Brochure digital
-              </div>
-              <div style={{display:"flex",gap:6}}>
-                <button onClick={doCopy}
-                  style={{flex:1,height:36,borderRadius:10,border:"none",
-                    background:copied?"#ecfdf5":"linear-gradient(135deg,"+color+","+accent+")",
-                    color:copied?"#059669":"#fff",fontWeight:700,fontSize:12,cursor:"pointer",
-                    transition:"all .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                  {copied?"✅ ¡Link copiado!":"📋 Copiar link del "+planName}
-                </button>
-                <a href={link} target="_blank" rel="noopener noreferrer"
-                  style={{width:36,height:36,borderRadius:10,border:"1.5px solid "+accent,
-                    background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",
-                    fontSize:16,textDecoration:"none",flexShrink:0}} title="Abrir brochure">
-                  ↗
-                </a>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-    </div>
-  );
-}
-// Datos eSIM embebidos + sync desde Sheets (pestaña "Discover Global Esim")
-let ESIM_DEFAULT = [
-  {plan:"1 GB - 5 días",  precio:7},
-  {plan:"1 GB - 7 días",  precio:14},
-  {plan:"2 GB - 15 días", precio:20},
-  {plan:"3 GB - 30 días", precio:30},
-  {plan:"5 GB - 30 días", precio:38},
-  {plan:"5 GB - 60 días", precio:38},
-  {plan:"10 GB - 180 días",precio:68},
-  {plan:"10 GB - 30 días", precio:68},
-  {plan:"20 GB - 30 días", precio:76},
-  {plan:"20 GB - 365 días",precio:76},
-];
-
-function EsimCalc() {
-  const [planes,  setPlanes]  = useState(ESIM_DEFAULT);
-  const [loading, setLoading] = useState(false);
-  const [qty,     setQty]     = useState({});  // {plan: cantidad}
-  const [moneda,  setMoneda]  = useState("USD");
-  const [tasa,    setTasa]    = useState(1);   // tasa respecto a USD
-
-  let MONEDAS = [
-    {code:"USD", label:"USD — Dólar", tasa:1},
-    {code:"COP", label:"COP — Peso Colombiano", tasa:4200},
-    {code:"MXN", label:"MXN — Peso Mexicano",  tasa:19.5},
-    {code:"ARS", label:"ARS — Peso Argentino",  tasa:950},
-    {code:"EUR", label:"EUR — Euro",            tasa:0.92},
-  ];
-
-  // Cargar desde Sheets al montar
-  useEffect(function(){
-    setLoading(true);
-    fetch(SHEETS_URL+"?accion=read&sheet=Discover%20Global%20Esim",{cache:"no-store"})
-      .then(r=>r.json())
-      .then(function(data){
-        if(data&&data.ok&&Array.isArray(data.rows)&&data.rows.length>0){
-          let mapped=data.rows
-            .filter(r=>r.asesor&&r.valorUsd>0)
-            .map(r=>({plan:String(r.asesor||"").trim(), precio:parseFloat(r.valorUsd)||0}));
-          if(mapped.length>0) setPlanes(mapped);
-        }
-        setLoading(false);
-      }).catch(()=>setLoading(false));
-  },[]);
-
-  let total = planes.reduce((s,p)=>{
-    let q=qty[p.plan]||0;
-    return s+q*p.precio;
-  },0);
-  const totalMoneda = total*tasa;
-
-  function fmtM(v){
-    if(moneda==="USD") return "$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
-    return v.toLocaleString("es-CO",{minimumFractionDigits:0,maximumFractionDigits:0})+" "+moneda;
-  }
-
-  function setQ(plan,v){
-    setQty(prev=>({...prev,[plan]:Math.max(0,v)}));
-  }
-
-  let hasItems = Object.values(qty).some(v=>v>0);
-
-  return (
-    <div style={{background:"#fff",border:"1.5px solid #0891b222",borderRadius:16,overflow:"hidden",marginTop:16}}>
-      {/* Header */}
-      <div style={{background:"linear-gradient(135deg,#0c4a6e,#0891b2)",padding:"14px 20px",
-        display:"flex",alignItems:"center",gap:12,justifyContent:"space-between"}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:26}}>📡</span>
-          <div>
-            <div style={{fontSize:15,fontWeight:800,color:"#fff"}}>Discover Global eSIM</div>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.75)"}}>
-              {loading?"Sincronizando con Sheet...":"Precios sincronizados · "+planes.length+" planes disponibles"}
-            </div>
-          </div>
-        </div>
-        {/* Selector moneda */}
-        <select value={moneda}
-          onChange={e=>{
-            let m=MONEDAS.find(x=>x.code===e.target.value);
-            setMoneda(e.target.value);
-            setTasa(m?m.tasa:1);
-          }}
-          style={{height:32,borderRadius:8,border:"1px solid rgba(255,255,255,0.3)",
-            background:"rgba(255,255,255,0.15)",color:"#fff",fontSize:12,fontWeight:700,
-            padding:"0 10px",cursor:"pointer"}}>
-          {MONEDAS.map(m=><option key={m.code} value={m.code} style={{color:"#1e293b"}}>{m.label}</option>)}
-        </select>
-      </div>
-
-      {/* Tabla de planes */}
-      <div style={{overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse"}}>
-          <thead>
-            <tr style={{background:"#f0f9ff",borderBottom:"1px solid #e0f2fe"}}>
-              {["Plan","Precio USD","Precio "+moneda,"Cant.","Subtotal"].map(h=>(
-                <th key={h} style={{padding:"10px 14px",fontSize:11,fontWeight:700,
-                  color:"#0891b2",textTransform:"uppercase",letterSpacing:"0.06em",
-                  textAlign:h==="Plan"?"left":"center"}}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {planes.map(function(p,i){
-              let q=qty[p.plan]||0;
-              let sub=q*p.precio*tasa;
-              return (
-                <tr key={i} style={{borderBottom:"1px solid #f0f9ff",
-                  background:q>0?"#e0f2fe22":"#fff",transition:"background .15s"}}>
-                  <td style={{padding:"10px 14px",fontSize:13,fontWeight:600,color:"#1e293b"}}>
-                    {p.plan}
-                  </td>
-                  <td style={{padding:"10px 14px",textAlign:"center",fontWeight:700,color:"#0891b2"}}>
-                    ${p.precio}
-                  </td>
-                  <td style={{padding:"10px 14px",textAlign:"center",color:"#64748b",fontWeight:600}}>
-                    {moneda==="USD"?"—":fmtM(p.precio*tasa)}
-                  </td>
-                  <td style={{padding:"10px 14px",textAlign:"center"}}>
-                    <div style={{display:"flex",gap:6,alignItems:"center",justifyContent:"center"}}>
-                      <button onClick={()=>setQ(p.plan,q-1)}
-                        style={{width:28,height:28,borderRadius:7,border:"1.5px solid #e2e8f0",
-                          background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:14,
-                          cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
-                      <span style={{minWidth:24,textAlign:"center",fontSize:14,fontWeight:700,color:q>0?"#0891b2":"#1e293b"}}>{q}</span>
-                      <button onClick={()=>setQ(p.plan,q+1)}
-                        style={{width:28,height:28,borderRadius:7,border:"1.5px solid #e2e8f0",
-                          background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:14,
-                          cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-                    </div>
-                  </td>
-                  <td style={{padding:"10px 14px",textAlign:"center",fontWeight:800,
-                    color:q>0?"#0891b2":"#94a3b8",fontSize:q>0?14:12}}>
-                    {q>0?fmtM(sub):"—"}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Total */}
-      {hasItems&&(
-        <div style={{borderTop:"2px solid #e0f2fe",padding:"14px 20px",
-          display:"flex",justifyContent:"space-between",alignItems:"center",
-          background:"#f0f9ff"}}>
-          <div>
-            <div style={{fontSize:12,color:"#0891b2",fontWeight:700,textTransform:"uppercase"}}>Total seleccionado</div>
-            <div style={{fontSize:11,color:"#64748b",marginTop:2}}>
-              {Object.entries(qty).filter(([,v])=>v>0).map(([k,v])=>v+"x "+k).join(" · ")}
-            </div>
-          </div>
-          <div style={{textAlign:"right"}}>
-            <div style={{fontSize:24,fontWeight:800,color:"#0891b2"}}>{fmtM(totalMoneda)}</div>
-            {moneda!=="USD"&&<div style={{fontSize:12,color:"#94a3b8"}}>USD ${total.toFixed(2)}</div>}
-          </div>
-        </div>
-      )}
-      {hasItems&&(
-        <div style={{padding:"0 20px 14px",display:"flex",justifyContent:"flex-end"}}>
-          <button onClick={()=>setQty({})}
-            style={{height:30,padding:"0 14px",borderRadius:8,border:"1px solid #fca5a5",
-              background:"#fff5f5",color:"#ef4444",fontWeight:700,fontSize:11,cursor:"pointer"}}>
-            🗑️ Limpiar selección
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -4848,8 +4308,8 @@ function TosspileTab({ store, onUpdate }) {
   useEffect(function(){ fetchReviewsFromSheets(setReviews); }, []);
   const visibles = reviews.filter(r => !r.deleted);
 
-  const TP_ASESORES = ["guillermo","daniel","wilmary"]; // Asesores activos en Trustpilot — editar aquí para agregar más
-  const COLOR = { guillermo:"#2563eb", carolina:"#7c3aed", daniel:"#0f766e", wilmary:"#be185d" };
+  const TP_ASESORES = ["guillermo","daniel","wilmary","christian"]; // Asesores activos en Trustpilot — editar aquí para agregar más
+  const COLOR = { guillermo:"#2563eb", carolina:"#7c3aed", daniel:"#0f766e", wilmary:"#be185d", christian:"#0891b2" };
   const nombreAsesor = (a) => { const names={guillermo:"Guillermo",carolina:"Carolina",daniel:"Daniel R.",wilmary:"Wilmary"}; return names[a]||( a?a[0].toUpperCase()+a.slice(1):a); };
 
   let totales = TP_ASESORES.reduce((acc, a) => {
@@ -4871,7 +4331,7 @@ function TosspileTab({ store, onUpdate }) {
     }).length
   }));
   const maxDow = Math.max(...reviewsByDow.map(d=>d.count), 1);
-  const topDow = reviewsByDow.reduce((a,b)=>b.count>a.count?b:a, reviewsByDow[0]);
+  let topDow = reviewsByDow.reduce((a,b)=>b.count>a.count?b:a, reviewsByDow[0]);
 
   // Reviews filtradas para la lista
   const reviewsFiltradas = visibles.filter(r => filterAsesor==="todos" || r.asesor===filterAsesor);
@@ -4885,7 +4345,7 @@ function TosspileTab({ store, onUpdate }) {
     } else {
       updated = [{ id:Date.now().toString(), ...form, valor:REVIEW_VALUE }, ...reviews];
     }
-    let lastRev = editId ? updated.find(r=>r.id===editId) : updated[0];
+    const lastRev = editId ? updated.find(r=>r.id===editId) : updated[0];
     persist(updated, lastRev, "save");
     setForm({ fecha: new Date().toISOString().slice(0,10), email:"", asesor: TP_ASESORES[0] });
     setSaved(true); setTimeout(()=>setSaved(false), 2000);
@@ -4899,7 +4359,7 @@ function TosspileTab({ store, onUpdate }) {
 
   const handleDelConfirm = () => {
     if (delPin===TOSSPILE_PIN) {
-      let deletedRev = reviews.find(r=>r.id===delId);
+      const deletedRev = reviews.find(r=>r.id===delId);
       persist(reviews.filter(r=>r.id!==delId), deletedRev, "delete");
       setDelId(null); setDelPin(""); setDelErr(false);
     } else {
@@ -4993,11 +4453,11 @@ function TosspileTab({ store, onUpdate }) {
           </defs>
           {(() => {
             let W=560,H=120,PL=12,PR=12,PT=28,PB=36;
-            let colW=(W-PL-PR)/6;
-            let pts = reviewsByDow.map((d,i)=>({
+            const colW=(W-PL-PR)/6;
+            const pts = reviewsByDow.map((d,i)=>({
               ...d, x:PL+i*colW, y:PT+(1-(d.count/maxDow))*(H-PT-PB)
             }));
-            let poly = pts.map(p=>p.x+","+p.y).join(" ");
+            const poly = pts.map(p=>p.x+","+p.y).join(" ");
             return (
               <g>
                 {[0,0.5,1].map((t,i)=>(
@@ -5278,6 +4738,7 @@ const MAIN_TABS = [
   { id:"carolina",  label:"Carolina",      color:"#7c3aed" },
   { id:"daniel",    label:"Daniel",        color:"#0f766e" },
   { id:"wilmary",   label:"Wilmary",       color:"#be185d" },
+  { id:"christian", label:"Christian",     color:"#0891b2" },
   { id:"tracker",   label:"Tracker",       color:"#0d9488" },
   { id:"calc",      label:"Calculadoras",  color:"#b45309" },
   { id:"malla",      label:"Malla SF",       color:"#6d28d9" },
@@ -5304,7 +4765,7 @@ function App() {
     }
     loadConfig();
     // Refresca la config remota cada 60s (los datos de config cambian poco)
-    let id = setInterval(function() {
+    const id = setInterval(function() {
       _remoteConfigLoading = false; // permitir re-fetch
       loadConfig();
     }, 60000);
@@ -5315,9 +4776,9 @@ function App() {
   useEffect(function() {
     let cancelled = false;
     let lastSig = "";
-    let REMOTE_URL = SHEETS_URL + "?accion=read";
+    const REMOTE_URL = SHEETS_URL + "?accion=read";
 
-    let buildStoreFromRows = function(rows) {
+    const buildStoreFromRows = function(rows) {
       var prev = storeRef.current || {};
       var next = {};
       // CAMBIO METAS: preservar configs locales mientras llegan las remotas
@@ -5351,7 +4812,12 @@ function App() {
         if (!mesId) return;
         var asesor = String(r.asesor || "").toLowerCase().trim();
         if (!asesor) return;
-        if (ASESORES.indexOf(asesor) === -1) return;
+        // Normalizar: acepta nombre completo (ej: "guillermo gonzalez" → "guillermo")
+        if (ASESORES.indexOf(asesor) === -1) {
+          var matched = ASESORES.find(function(a){ return asesor.indexOf(a) === 0 || asesor === a; });
+          if (!matched) return;
+          asesor = matched;
+        }
         var dia = String(r.dia || "").trim();
         if (!dia) return;
         next[mesId] = next[mesId] || {};
@@ -5394,7 +4860,7 @@ function App() {
       return next;
     };
 
-    let cargarYRefrescar = async function() {
+    const cargarYRefrescar = async function() {
       try {
         let res = await fetch(REMOTE_URL, { method:"GET", cache:"no-store" });
         let data = await res.json();
@@ -5434,7 +4900,7 @@ function App() {
         }
         // ─────────────────────────────────────────────────────────────────────
 
-        let newStore = buildStoreFromRows(data.rows);
+        const newStore = buildStoreFromRows(data.rows);
         // FIX METAS: merge inteligente — la edición LOCAL más reciente prevalece sobre la remota
         if (data.configs && typeof data.configs === "object") {
           // NUEVO: también poblar el cache remoto de Config del Sheet
@@ -5474,7 +4940,7 @@ function App() {
           });
           newStore.config = mergedCfg;
         }
-        let sig = JSON.stringify(newStore);
+        const sig = JSON.stringify(newStore);
         if (sig === lastSig) return;
         lastSig = sig;
         storeRef.current = newStore;
@@ -5548,7 +5014,7 @@ function App() {
           </div>
           {/* Fila 2 — Asesores */}
           <div style={{display:"flex",gap:3,overflowX:"auto",justifyContent:"center"}}>
-            {[{id:"guillermo",label:"Guillermo",color:"#2563eb"},{id:"carolina",label:"Carolina",color:"#7c3aed"},{id:"daniel",label:"Daniel R.",color:"#0f766e"},{id:"wilmary",label:"Wilmary",color:"#be185d"}].map(a=>(
+            {[{id:"guillermo",label:"Guillermo",color:"#2563eb"},{id:"carolina",label:"Carolina",color:"#7c3aed"},{id:"daniel",label:"Daniel R.",color:"#0f766e"},{id:"wilmary",label:"Wilmary",color:"#be185d"},{id:"christian",label:"Christian",color:"#0891b2"}].map(a=>(
               <button key={a.id} onClick={()=>setTab(a.id)}
                 style={{background:tab===a.id?a.color:"transparent",color:tab===a.id?"#fff":"#94a3b8",
                   border:"1px solid "+(tab===a.id?a.color:"#e2e8f0"),borderRadius:7,
@@ -5582,6 +5048,7 @@ function App() {
         {tab==="carolina"  &&<AdvisorTab name="Carolina"  asesor="carolina"  color="#7c3aed" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
         {tab==="daniel"    &&<AdvisorTab name="Daniel Romero" asesor="daniel" color="#0f766e" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
         {tab==="wilmary"   &&<AdvisorTab name="Wilmary Antolinez" asesor="wilmary" color="#be185d" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
+        {tab==="christian" &&<AdvisorTab name="Christian Torres" asesor="christian" color="#0891b2" store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} />}
         {tab==="tracker"   &&<TrackerTab store={store} />}
         {tab==="tosspile"  &&<TosspileTab store={store} onUpdate={onUpdate} />}
         {tab==="docs"       &&<DocumentosTab />}
