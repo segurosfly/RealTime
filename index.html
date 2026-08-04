@@ -563,55 +563,62 @@ function look(rows,d){ let r=null; for(const x of rows){ if(x[0]<=d)r=x; else br
 // ── init ──
 function initChips(){
   const dc=document.getElementById('chips-dias');
-  [3,5,7,10,15,20,30,45,60,90,120,180,270,365].forEach(d=>{
+  if(dc&&!dc.hasChildNodes())[3,5,7,10,15,20,30,45,60,90,120,180,270,365].forEach(d=>{
     const b=document.createElement('button'); b.className='chip'; b.textContent=d+'d';
-    b.onclick=()=>{document.getElementById('dias').value=d;S.dias=d;calc();};
+    b.onclick=()=>{const el=document.getElementById('dias');if(el){el.value=d;S.dias=d;calc();}};
     dc.appendChild(b);
   });
   const mc=document.getElementById('chips-mv');
-  [30,45,60,90].forEach(d=>{
+  if(mc&&!mc.hasChildNodes())[30,45,60,90].forEach(d=>{
     const b=document.createElement('button'); b.className='chip'+(d===30?' on':''); b.textContent=d+' días';
     b.onclick=()=>{S.mvDias=d;[...mc.children].forEach(c=>c.classList.remove('on'));b.classList.add('on');calc();};
     mc.appendChild(b);
   });
   const dc2=document.getElementById('chips-desc');
-  DESCS.forEach(d=>{
+  if(dc2&&!dc2.hasChildNodes())DESCS.forEach(d=>{
     const b=document.createElement('button'); b.className='chip dsc'+(d===0?' on':'');
     b.textContent=d===0?'Sin desc.':d+'%';
     b.onclick=()=>{S.desc=d;[...dc2.children].forEach(c=>c.classList.remove('on'));b.classList.add('on');calc();};
     dc2.appendChild(b);
   });
   const ms=document.getElementById('moneda');
-  MONEDAS.forEach(m=>{
+  if(ms&&!ms.hasChildNodes())MONEDAS.forEach(m=>{
     const o=document.createElement('option'); o.value=m.k;
-    o.textContent=`${m.p} — ${m.n} (${m.c})`;
+    o.textContent=m.p+' — '+m.n+' ('+m.c+')';
     ms.appendChild(o);
   });
-  updFx();
+  if(document.getElementById('fx-note')) updFx();
 }
 function setMon(k){ S.mon=k; updFx(); calc(); }
 function setPrev(v){ S.prev=Math.max(0,+v||0); calc(); }
 function clearPrev(){ S.prev=0; document.getElementById('prev').value=''; calc(); }
 function updFx(){
   const m=mon();
-  document.getElementById('fx-note').textContent = m.v===1 ? 'Cotización directa en dólares' : `1 USD = ${m.v.toLocaleString('en-US',{maximumFractionDigits:4})} ${m.c}`;
+  const fn=document.getElementById('fx-note');
+  if(fn) fn.textContent = m.v===1 ? 'Cotización directa en dólares' : '1 USD = '+m.v.toLocaleString('en-US',{maximumFractionDigits:4})+' '+m.c;
   const pc=document.getElementById('prev-cur'); if(pc) pc.textContent=m.c;
 }
-document.querySelectorAll('#tipo button').forEach(b=>{
-  b.onclick=()=>{
-    document.querySelectorAll('#tipo button').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); S.tipo=b.dataset.t;
-    document.getElementById('fld-dias').style.display=S.tipo==='multiple'?'none':'block';
-    document.getElementById('fld-mv').style.display=S.tipo==='multiple'?'block':'none';
-    if(S.tipo==='senior'&&S.travs.every(t=>t.age<86)) S.travs=[{age:88}];
-    if(S.tipo!=='senior'&&S.travs.some(t=>t.age>85)) S.travs=[{age:35}];
-    renderTravs(); calc();
-  };
-});
+(function attachTipoListeners(){
+  var btns=document.querySelectorAll('#tipo button');
+  if(!btns.length) return;
+  btns.forEach(function(b){
+    b.onclick=function(){
+      document.querySelectorAll('#tipo button').forEach(function(x){x.classList.remove('on');});
+      b.classList.add('on'); S.tipo=b.dataset.t;
+      var fd=document.getElementById('fld-dias');
+      var fm=document.getElementById('fld-mv');
+      if(fd) fd.style.display=S.tipo==='multiple'?'none':'block';
+      if(fm) fm.style.display=S.tipo==='multiple'?'block':'none';
+      if(S.tipo==='senior'&&S.travs.every(function(t){return t.age<86;})) S.travs=[{age:88}];
+      if(S.tipo!=='senior'&&S.travs.some(function(t){return t.age>85;})) S.travs=[{age:35}];
+      renderTravs(); calc();
+    };
+  });
+})();
 function addTrav(){ S.travs.push({age:S.tipo==='senior'?88:35}); renderTravs(); calc(); }
 function rmTrav(i){ if(S.travs.length>1){S.travs.splice(i,1);renderTravs();calc();} }
 function renderTravs(){
-  const c=document.getElementById('travs'); c.innerHTML='';
+  const c=document.getElementById('travs'); if(!c) return; c.innerHTML='';
   S.travs.forEach((t,i)=>{
     const [lbl,cls]=ageLbl(t.age);
     const r=document.createElement('div'); r.className='trav-row';
@@ -681,7 +688,7 @@ function upgradesAllowed(){ return S.prev>0||(S.tipo==='puntual'&&S.dias<60)||S.
 // ── RENDER ──
 function calc(){
   S.dias=+document.getElementById('dias').value||1;
-  const out=document.getElementById('out');
+  const out=document.getElementById('out'); if(!out) return;
   const {w,e}=validate();
   const n=S.travs.length;
   let html='';
@@ -931,7 +938,7 @@ attachTipListeners();
 // Touch: tap on .up-i button handles by the click listener above
 function setQ(id,q,n){ S.ups[id]=Math.max(1,Math.min(n,q)); calc(); } // n=maxQ=10
 
-initChips(); renderTravs(); calc();
+// initChips/renderTravs/calc se llaman desde CotizadorTab useEffect
 
 </script>
 <script type="text/babel">
@@ -943,9 +950,12 @@ const LOGO_SQ_SRC  = "https://raw.githubusercontent.com/segurosfly/RealTime/main
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────────
 const DOW      = ["Dom","Lun","Mar","Mie","Jue","Vie","Sab"];
-const ASESORES = ["guillermo","carolina","daniel","wilmary"];
+var ASESORES = ["guillermo","carolina","daniel","wilmary"];
+var ASESORES_NOMBRES = {guillermo:"Guillermo González",carolina:"Carolina",daniel:"Daniel Romero",wilmary:"Wilmary Antolinez"};
+var ASESORES_COLORES  = {guillermo:"#2563eb",carolina:"#7c3aed",daniel:"#0f766e",wilmary:"#be185d"};
 // PROTECCION POR ASESOR: contrasenas requeridas para Guardar/Eliminar
-const PIN_ASESORES = { guillermo: "2026", carolina: "2027", daniel: "2028", wilmary: "2029" };
+var PIN_ASESORES = { guillermo: "2026", carolina: "2027", daniel: "2028", wilmary: "2029" };
+
 // verificarPinAsesor ahora es async y usa modal React (ver ModalPinAsesor)
 // Se resuelve a true/false via window.__pinAsesorResolve
 function verificarPinAsesor(asesor) {
@@ -958,6 +968,26 @@ function verificarPinAsesor(asesor) {
 // CAMBIO #10: PIN actualizado a 2187
 const SYNC_PIN = "2187";
 const SHEETS_URL = "https://script.google.com/macros/s/AKfycbykJDP_T1aOY9Kkk22ePOnLQk9e7E5aJdwH_SEpfd4Lhhgtr1OpyxzwIX7fE2jH8hL0/exec";
+
+// Carga agentes adicionales desde Sheet pestaña "Agentes" — corre después de SHEETS_URL
+(function cargarAgentes(){
+  fetch(SHEETS_URL+"?accion=read&sheet=Agentes",{cache:"no-store"})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(!data||!data.ok||!Array.isArray(data.rows)) return;
+      data.rows.forEach(function(r){
+        var id    = String(r.fecha||"").trim().toLowerCase();
+        var nombre= String(r.mes||"").trim();
+        var pin   = String(r.dia||"").trim();
+        var color = String(r.orden||"").trim()||"#6366f1";
+        if(!id||!nombre) return;
+        if(ASESORES.indexOf(id)===-1) ASESORES.push(id);
+        if(pin) PIN_ASESORES[id]=pin;
+        ASESORES_NOMBRES[id]=nombre;
+        ASESORES_COLORES[id]=color;
+      });
+    }).catch(function(){});
+})();
 
 // ── CONFIG REMOTA (pestaña Config de Google Sheets) ────────────────────────────
 // Cache en memoria: { "2026-05": { metaBase, pctBase, metaSfly, pctSfly, meta, comision }, ... }
@@ -999,9 +1029,9 @@ async function fetchRemoteConfig() {
   _remoteConfigLoading = true;
   try {
     // Intento 1: endpoint dedicado get_config
-    const url = SHEETS_URL + "?accion=get_config";
-    const res = await fetch(url, { method:"GET", cache:"no-store" });
-    const data = await res.json();
+    let url = SHEETS_URL + "?accion=get_config";
+    let res = await fetch(url, { method:"GET", cache:"no-store" });
+    let data = await res.json();
     if (data && data.ok && data.configs && typeof data.configs === "object" && Object.keys(data.configs).length > 0) {
       // Formato: { ok:true, configs: { "2026-05": { metaBase, pctBase, metaSfly, pctSfly } } }
       Object.keys(data.configs).forEach(function(mid) {
@@ -1134,13 +1164,13 @@ const setMonthData = (store, mesId, asesor, data) => {
   return next;
 };
 const setConfigStore = (store, mesId, cfg) => {
-  const next = Object.assign({}, store, { config: Object.assign({}, store.config||{}, { [mesId]: cfg }) });
+  let next = Object.assign({}, store, { config: Object.assign({}, store.config||{}, { [mesId]: cfg }) });
   saveStore(next);
   return next;
 };
 const pushDeleted = (store, fila) => {
   const deleted = (store.deleted||[]).concat([fila]);
-  const next = Object.assign({}, store, { deleted });
+  let next = Object.assign({}, store, { deleted });
   saveStore(next);
   return next;
 };
@@ -1170,9 +1200,9 @@ const sincronizarConSheets = async (store, silent) => {
   const fecha = new Date().toLocaleDateString("es-CO");
 
   MESES.forEach(mes => {
-    const mesLabel = mes.label;
+    let mesLabel = mes.label;
     ASESORES.forEach(asesor => {
-      const data = getMonthData(store, mes.id, asesor);
+      let data = getMonthData(store, mes.id, asesor);
       Object.entries(data).forEach(function(entry) {
         var dia = entry[0]; var ventas = entry[1];
         (ventas||[]).forEach(v => {
@@ -1184,7 +1214,7 @@ const sincronizarConSheets = async (store, silent) => {
 
   if (!rows.length) { if (!silent) alert("Sin datos para sincronizar."); return false; }
   try {
-    const params = new URLSearchParams({ bulk: JSON.stringify(rows), sheet: "Sync", accion: "sync_bulk" });
+    let params = new URLSearchParams({ bulk: JSON.stringify(rows), sheet: "Sync", accion: "sync_bulk" });
     await fetch(SHEETS_URL+"?"+params.toString(), { method:"GET", mode:"no-cors" });
     if (!silent) alert("✅ Sincronizadas "+rows.length+" filas → hoja 'Sync' (todos los meses)\n\n📌 Guardar individual → RealTime\n☁️ Sync masivo → Sync");
     return true;
@@ -1194,10 +1224,10 @@ const sincronizarConSheets = async (store, silent) => {
 // CAMBIO #2: guardar en RealTime al hacer save en pestaña asesor
 const enviarRealTime = async (row, mesId, asesor) => {
   try {
-    const mesLabel = getMesInfo(mesId).label;
-    const ts = new Date().toISOString();
-    const fecha = new Date().toLocaleDateString("es-CO");
-    const params = new URLSearchParams({
+    let mesLabel = getMesInfo(mesId).label;
+    let ts = new Date().toISOString();
+    let fecha = new Date().toLocaleDateString("es-CO");
+    let params = new URLSearchParams({
       accion:"guardar", sheet:"RealTime",
       fecha, mes:mesLabel, asesor:cap(asesor),
       dia:String(row.dia||""), orden:row.orden||"-",
@@ -1210,7 +1240,7 @@ const enviarRealTime = async (row, mesId, asesor) => {
 // CAMBIO #2: eliminar en RealTime escribe "eliminado de real" en columna I
 const enviarEliminacion = async (fila, mesId) => {
   try {
-    const params = new URLSearchParams({
+    let params = new URLSearchParams({
       accion:"eliminar", sheet:"RealTime",
       mes:getMesInfo(mesId).label, asesor:cap(fila.asesor||""),
       dia:String(fila.dia||""), orden:fila.orden||"-", plan:fila.plan||"-",
@@ -1249,9 +1279,9 @@ const enviarConfigRT = async (cfg, mesId, who, updatedAtIso) => {
 const descargarCSV = (store, mesId) => {
   const mesLabel = getMesInfo(mesId).label;
   const header   = "Mes,Asesor,Dia,Dia semana,Orden,Plan,Valor USD";
-  const rows     = [];
+  let rows     = [];
   ASESORES.forEach(asesor => {
-    const data = getMonthData(store, mesId, asesor);
+    let data = getMonthData(store, mesId, asesor);
     Object.entries(data).forEach(function(entry) {
       var dia = entry[0]; var ventas = entry[1];
       (ventas||[]).forEach(v => {
@@ -1262,7 +1292,7 @@ const descargarCSV = (store, mesId) => {
   if (!rows.length) { alert("Sin datos."); return; }
   const csv  = [header].concat(rows).join("\n");
   const blob = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8;"});
-  const url  = URL.createObjectURL(blob);
+  let url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
   a.href=url; a.download="SegurosFlyCRM_"+mesLabel+"_"+new Date().toISOString().slice(0,10)+".csv";
   document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
@@ -1370,7 +1400,7 @@ function ModalPinAsesor() {
     if (window.__pinAsesorResolve) { window.__pinAsesorResolve(result); window.__pinAsesorResolve = null; }
   };
 
-  const check = function() {
+  let check = function() {
     var esperado = PIN_ASESORES[asesor];
     if (String(pin).trim() === String(esperado)) {
       resolve(true);
@@ -1505,10 +1535,10 @@ function ConfigMes({config,onSave}) {
   };
 
   const save = () => {
-    const mb = parseFloat(metaBase)||12500;
-    const pb = parseFloat(pctBase)||10;
-    const ms = parseFloat(metaSfly)||18000;
-    const ps = parseFloat(pctSfly)||15;
+    let mb = parseFloat(metaBase)||12500;
+    let pb = parseFloat(pctBase)||10;
+    let ms = parseFloat(metaSfly)||18000;
+    let ps = parseFloat(pctSfly)||15;
     onSave({ meta: mb, comision: pb, metaBase: mb, pctBase: pb, metaSfly: ms, pctSfly: ps });
     setOpen(false);
   };
@@ -1752,7 +1782,7 @@ function PanelPresion({acum,promDia,proy,name,mesId,metaInd}) {
 // ── ASESOR HEADER (reemplaza BloqueOperativo + cabecera) ──────────────────────
 // Muestra: día top valor · día top ventas · mejor ticket promedio · plan más vendido
 function AsesorHeader({name, asesor, color, data, mesId, diaHoy}) {
-  const mesInfo = getMesInfo(mesId);
+  let mesInfo = getMesInfo(mesId);
 
   // Calcular stats
   const diasKeys = Object.keys(data).filter(d => data[d] && data[d].length > 0);
@@ -1763,12 +1793,12 @@ function AsesorHeader({name, asesor, color, data, mesId, diaHoy}) {
   let allVals = [];
 
   diasKeys.forEach(d => {
-    const rows = data[d] || [];
-    const dayTotal = sumR(rows);
+    let rows = data[d] || [];
+    let dayTotal = sumR(rows);
     if (dayTotal > topValorAmt) { topValorAmt = dayTotal; topValorDia = +d; }
     if (rows.length > topVentasN) { topVentasN = rows.length; topVentasDia = +d; }
     rows.forEach(r => {
-      const v = parseFloat(r.valor)||0;
+      let v = parseFloat(r.valor)||0;
       allVals.push(v);
       planCount[r.plan||"N/A"] = (planCount[r.plan||"N/A"]||0)+1;
     });
@@ -1820,14 +1850,14 @@ function GlobalDayStats({gData, cData, dData, wData, mesId, total, gVentas, cVen
   const allRows = [];
   [gData, cData, dData, wData].forEach(d => Object.values(d).forEach(arr => arr.forEach(r => allRows.push(r))));
   const totalVentas = gVentas + cVentas + dVentas + wVentas;
-  const avgTicket = totalVentas > 0 ? total / totalVentas : 0;
+  let avgTicket = totalVentas > 0 ? total / totalVentas : 0;
 
   // Day totals
   const dayTotals = {};
   const dayVentas = {};
   [gData, cData, dData, wData].forEach(d => {
     Object.entries(d).forEach(([dia, rows]) => {
-      const v = sumR(rows);
+      let v = sumR(rows);
       dayTotals[+dia] = (dayTotals[+dia]||0) + v;
       dayVentas[+dia] = (dayVentas[+dia]||0) + (rows||[]).length;
     });
@@ -1842,8 +1872,8 @@ function GlobalDayStats({gData, cData, dData, wData, mesId, total, gVentas, cVen
   const dowCnt = {0:0,1:0,2:0,3:0,4:0,5:0,6:0};
   [gData, cData, dData, wData].forEach(d => {
     Object.entries(d).forEach(([dia, rows]) => {
-      const mesInfo = getMesInfo(mesId);
-      const dow = (mesInfo.dow0 + (+dia) - 1) % 7;
+      let mesInfo = getMesInfo(mesId);
+      let dow = (mesInfo.dow0 + (+dia) - 1) % 7;
       dowRev[dow] = (dowRev[dow]||0) + sumR(rows);
       dowCnt[dow] = (dowCnt[dow]||0) + (rows||[]).length;
     });
@@ -1871,17 +1901,17 @@ function GlobalDayStats({gData, cData, dData, wData, mesId, total, gVentas, cVen
       <div style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,padding:"16px 18px"}}>
         <div style={{fontSize:11,color:"#94a3b8",textTransform:"uppercase",letterSpacing:"0.09em",fontWeight:700,marginBottom:14}}>📅 Revenue por Día de Semana</div>
         {(()=>{
-          const W=560, H=120, PAD_L=10, PAD_R=10, PAD_T=28, PAD_B=38;
-          const points = [0,1,2,3,4,5,6].map((dow,i)=>({
+          let W=560, H=120, PAD_L=10, PAD_R=10, PAD_T=28, PAD_B=38;
+          let points = [0,1,2,3,4,5,6].map((dow,i)=>({
             dow, i,
             x: PAD_L + i * ((W-PAD_L-PAD_R)/6),
             rev: dowRev[dow]||0,
             cnt: dowCnt[dow]||0,
           }));
-          const maxR = Math.max(...points.map(p=>p.rev), 1);
-          const getY = (r) => PAD_T + (1 - r/maxR) * (H - PAD_T - PAD_B);
-          const polyline = points.map(p=>p.x+","+getY(p.rev)).join(" ");
-          const topDow = points.reduce((a,b)=>b.rev>a.rev?b:a, points[0]);
+          let maxR = Math.max(...points.map(p=>p.rev), 1);
+          let getY = (r) => PAD_T + (1 - r/maxR) * (H - PAD_T - PAD_B);
+          let polyline = points.map(p=>p.x+","+getY(p.rev)).join(" ");
+          let topDow = points.reduce((a,b)=>b.rev>a.rev?b:a, points[0]);
           return (
             <svg viewBox={"0 0 "+W+" "+H} style={{width:"100%",height:"auto",overflow:"visible",display:"block"}}>
               <defs>
@@ -1900,8 +1930,8 @@ function GlobalDayStats({gData, cData, dData, wData, mesId, total, gVentas, cVen
               <polyline points={polyline} fill="none" stroke="#2563eb" strokeWidth="2.5"
                 strokeLinejoin="round" strokeLinecap="round"/>
               {points.map(p=>{
-                const y = getY(p.rev);
-                const isTop = p.rev===topDow.rev && maxR>0 && p.rev>0;
+                let y = getY(p.rev);
+                let isTop = p.rev===topDow.rev && maxR>0 && p.rev>0;
                 return (
                   <g key={p.dow}>
                     {p.rev>0&&(
@@ -1938,8 +1968,8 @@ function GlobalDayStats({gData, cData, dData, wData, mesId, total, gVentas, cVen
 // ── HISTORIAL ──────────────────────────────────────────────────────────────────
 // CAMBIO #8: Días sin registro se muestran en naranja con alerta
 function HistorialPanel({data,color,mesId}) {
-  const mesInfo  = getMesInfo(mesId);
-  const diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
+  let mesInfo  = getMesInfo(mesId);
+  let diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
 
   const diasCon  = Object.keys(data).filter(d=>data[d]&&data[d].length>0).sort((a,b)=>+a-+b);
   const totales  = diasCon.map(d=>({dia:+d,val:sumR(data[d]),dow:dowDia(+d,mesId)}));
@@ -1995,9 +2025,9 @@ function HistorialPanel({data,color,mesId}) {
 
 // ── ANÁLISIS AUTOMÁTICO (CAMBIO #5) ───────────────────────────────────────────
 function AnalisisAutomatico({acum,proy,promDia,name,mesId,metaBase,metaSfly,color}) {
-  const mesInfo  = getMesInfo(mesId);
-  const diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
-  const diasRest = Math.max(1,mesInfo.dias-diaHoy);
+  let mesInfo  = getMesInfo(mesId);
+  let diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
+  let diasRest = Math.max(1,mesInfo.dias-diaHoy);
   const dowHoy   = mesId===getMesActual()?dowDia(diaHoy,mesId):"";
 
   const necParaBase = acum<metaBase?(metaBase-acum)/diasRest:0;
@@ -2057,8 +2087,8 @@ function ProgresoMetas({acum,proy,mesId,metaBase,metaSfly,color}) {
         </div>
       )}
       {metas.map(m=>{
-        const p = Math.min(100,(acum/m.val)*100);
-        const falt = Math.max(0,m.val-acum);
+        let p = Math.min(100,(acum/m.val)*100);
+        let falt = Math.max(0,m.val-acum);
         return (
           <div key={m.label} style={{marginBottom:14}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
@@ -2088,11 +2118,11 @@ function ProgresoMetas({acum,proy,mesId,metaBase,metaSfly,color}) {
 
 // ── ¿QUÉ PASA SI? (CAMBIO #7) ─────────────────────────────────────────────────
 function QueParaSi({acum,mesId,metaBase,metaSfly,color}) {
-  const mesInfo  = getMesInfo(mesId);
-  const diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
-  const diasRest = Math.max(1,mesInfo.dias-diaHoy);
+  let mesInfo  = getMesInfo(mesId);
+  let diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
+  let diasRest = Math.max(1,mesInfo.dias-diaHoy);
 
-  const necBase = acum<metaBase?(metaBase-acum)/diasRest:0;
+  let necBase = acum<metaBase?(metaBase-acum)/diasRest:0;
   const necSfly = acum<metaSfly?(metaSfly-acum)/diasRest:0;
 
   const escenarios = [
@@ -2144,13 +2174,13 @@ function QueParaSi({acum,mesId,metaBase,metaSfly,color}) {
 // ── METAS GLOBALES (CAMBIO #4) ─────────────────────────────────────────────────
 function MetasGlobales({store,mesId,total,proy,configSource}) {
   const cfg = getConfig(store, mesId);
-  const proyFin = proy;
+  let proyFin = proy;
   const metaBase = cfg.metaBase;
   const metaSfly = cfg.metaSfly;
-  const proyBajoMetas = proyFin < metaBase && proyFin < metaSfly;
-  const mesLabel = getMesInfo(mesId).label;
+  let proyBajoMetas = proyFin < metaBase && proyFin < metaSfly;
+  let mesLabel = getMesInfo(mesId).label;
 
-  const metas = [
+  let metas = [
     { label:"Proyección al ritmo actual", val:proyFin, note:"Si el equipo mantiene el ritmo actual", c:"#6366f1", icon:"📊" },
     { label:"Meta Base",       val:metaBase, note:`${usd(metaBase,0)} equipo · ${normalizePct(cfg.pctBase||11)}% com.`, c:"#2563eb", icon:"🎯" },
     { label:"Meta SegurosFly", val:metaSfly, note:`${usd(metaSfly,0)} equipo · ${cfg.pctSfly}% com.`, c:"#d97706", icon:"✈️" },
@@ -2181,8 +2211,8 @@ function MetasGlobales({store,mesId,total,proy,configSource}) {
       )}
       <div className="mob-g3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
         {metas.map(m=>{
-          const p = Math.min(100,(total/m.val)*100);
-          const falt = Math.max(0,m.val-total);
+          let p = Math.min(100,(total/m.val)*100);
+          let falt = Math.max(0,m.val-total);
           return (
             <div key={m.label} style={{background:m.c+"08",border:"1px solid "+m.c+"33",borderRadius:10,padding:"14px"}}>
               <div style={{fontSize:18,marginBottom:4}}>{m.icon}</div>
@@ -2208,7 +2238,7 @@ function MetasGlobales({store,mesId,total,proy,configSource}) {
 
 // ── ADVISOR TAB ────────────────────────────────────────────────────────────────
 function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
-  const mesInfo   = getMesInfo(mesId);
+  let mesInfo   = getMesInfo(mesId);
   const diaHoyMes = mesId===getMesActual()?getDiaHoy():1;
   const [dia,setDia]         = useState(diaHoyMes);
   const [form,setForm]       = useState({orden:"",valor:"",plan:"Plan Smart"});
@@ -2219,23 +2249,23 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
   useEffect(()=>{ setDia(mesId===getMesActual()?getDiaHoy():1); },[mesId]);
 
   const data    = getMonthData(store,mesId,asesor);
-  const cfg     = getConfig(store,mesId);
+  let cfg     = getConfig(store,mesId);
   const metaInd = cfg.metaBase/2;
   const metaBaseSolo = cfg.metaBase/2;
   const metaSlySolo  = cfg.metaSfly/2;
 
   // Total del equipo completo — determina en qué piso de comisión están todos
   const totalEquipo = ASESORES.reduce((s,a)=>{
-    const rows = Object.values(getMonthData(store,mesId,a)).reduce((a,b)=>a.concat(b),[]);
+    let rows = Object.values(getMonthData(store,mesId,a)).reduce((a,b)=>a.concat(b),[]);
     return s + sumR(rows);
   }, 0);
 
-  const allRows   = Object.values(data).reduce((a,b)=>a.concat(b),[]);
+  let allRows   = Object.values(data).reduce((a,b)=>a.concat(b),[]);
   const acum      = sumR(allRows);
   const totalVtas = allRows.length;
-  const diasCon   = Object.keys(data).filter(d=>data[d]&&data[d].length>0).length;
-  const diaHoy    = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
-  const diasRest  = Math.max(1,mesInfo.dias-diaHoy);
+  let diasCon   = Object.keys(data).filter(d=>data[d]&&data[d].length>0).length;
+  let diaHoy    = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
+  let diasRest  = Math.max(1,mesInfo.dias-diaHoy);
   const promDia   = diasCon>0?acum/diasCon:0;
   const proy      = acum+promDia*diasRest;
   const rowsHoy   = data[dia]||[];
@@ -2244,13 +2274,13 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
   // CAMBIO #2: guardar también envía a RealTime
   const saveRow = async () => {
     if (!form.valor) return;
-    const pinOk = await verificarPinAsesor(asesor);
+    let pinOk = await verificarPinAsesor(asesor);
     if (!pinOk) { return; }
     setStatus("saving");
-    const day    = data[dia]||[];
-    const newRow = {id:uid(),orden:form.orden,valor:form.valor,plan:form.plan,ts:Date.now()};
-    const updated = editId ? day.map(r=>r.id===editId?Object.assign({},r,form):r) : day.concat([newRow]);
-    const newData = Object.assign({},data,{[dia]:updated});
+    let day    = data[dia]||[];
+    let newRow = {id:uid(),orden:form.orden,valor:form.valor,plan:form.plan,ts:Date.now()};
+    let updated = editId ? day.map(r=>r.id===editId?Object.assign({},r,form):r) : day.concat([newRow]);
+    let newData = Object.assign({},data,{[dia]:updated});
     onUpdate(setMonthData(store,mesId,asesor,newData));
     setForm({orden:"",valor:"",plan:"Plan Smart"}); setEditId(null);
     // Enviar a RealTime
@@ -2262,11 +2292,11 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
 
   const confirmDelete = async () => {
     if (!confirmDel) return;
-    const pinOk2 = await verificarPinAsesor(asesor);
+    let pinOk2 = await verificarPinAsesor(asesor);
     if (!pinOk2) { setConfirmDel(null); return; }
-    const updated    = (data[confirmDel.dia]||[]).filter(r=>r.id!==confirmDel.id);
-    const newData    = Object.assign({},data,{[confirmDel.dia]:updated});
-    const deletedFila = Object.assign({},confirmDel,{deletedAt:new Date().toISOString()});
+    let updated    = (data[confirmDel.dia]||[]).filter(r=>r.id!==confirmDel.id);
+    let newData    = Object.assign({},data,{[confirmDel.dia]:updated});
+    let deletedFila = Object.assign({},confirmDel,{deletedAt:new Date().toISOString()});
     let newStore = setMonthData(store,mesId,asesor,newData);
     newStore     = pushDeleted(newStore,deletedFila);
     onUpdate(newStore);
@@ -2307,8 +2337,8 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
         <SLabel>📅 Registro Diario — {name}</SLabel>
         <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:14}}>
           {Array.from({length:mesInfo.dias},(_,i)=>i+1).map(d=>{
-            const tiene=(data[d]||[]).length>0, sel=d===dia, esHoy=d===diaHoyMes;
-            const sinRegistro = d<=diaHoy && !tiene;
+            let tiene=(data[d]||[]).length>0, sel=d===dia, esHoy=d===diaHoyMes;
+            let sinRegistro = d<=diaHoy && !tiene;
             return (
               <button key={d} onClick={()=>setDia(d)} style={{width:33,height:33,borderRadius:7,cursor:"pointer",
                 border:sel?"2px solid "+color:esHoy?"2px dashed "+color+"88":sinRegistro?"1.5px solid #fb923c":"1px solid #e2e8f0",
@@ -2324,13 +2354,13 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
         </div>
         {/* BANNER: mes y día activo — para que el asesor siempre sepa dónde está registrando */}
         {(()=>{
-          const esHoy = dia===diaHoyMes && mesId===getMesActual();
-          const esMesActual = mesId===getMesActual();
-          const mesLabel = getMesInfo(mesId).label;
-          const bannerBg = !esMesActual ? "#fff7ed" : esHoy ? "#f0fdf4" : "#eff6ff";
-          const bannerBorder = !esMesActual ? "#fb923c" : esHoy ? "#10b981" : "#2563eb";
-          const bannerIcon = !esMesActual ? "⚠️" : esHoy ? "📍" : "📅";
-          const bannerMsg = !esMesActual
+          let esHoy = dia===diaHoyMes && mesId===getMesActual();
+          let esMesActual = mesId===getMesActual();
+          let mesLabel = getMesInfo(mesId).label;
+          let bannerBg = !esMesActual ? "#fff7ed" : esHoy ? "#f0fdf4" : "#eff6ff";
+          let bannerBorder = !esMesActual ? "#fb923c" : esHoy ? "#10b981" : "#2563eb";
+          let bannerIcon = !esMesActual ? "⚠️" : esHoy ? "📍" : "📅";
+          let bannerMsg = !esMesActual
             ? `Estás registrando en ${mesLabel} — ¡no es el mes actual!`
             : esHoy
             ? `Registrando en ${mesLabel} · Día ${dia} (hoy)`
@@ -2401,10 +2431,10 @@ function AdvisorTab({name,asesor,color,store,mesId,onUpdate}) {
 
 // ── GLOBAL TAB ─────────────────────────────────────────────────────────────────
 function GlobalTab({store,mesId,configSource}) {
-  const mesInfo  = getMesInfo(mesId);
-  const cfg      = getConfig(store,mesId);
-  const diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
-  const diasRest = Math.max(1,mesInfo.dias-diaHoy);
+  let mesInfo  = getMesInfo(mesId);
+  let cfg      = getConfig(store,mesId);
+  let diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
+  let diasRest = Math.max(1,mesInfo.dias-diaHoy);
   const gData    = getMonthData(store,mesId,"guillermo");
   const cData    = getMonthData(store,mesId,"carolina");
   const dData    = getMonthData(store,mesId,"daniel");
@@ -2422,7 +2452,7 @@ function GlobalTab({store,mesId,configSource}) {
   const gProm    = gDias>0?gAcum/gDias:0, cProm = cDias>0?cAcum/cDias:0, dProm = dDias>0?dAcum/dDias:0, wProm = wDias>0?wAcum/wDias:0;
   const gProy    = gAcum+gProm*diasRest, cProy = cAcum+cProm*diasRest, dProy = dAcum+dProm*diasRest, wProy = wAcum+wProm*diasRest, totProy = gProy+cProy+dProy+wProy;
   const metaEq   = cfg.metaBase;
-  const metaInd  = cfg.metaBase/2;
+  let metaInd  = cfg.metaBase/2;
   // comPct = piso actual del equipo según total acumulado
   // cfg.comision=10%(base) cfg.pctBase=11%(meta) cfg.pctSfly=12%(SFly)
   const pct1eq = normalizePct(cfg.comision||10)/100;
@@ -2510,8 +2540,8 @@ function GlobalTab({store,mesId,configSource}) {
         <div className="mob-g4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:10}}>
           {(()=>{
             // Piso proyectado — si el equipo proyecta superar la meta, usa el % del piso siguiente
-            const pisoProy = totProy>=(cfg.metaSfly||13000)?3:totProy>=(cfg.metaBase||10000)?2:1;
-            const comProy  = pisoProy===3?pct3eq:pisoProy===2?pct2eq:pct1eq;
+            let pisoProy = totProy>=(cfg.metaSfly||13000)?3:totProy>=(cfg.metaBase||10000)?2:1;
+            let comProy  = pisoProy===3?pct3eq:pisoProy===2?pct2eq:pct1eq;
             return [{l:"G actual",v:gAcum*comPct,c:"#2563eb"},{l:"G proyectada",v:gProy*comProy,c:"#2563eb"},
               {l:"C actual",v:cAcum*comPct,c:"#7c3aed"},{l:"C proyectada",v:cProy*comProy,c:"#7c3aed"},
               {l:"D actual",v:dAcum*comPct,c:"#0f766e"},{l:"D proyectada",v:dProy*comProy,c:"#0f766e"},
@@ -2526,8 +2556,8 @@ function GlobalTab({store,mesId,configSource}) {
         <div style={{padding:"10px 14px",background:"#ecfdf5",border:"1px solid #a7f3d0",borderRadius:8,display:"flex",justifyContent:"space-between"}}>
           <span style={{fontSize:12,fontWeight:700,color:"#059669"}}>Total comisiones equipo proyectadas</span>
           <span style={{fontSize:17,fontWeight:800,color:"#059669"}}>{usd((()=>{
-            const pisoProy=totProy>=(cfg.metaSfly||13000)?3:totProy>=(cfg.metaBase||10000)?2:1;
-            const cp=pisoProy===3?pct3eq:pisoProy===2?pct2eq:pct1eq;
+            let pisoProy=totProy>=(cfg.metaSfly||13000)?3:totProy>=(cfg.metaBase||10000)?2:1;
+            let cp=pisoProy===3?pct3eq:pisoProy===2?pct2eq:pct1eq;
             return (gProy+cProy+dProy+wProy)*cp;
           })(),0)}</span>
         </div>
@@ -2537,7 +2567,7 @@ function GlobalTab({store,mesId,configSource}) {
           <SLabel>Revenue por Dia — Equipo</SLabel>
           <div style={{display:"flex",flexDirection:"column",gap:5}}>
             {diasOrd.map(d=>{
-              const gV=sumR(gData[d]||[]), cV=sumR(cData[d]||[]), dV=sumR(dData[d]||[]), wV=sumR(wData[d]||[]);
+              let gV=sumR(gData[d]||[]), cV=sumR(cData[d]||[]), dV=sumR(dData[d]||[]), wV=sumR(wData[d]||[]);
               return (
                 <div key={d} style={{display:"flex",alignItems:"center",gap:10}}>
                   <span style={{fontSize:11,color:"#94a3b8",minWidth:60}}>D{d} {dowDia(+d,mesId)}</span>
@@ -2567,7 +2597,7 @@ function GlobalTab({store,mesId,configSource}) {
 // ── TRACKER ────────────────────────────────────────────────────────────────────
 function TrackerTab({store}) {
   const mesesConDatos = MESES.filter(m=>ASESORES.some(a=>{
-    const d=getMonthData(store,m.id,a);
+    let d=getMonthData(store,m.id,a);
     return Object.values(d).reduce((a,b)=>a.concat(b),[]).length>0;
   }));
   if (!mesesConDatos.length) return (
@@ -2578,17 +2608,17 @@ function TrackerTab({store}) {
     </div>
   );
   const resumen = mesesConDatos.map(m=>{
-    const gData=getMonthData(store,m.id,"guillermo");
-    const cData=getMonthData(store,m.id,"carolina");
-    const dData=getMonthData(store,m.id,"daniel");
-    const wData=getMonthData(store,m.id,"wilmary");
-    const gRows=Object.values(gData).reduce((a,b)=>a.concat(b),[]);
-    const cRows=Object.values(cData).reduce((a,b)=>a.concat(b),[]);
-    const dRows=Object.values(dData).reduce((a,b)=>a.concat(b),[]);
-    const wRows=Object.values(wData).reduce((a,b)=>a.concat(b),[]);
-    const gAcum=sumR(gRows), cAcum=sumR(cRows), dAcum=sumR(dRows), wAcum=sumR(wRows), total=gAcum+cAcum+dAcum+wAcum;
-    const cfg=getConfig(store,m.id);
-    const cumplimiento=cfg.metaBase>0?(total/cfg.metaBase)*100:0;
+    let gData=getMonthData(store,m.id,"guillermo");
+    let cData=getMonthData(store,m.id,"carolina");
+    let dData=getMonthData(store,m.id,"daniel");
+    let wData=getMonthData(store,m.id,"wilmary");
+    let gRows=Object.values(gData).reduce((a,b)=>a.concat(b),[]);
+    let cRows=Object.values(cData).reduce((a,b)=>a.concat(b),[]);
+    let dRows=Object.values(dData).reduce((a,b)=>a.concat(b),[]);
+    let wRows=Object.values(wData).reduce((a,b)=>a.concat(b),[]);
+    let gAcum=sumR(gRows), cAcum=sumR(cRows), dAcum=sumR(dRows), wAcum=sumR(wRows), total=gAcum+cAcum+dAcum+wAcum;
+    let cfg=getConfig(store,m.id);
+    let cumplimiento=cfg.metaBase>0?(total/cfg.metaBase)*100:0;
     return Object.assign({},m,{gAcum,cAcum,dAcum,wAcum,total,gVentas:gRows.length,cVentas:cRows.length,dVentas:dRows.length,wVentas:wRows.length,cfg,cumplimiento});
   });
   const totalHistorico = resumen.reduce((s,r)=>s+r.total,0);
@@ -2854,10 +2884,10 @@ function MallaTab({ mesId, store }) {
       .then(r=>r.json())
       .then(function(data){
         if(data&&data.ok&&Array.isArray(data.rows)&&data.rows.length>0){
-          const n={};
+          let n={};
           data.rows.forEach(function(r){
             if(r.nota&&r.nota!=="eliminado"){
-              const key=r.fecha+"|"+r.asesor+"|"+r.dia;
+              let key=r.fecha+"|"+r.asesor+"|"+r.dia;
               n[key]=r.nota;
             }
           });
@@ -2870,7 +2900,7 @@ function MallaTab({ mesId, store }) {
   },[]);
   const mesNum   = parseInt(mesId.split("-")[0] === "2026" ? mesId.split("-")[1] : mesId.split("-")[1]);
   const year     = parseInt(mesId.split("-")[0]);
-  const mesLabel = MESES_ES[mesNum-1];
+  let mesLabel = MESES_ES[mesNum-1];
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   function getAsign(turno, dayNum) {
@@ -2885,17 +2915,17 @@ function MallaTab({ mesId, store }) {
   // Semanas Lun→Dom
   const semanas = useMemo(function(){
     if (!malla) return [];
-    const weeks=[], allDays=[];
+    let weeks=[], allDays=[];
     for(let d=1;d<=daysInMonth;d++) allDays.push(d);
     let week=[];
     // find first Monday
-    const firstDay = new Date(year,mesNum-1,1).getDay(); // 0=Dom
+    let firstDay = new Date(year,mesNum-1,1).getDay(); // 0=Dom
     // pad to Monday start
-    const padStart = firstDay===0?6:firstDay-1; // days before first Monday
+    let padStart = firstDay===0?6:firstDay-1; // days before first Monday
     for(let i=0;i<padStart;i++) week.push(null);
     for(let d=1;d<=daysInMonth;d++){
       week.push(d);
-      const dow=getDow(d);
+      let dow=getDow(d);
       if(dow===0||d===daysInMonth){ // domingo o último día
         while(week.length<7) week.push(null);
         weeks.push([...week]); week=[];
@@ -2913,7 +2943,7 @@ function MallaTab({ mesId, store }) {
   function getTurnoAgente(agente, dayNum){
     if(!malla) return null;
     for(const t of [...TURNOS_PRINCIPALES,...(malla.fds||[])]){
-      const a=getAsign(t,dayNum);
+      let a=getAsign(t,dayNum);
       if(a===agente) return t;
     }
     return null;
@@ -2922,11 +2952,11 @@ function MallaTab({ mesId, store }) {
   // Notas
   function notaKey(socio,dayNum){ return `${mesId}|${socio}|${dayNum}`; }
   function saveNota(key,val){
-    const n={...notas,[key]:val}; setNotas(n); saveNotas(n);
+    let n={...notas,[key]:val}; setNotas(n); saveNotas(n);
     // Sincronizar nota al Sheet y disparar email
     const parts=key.split("|"); // mesId|socio|dayNum
     if(parts.length>=3){
-      const params=new URLSearchParams({
+      let params=new URLSearchParams({
         accion:"save_nota_malla",
         mesId:parts[0], socio:parts[1], dia:parts[2],
         nota:val, ts:new Date().toISOString()
@@ -2937,7 +2967,7 @@ function MallaTab({ mesId, store }) {
 
   // Colors
   const AGENTE_COLORS={"Guillermo González":"#2563eb","Wilmary Antolinez":"#be185d","Daniel Romero":"#0f766e","Jhojan Torres":"#b45309","Wilker Casadiego":"#0891b2","Otoniel Martell":"#7c3aed","Ricardo Torres":"#059669","Bot Madruga":"#475569"};
-  const DOW = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+  let DOW = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
 
   function AgenteBadge({name, size="md", onClick, active}){
     if(!name||name==="N/A"||name==="") return <span style={{color:"#cbd5e1",fontSize:11}}>—</span>;
@@ -2965,7 +2995,7 @@ function MallaTab({ mesId, store }) {
 
   function TurnoBadge({turno}){
     if(!turno) return <span style={{fontSize:10,color:"#e2e8f0",fontWeight:600}}>libre</span>;
-    const m=TURNO_META[turno.id]||{label:"T"+turno.id,h:turno.horario,c:"#64748b"};
+    let m=TURNO_META[turno.id]||{label:"T"+turno.id,h:turno.horario,c:"#64748b"};
     return (
       <span style={{display:"inline-flex",flexDirection:"column",alignItems:"center",
         background:m.c+"15",border:"1px solid "+m.c+"44",borderRadius:8,
@@ -2978,11 +3008,11 @@ function MallaTab({ mesId, store }) {
 
   // ── VISTA PERSONAL (clic en agente) ──────────────────────────────────────────
   function VistaPersonal({agente}){
-    const c=AGENTE_COLORS[agente]||"#6366f1";
+    let c=AGENTE_COLORS[agente]||"#6366f1";
     const isSocioVista = MALLA_SOCIOS.includes(agente);
     let descansosDias=[];
     if(malla&&malla.descansos){
-      const d=malla.descansos.find(d=>d.agente===agente);
+      let d=malla.descansos.find(d=>d.agente===agente);
       if(d) descansosDias=d.dias||[];
     }
 
@@ -2996,7 +3026,7 @@ function MallaTab({ mesId, store }) {
 
     // ── Vista SOCIO — solo muestra FDS ────────────────────────────────────────
     if(isSocioVista){
-      const fdsList = allDays.filter(d=>isWeekend(d));
+      let fdsList = allDays.filter(d=>isWeekend(d));
       return (
         <div>
           <div style={{background:"linear-gradient(135deg,"+c+","+c+"bb)",borderRadius:14,
@@ -3026,8 +3056,8 @@ function MallaTab({ mesId, store }) {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10}}>
               {fdsList.map(function(d){
-                const t=getTurnoAgente(agente,d);
-                const isLibre=!t;
+                let t=getTurnoAgente(agente,d);
+                let isLibre=!t;
                 return (
                   <div key={d} style={{background:isLibre?"#f0fdf4":c+"0d",
                     border:"1.5px solid "+(isLibre?"#bbf7d0":c+"44"),
@@ -3053,9 +3083,9 @@ function MallaTab({ mesId, store }) {
 
     // ── Vista AGENTE PRINCIPAL — semana + FDS + resumen ───────────────────────
     const semanaRows = semanas.map(function(week,wi){
-      const realDays=week.filter(Boolean);
-      const wkDays=realDays.filter(d=>!isWeekend(d));
-      const wkndDays=realDays.filter(d=>isWeekend(d));
+      let realDays=week.filter(Boolean);
+      let wkDays=realDays.filter(d=>!isWeekend(d));
+      let wkndDays=realDays.filter(d=>isWeekend(d));
       return (
         <div key={wi} style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:12,overflow:"hidden",marginBottom:10}}>
           <div style={{background:c+"0f",borderBottom:"1px solid "+c+"22",
@@ -3071,8 +3101,8 @@ function MallaTab({ mesId, store }) {
           {/* Lun-Vie */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6,padding:"12px 14px"}}>
             {week.filter(d=>d&&!isWeekend(d)).map(function(d){
-              const t=getTurnoAgente(agente,d);
-              const desc=descansosDias.includes(d);
+              let t=getTurnoAgente(agente,d);
+              let desc=descansosDias.includes(d);
               return (
                 <div key={d} style={{textAlign:"center",
                   background:desc?"#f0fdf4":t?(TURNO_META[t.id]?.c||c)+"0d":"#f8fafc",
@@ -3093,9 +3123,9 @@ function MallaTab({ mesId, store }) {
               <span style={{fontSize:10,fontWeight:700,color:"#be185d",textTransform:"uppercase"}}>🏖 Fin de semana</span>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {wkndDays.map(function(d){
-                const t=getTurnoAgente(agente,d);
-                const fdsDesc=(malla.descansosFds||[]).find(fd=>fd.dias.includes(d)&&(fd.descansan||[]).includes(agente));
-                const isLibre=fdsDesc||!t;
+                let t=getTurnoAgente(agente,d);
+                let fdsDesc=(malla.descansosFds||[]).find(fd=>fd.dias.includes(d)&&(fd.descansan||[]).includes(agente));
+                let isLibre=fdsDesc||!t;
                 return (
                   <div key={d} style={{display:"flex",alignItems:"center",gap:6,
                     background:isLibre?"#dcfce7":"#fff",border:"1px solid "+(isLibre?"#bbf7d0":"#fecdd3"),
@@ -3172,11 +3202,11 @@ function MallaTab({ mesId, store }) {
         {/* Selector de semanas */}
         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:4}}>
           {semanas.map(function(week,wi){
-            const realDays=week.filter(Boolean);
+            let realDays=week.filter(Boolean);
             if(!realDays.length) return null;
-            const wkndDays=realDays.filter(d=>isWeekend(d));
-            const lunes=realDays.find(d=>!isWeekend(d));
-            const vie=realDays.filter(d=>!isWeekend(d)).pop();
+            let wkndDays=realDays.filter(d=>isWeekend(d));
+            let lunes=realDays.find(d=>!isWeekend(d));
+            let vie=realDays.filter(d=>!isWeekend(d)).pop();
             return (
               <button key={wi}
                 onClick={()=>setSemanaActiva(wi)}
@@ -3193,9 +3223,9 @@ function MallaTab({ mesId, store }) {
 
         {semanas.map(function(week,wi){
           if(wi!==semanaActiva) return null;
-          const realDays=week.filter(Boolean);
+          let realDays=week.filter(Boolean);
           if(!realDays.length) return null;
-          const wkndDays=realDays.filter(d=>isWeekend(d));
+          let wkndDays=realDays.filter(d=>isWeekend(d));
 
           return (
             <div key={wi} style={{background:"#fff",border:"1.5px solid #6d28d9",borderRadius:14,overflow:"hidden"}}>
@@ -3224,7 +3254,7 @@ function MallaTab({ mesId, store }) {
                         textAlign:"left",borderBottom:"1px solid #e2e8f0",width:110}}>Turno</th>
                       {week.map(function(d,di){
                         if(d===null) return <th key={di} style={{borderBottom:"1px solid #e2e8f0",width:60}}/>;
-                        const wknd=isWeekend(d), dow=getDow(d);
+                        let wknd=isWeekend(d), dow=getDow(d);
                         return (
                           <th key={di} style={{padding:"6px 8px",fontSize:11,fontWeight:700,
                             color:wknd?"#be185d":"#475569",textAlign:"center",
@@ -3240,7 +3270,7 @@ function MallaTab({ mesId, store }) {
                   <tbody>
                     {/* Turnos semana L-V */}
                     {TURNOS_PRINCIPALES.map(function(turno,ti){
-                      const m=TURNO_META[turno.id]||{label:turno.label,h:turno.horario,c:"#64748b"};
+                      let m=TURNO_META[turno.id]||{label:turno.label,h:turno.horario,c:"#64748b"};
                       return (
                         <tr key={ti} style={{borderBottom:"1px solid #f1f5f9"}}>
                           <td style={{padding:"8px 14px",borderRight:"1px solid #f1f5f9"}}>
@@ -3249,8 +3279,8 @@ function MallaTab({ mesId, store }) {
                           </td>
                           {week.map(function(d,di){
                             if(d===null) return <td key={di}/>;
-                            const asign=getAsign(turno,d);
-                            const wknd=isWeekend(d);
+                            let asign=getAsign(turno,d);
+                            let wknd=isWeekend(d);
                             return (
                               <td key={di} style={{padding:"6px 8px",textAlign:"center",
                                 background:wknd?"#f8fafc":"transparent"}}>
@@ -3265,8 +3295,8 @@ function MallaTab({ mesId, store }) {
                     })}
                     {/* FDS rows — solo en días sáb/dom */}
                     {wkndDays.length>0&&(malla.fds||[]).map(function(fds,fi){
-                      const m=TURNO_META[fds.id]||{label:fds.label,h:fds.horario,c:"#b45309"};
-                      const hasFds=week.some(d=>d&&isWeekend(d)&&getAsign(fds,d));
+                      let m=TURNO_META[fds.id]||{label:fds.label,h:fds.horario,c:"#b45309"};
+                      let hasFds=week.some(d=>d&&isWeekend(d)&&getAsign(fds,d));
                       if(!hasFds) return null;
                       return (
                         <tr key={"fds"+fi} style={{borderBottom:"1px solid #fecdd3",background:"#fff8f8"}}>
@@ -3276,9 +3306,9 @@ function MallaTab({ mesId, store }) {
                           </td>
                           {week.map(function(d,di){
                             if(d===null) return <td key={di} style={{background:"#fff8f8"}}/>;
-                            const wknd=isWeekend(d);
+                            let wknd=isWeekend(d);
                             if(!wknd) return <td key={di} style={{background:"#f8fafc",padding:"6px 8px",textAlign:"center"}}><span style={{color:"#e2e8f0",fontSize:10}}>—</span></td>;
-                            const asign=getAsign(fds,d);
+                            let asign=getAsign(fds,d);
                             return (
                               <td key={di} style={{padding:"6px 8px",textAlign:"center",background:"#fff8f8"}}>
                                 <AgenteBadge name={asign} size="sm"
@@ -3291,7 +3321,7 @@ function MallaTab({ mesId, store }) {
                     })}
                     {/* Descanso FDS — quién libra */}
                     {wkndDays.length>0&&(()=>{
-                      const desc=(malla.descansosFds||[]).find(d=>wkndDays.some(w=>d.dias.includes(w)));
+                      let desc=(malla.descansosFds||[]).find(d=>wkndDays.some(w=>d.dias.includes(w)));
                       if(!desc||!desc.descansan||!desc.descansan.length) return null;
                       return (
                         <tr style={{background:"#f0fdf4",borderBottom:"1px solid #bbf7d0"}}>
@@ -3319,10 +3349,10 @@ function MallaTab({ mesId, store }) {
 
               {/* Fin de semana socios + notas */}
               {wkndDays.length>0&&(()=>{
-                const socios=[];
+                let socios=[];
                 wkndDays.forEach(d=>{
                   (malla.fds||[]).forEach(function(t){
-                    const a=getAsign(t,d);
+                    let a=getAsign(t,d);
                     if(a&&a!=="N/A"&&a!=="") socios.push({socio:a,d,t});
                   });
                 });
@@ -3335,9 +3365,9 @@ function MallaTab({ mesId, store }) {
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:8}}>
                       {socios.map(function({socio,d,t}){
-                        const key=notaKey(socio,d);
-                        const nota=notas[key]||"";
-                        const isEditing=editNota&&editNota.key===key;
+                        let key=notaKey(socio,d);
+                        let nota=notas[key]||"";
+                        let isEditing=editNota&&editNota.key===key;
                         return (
                           <div key={key} style={{background:"#fff",border:"1px solid #fecdd3",
                             borderRadius:10,padding:"10px 12px"}}>
@@ -3352,9 +3382,11 @@ function MallaTab({ mesId, store }) {
                                 <textarea autoFocus defaultValue={editNota.value}
                                   onChange={e=>setEditNota({...editNota,value:e.target.value})}
                                   rows={3} placeholder="Pendientes, promesas, novedades..."
+                                  dir="ltr"
                                   style={{width:"100%",border:"1.5px solid #6d28d9",borderRadius:8,
                                     padding:"6px 10px",fontSize:12,fontFamily:"'Sora',sans-serif",
-                                    resize:"vertical",outline:"none"}}/>
+                                    resize:"vertical",outline:"none",textAlign:"left",
+                                    direction:"ltr",unicodeBidi:"plaintext"}}/>
                                 <div style={{display:"flex",gap:6,marginTop:6}}>
                                   <button onClick={()=>{saveNota(key,editNota.value);setEditNota(null);}}
                                     style={{flex:1,height:30,borderRadius:8,border:"none",
@@ -3505,7 +3537,7 @@ function AlianzasPanel() {
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
         {ALIANZAS.map(function(a){
-          const open = expandido===a.nombre;
+          let open = expandido===a.nombre;
           return (
             <div key={a.nombre} style={{background:"#fff",border:"1.5px solid "+(open?a.color+"66":"#e2e8f0"),
               borderRadius:14,overflow:"hidden",transition:"border-color .2s",
@@ -3785,12 +3817,12 @@ function CalcCard({ index, label, color, accent, pasajeros, dias, onPasajerosCha
 
         {/* Botón copiar link — disponible en las 3 opciones */}
         {link&&(()=>{
-          const [copied,setCopied]=useState(false);
-          const planName=(label.split("·")[1]||label).trim();
-          const doCopy=()=>{
+          let [copied,setCopied]=useState(false);
+          let planName=(label.split("·")[1]||label).trim();
+          let doCopy=()=>{
             try{navigator.clipboard.writeText(link).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2200);});}
             catch(e){
-              const el=document.createElement("textarea");el.value=link;document.body.appendChild(el);el.select();
+              let el=document.createElement("textarea");el.value=link;document.body.appendChild(el);el.select();
               document.execCommand("copy");document.body.removeChild(el);
               setCopied(true);setTimeout(()=>setCopied(false),2200);
             }
@@ -3839,11 +3871,586 @@ const ESIM_DEFAULT = [
 function EsimCalc() {
   const [planes,  setPlanes]  = useState(ESIM_DEFAULT);
   const [loading, setLoading] = useState(false);
+  const [qty,     setQty]     = useState({});
+  const [moneda,  setMoneda]  = useState("USD");
+  const [tasa,    setTasa]    = useState(1);
+  const [copied,  setCopied]  = useState(null);
+
+  const MONEDAS = [
+    {code:"USD", label:"Dólar (USD)", tasa:1},
+    {code:"COP", label:"Peso Col (COP)", tasa:4200},
+    {code:"MXN", label:"Peso Mex (MXN)", tasa:19.5},
+    {code:"ARS", label:"Peso Arg (ARS)", tasa:950},
+    {code:"EUR", label:"Euro (EUR)", tasa:0.92},
+    {code:"PEN", label:"Sol (PEN)", tasa:3.75},
+    {code:"BRL", label:"Real (BRL)", tasa:5.1},
+  ];
+
+  useEffect(function(){
+    setLoading(true);
+    fetch(SHEETS_URL+"?accion=read&sheet=Discover%20Global%20Esim",{cache:"no-store"})
+      .then(r=>r.json())
+      .then(function(data){
+        if(data&&data.ok&&Array.isArray(data.rows)&&data.rows.length>0){
+          let mapped=data.rows.filter(r=>r.asesor&&r.valorUsd>0)
+            .map(r=>({plan:String(r.asesor||"").trim(),precio:parseFloat(r.valorUsd)||0}));
+          if(mapped.length>0) setPlanes(mapped);
+        }
+        setLoading(false);
+      }).catch(()=>setLoading(false));
+  },[]);
+
+  const total = planes.reduce((s,p)=>s+(qty[p.plan]||0)*p.precio,0);
+  const totalM = total*tasa;
+  const mon = MONEDAS.find(m=>m.code===moneda)||MONEDAS[0];
+
+  function fmtM(v){
+    if(moneda==="USD") return "$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})+" USD";
+    return v.toLocaleString("es-CO",{minimumFractionDigits:0,maximumFractionDigits:0})+" "+moneda;
+  }
+  function setQ(plan,v){ setQty(prev=>({...prev,[plan]:Math.max(0,v)})); }
+
+  const hasItems = Object.values(qty).some(v=>v>0);
+  let resumen  = planes.filter(p=>(qty[p.plan]||0)>0)
+    .map(p=>qty[p.plan]+"x "+p.plan+" = $"+p.precio+" USD").join(" · ");
+
+  function copyResumen(){
+    let txt = planes.filter(p=>(qty[p.plan]||0)>0)
+      .map(p=>qty[p.plan]+"x "+p.plan+": "+fmtM(qty[p.plan]*p.precio*tasa))
+      .join("\n")+"\nTotal: "+fmtM(totalM);
+    try{ navigator.clipboard.writeText(txt).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500);}); }
+    catch(e){}
+  }
+
+  return (
+    <div style={{background:"#fff",border:"1.5px solid #1B3F8B22",borderRadius:16,overflow:"hidden"}}>
+      {/* Header con logo estilo imagen */}
+      <div style={{background:"#fff",borderBottom:"2px solid #1B3F8B",padding:"0"}}>
+        {/* Logo bar */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",padding:"16px 20px 10px",
+          gap:16,borderBottom:"1px solid #e2e8f0"}}>
+          <img src="https://raw.githubusercontent.com/segurosfly/RealTime/main/Logo-Square.png"
+            alt="Seguros Fly" style={{height:40,objectFit:"contain"}}
+            onError={e=>{e.target.style.display="none";}}/>
+          <div style={{fontSize:18,fontWeight:800,color:"#1e293b",letterSpacing:"0.02em"}}>Seguros Fly</div>
+        </div>
+        {/* Title row */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+          padding:"8px 20px",background:"#1B3F8B"}}>
+          <div style={{fontSize:14,fontWeight:800,color:"#fff",letterSpacing:"0.04em"}}>📡 DISCOVER GLOBAL</div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <span style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.8)"}}>RETAIL PRICE</span>
+            <select value={moneda}
+              onChange={e=>{const m=MONEDAS.find(x=>x.code===e.target.value);setMoneda(e.target.value);setTasa(m?m.tasa:1);}}
+              style={{height:28,borderRadius:6,border:"1px solid rgba(255,255,255,0.3)",
+                background:"rgba(255,255,255,0.15)",color:"#fff",fontSize:11,fontWeight:700,
+                padding:"0 8px",cursor:"pointer"}}>
+              {MONEDAS.map(m=><option key={m.code} value={m.code} style={{color:"#1e293b"}}>{m.label}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabla de planes */}
+      {loading?(
+        <div style={{padding:24,textAlign:"center",color:"#94a3b8",fontSize:13}}>⏳ Sincronizando precios...</div>
+      ):(
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <tbody>
+            {planes.map(function(p,i){
+              let q=qty[p.plan]||0;
+              let sub=q*p.precio;
+              return (
+                <tr key={i} style={{borderBottom:"1px solid #f1f5f9",
+                  background:q>0?"#EFF6FF":i%2===0?"#fff":"#fafafa"}}>
+                  {/* Plan name */}
+                  <td style={{padding:"12px 20px",fontSize:13,fontWeight:q>0?700:500,
+                    color:q>0?"#1B3F8B":"#374151",width:"40%"}}>
+                    {p.plan}
+                  </td>
+                  {/* Precio USD */}
+                  <td style={{padding:"12px 16px",textAlign:"right",fontSize:13,
+                    fontWeight:700,color:q>0?"#1B3F8B":"#374151"}}>
+                    ${p.precio}.00 USD
+                  </td>
+                  {/* Precio moneda */}
+                  {moneda!=="USD"&&(
+                    <td style={{padding:"12px 12px",textAlign:"right",fontSize:12,
+                      color:"#64748b",fontWeight:500}}>
+                      {fmtM(p.precio*tasa)}
+                    </td>
+                  )}
+                  {/* Cantidad */}
+                  <td style={{padding:"8px 16px",textAlign:"center",width:120}}>
+                    <div style={{display:"flex",gap:4,alignItems:"center",justifyContent:"center"}}>
+                      <button onClick={()=>setQ(p.plan,q-1)} disabled={q===0}
+                        style={{width:26,height:26,borderRadius:6,
+                          border:"1.5px solid "+(q>0?"#1B3F8B":"#e2e8f0"),
+                          background:q>0?"#EFF6FF":"#f8fafc",
+                          color:q>0?"#1B3F8B":"#94a3b8",fontWeight:800,fontSize:14,
+                          cursor:q>0?"pointer":"default"}}>−</button>
+                      <span style={{minWidth:20,textAlign:"center",fontSize:14,
+                        fontWeight:700,color:q>0?"#1B3F8B":"#94a3b8"}}>{q}</span>
+                      <button onClick={()=>setQ(p.plan,q+1)}
+                        style={{width:26,height:26,borderRadius:6,border:"1.5px solid #1B3F8B",
+                          background:"#EFF6FF",color:"#1B3F8B",fontWeight:800,fontSize:14,cursor:"pointer"}}>+</button>
+                    </div>
+                  </td>
+                  {/* Subtotal */}
+                  <td style={{padding:"12px 20px",textAlign:"right",fontSize:13,
+                    fontWeight:800,color:q>0?"#1B3F8B":"#e2e8f0",minWidth:90}}>
+                    {q>0?fmtM(sub*tasa):"—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+
+      {/* Total + botón copiar */}
+      <div style={{borderTop:"2px solid #1B3F8B",padding:"14px 20px",
+        display:"flex",alignItems:"center",justifyContent:"space-between",
+        background:"#EFF6FF",gap:12,flexWrap:"wrap"}}>
+        <div>
+          {hasItems&&(
+            <div style={{fontSize:11,color:"#64748b",marginBottom:4}}>{resumen}</div>
+          )}
+          <div style={{fontSize:11,color:"#94a3b8"}}>
+            {loading?"Cargando...":planes.length+" planes disponibles · "}
+            {!loading&&<span style={{color:"#10b981",fontWeight:700}}>✓ Sincronizado con Sheet</span>}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          {hasItems&&(
+            <>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:11,color:"#64748b"}}>Total</div>
+                <div style={{fontSize:20,fontWeight:800,color:"#1B3F8B"}}>{fmtM(totalM)}</div>
+                {moneda!=="USD"&&<div style={{fontSize:11,color:"#94a3b8"}}>${total.toFixed(2)} USD</div>}
+              </div>
+              <button onClick={copyResumen}
+                style={{height:38,padding:"0 14px",borderRadius:8,border:"none",
+                  background:copied?"#10b981":"#1B3F8B",color:"#fff",fontWeight:700,
+                  fontSize:12,cursor:"pointer",transition:"background .2s",whiteSpace:"nowrap"}}>
+                {copied?"✅ Copiado!":"📋 Copiar resumen"}
+              </button>
+              <button onClick={()=>setQty({})}
+                style={{height:38,padding:"0 12px",borderRadius:8,
+                  border:"1.5px solid #fca5a5",background:"#fff5f5",
+                  color:"#ef4444",fontWeight:700,fontSize:11,cursor:"pointer"}}>
+                🗑️
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function AlianzasPanel() {
+  let ALIANZAS = [
+    {
+      nombre: "AirHelp",
+      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/AirHelp_logo.svg/1200px-AirHelp_logo.svg.png",
+      color: "#1B3F8B",
+      descripcion: "Reclamaciones por vuelos retrasados, cancelados o con overbooking. El cliente puede reclamar hasta €600 por pasajero. SegurosFly lo refiere y AirHelp gestiona todo el proceso legal.",
+      como: "Compartí el link con el cliente si tuvo inconvenientes con su vuelo. AirHelp cobra solo si ganan el caso (sin costo inicial para el cliente).",
+      link: "https://funnel.airhelp.es/claims/new/trip-details?lang=es",
+      cta: "Abrir formulario"
+    },
+    {
+      nombre: "Rentcars",
+      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Rentcars.com_Logo.svg/2560px-Rentcars.com_Logo.svg.png",
+      color: "#F5A623",
+      descripcion: "Alquiler de autos en más de 140 países. El cliente compara precios y reserva directamente. SegurosFly tiene una landing page especial para sus clientes.",
+      como: "Compartí el link de alianza para que el cliente vea los precios. Se puede combinar con el seguro de viaje para proteger el alquiler.",
+      link: "https://www.rentcars.com/es-co/lp/segurosfly",
+      cta: "Ver alianza Rentcars"
+    },
+    {
+      nombre: "Airalo eSIM",
+      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Airalo_logo.svg/1200px-Airalo_logo.svg.png",
+      color: "#E65C4F",
+      descripcion: "eSIM digital para viajes internacionales. El viajero activa datos móviles en más de 200 países sin cambiar de SIM física. Planes desde $5 USD.",
+      como: "Recomendalo a clientes que viajen al exterior. Pueden comprar y activar desde el celular antes de salir. Complemento ideal al seguro de viaje.",
+      link: "https://www.airalo.com/",
+      cta: "Ver planes Airalo"
+    },
+    {
+      nombre: "Priority Pass",
+      logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Priority_Pass_logo.svg/2560px-Priority_Pass_logo.svg.png",
+      color: "#9B8A5A",
+      descripcion: "Acceso a más de 1,400 salas VIP en aeropuertos de todo el mundo. Ideal para viajeros frecuentes. Incluye bebidas, comida, WiFi y zonas de descanso.",
+      como: "Recomendalo a clientes premium o viajeros frecuentes. La membresía anual se amortiza rápidamente con los viajes.",
+      link: "https://www.prioritypass.com/es-LA/join-prioritypass",
+      cta: "Unirse a Priority Pass"
+    },
+    {
+      nombre: "Travel Registration",
+      logo: null,
+      color: "#0891b2",
+      descripcion: "Registro de viajeros ante autoridades. Permite a los consulados contactar al viajero en caso de emergencia en el destino. Recomendado para zonas de riesgo.",
+      como: "Sugerilo a clientes que viajan a destinos con alertas o zonas de conflicto. Es gratuito y toma menos de 5 minutos.",
+      link: "https://travelregistration.online/",
+      cta: "Registrar viaje"
+    },
+  ];
+
+  const [expandido, setExpandido] = useState(null);
+
+  return (
+    <div style={{marginTop:16}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+        <span style={{fontSize:20}}>🤝</span>
+        <div>
+          <div style={{fontSize:15,fontWeight:800,color:"#1e293b"}}>Alianzas SegurosFly</div>
+          <div style={{fontSize:12,color:"#94a3b8"}}>Servicios complementarios para ofrecer a tus clientes</div>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:12}}>
+        {ALIANZAS.map(function(a){
+          let open = expandido===a.nombre;
+          return (
+            <div key={a.nombre} style={{background:"#fff",border:"1.5px solid "+(open?a.color+"66":"#e2e8f0"),
+              borderRadius:14,overflow:"hidden",transition:"border-color .2s",
+              boxShadow:open?"0 4px 20px "+a.color+"18":"0 1px 4px rgba(0,0,0,0.05)"}}>
+              {/* Header */}
+              <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",
+                background:open?a.color+"08":"#fff"}}
+                onClick={()=>setExpandido(open?null:a.nombre)}>
+                <div style={{width:44,height:44,borderRadius:10,background:a.color+"12",
+                  border:"1.5px solid "+a.color+"33",display:"flex",alignItems:"center",
+                  justifyContent:"center",flexShrink:0,overflow:"hidden"}}>
+                  {a.logo?(
+                    <img src={a.logo} alt={a.nombre}
+                      style={{width:38,height:38,objectFit:"contain"}}
+                      onError={e=>{e.target.style.display="none";}}/>
+                  ):(
+                    <span style={{fontSize:16,fontWeight:800,color:a.color}}>{a.nombre[0]}</span>
+                  )}
+                </div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#1e293b"}}>{a.nombre}</div>
+                  <div style={{fontSize:11,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",
+                    whiteSpace:"nowrap"}}>{a.descripcion.slice(0,55)}...</div>
+                </div>
+                <span style={{fontSize:16,color:a.color,fontWeight:700,flexShrink:0,
+                  transform:open?"rotate(180deg)":"rotate(0deg)",transition:"transform .2s"}}>▾</span>
+              </div>
+              {/* Expandido */}
+              {open&&(
+                <div style={{borderTop:"1px solid "+a.color+"22",padding:"14px 16px",
+                  background:a.color+"05"}}>
+                  <div style={{fontSize:12,color:"#374151",lineHeight:1.6,marginBottom:10}}>
+                    {a.descripcion}
+                  </div>
+                  <div style={{background:"#fff",border:"1px solid "+a.color+"33",borderRadius:8,
+                    padding:"10px 12px",marginBottom:12}}>
+                    <div style={{fontSize:10,fontWeight:700,color:a.color,textTransform:"uppercase",
+                      letterSpacing:"0.06em",marginBottom:4}}>💡 Cómo usarlo con tu cliente</div>
+                    <div style={{fontSize:12,color:"#374151",lineHeight:1.5}}>{a.como}</div>
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <a href={a.link} target="_blank" rel="noopener noreferrer"
+                      style={{flex:1,height:36,borderRadius:8,border:"none",
+                        background:a.color,color:"#fff",fontWeight:700,fontSize:12,
+                        cursor:"pointer",textDecoration:"none",display:"flex",
+                        alignItems:"center",justifyContent:"center",gap:6}}>
+                      {a.cta} ↗
+                    </a>
+                    <button onClick={()=>{navigator.clipboard.writeText(a.link).catch(()=>{});}}
+                      style={{height:36,padding:"0 12px",borderRadius:8,
+                        border:"1.5px solid "+a.color+"44",background:"#fff",
+                        color:a.color,fontWeight:700,fontSize:11,cursor:"pointer"}}>
+                      📋 Copiar link
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── DOCUMENTOS SEGUROSFLY ─────────────────────────────────────────────────────
+function DocumentosTab() {
+  let DOCS = [
+    {
+      categoria: "📄 Documentos",
+      items: [
+        {
+          titulo: "Manual de Procesos SegurosFly",
+          descripcion: "Documento maestro con procesos, procedimientos y guías operativas del equipo.",
+          link: "https://docs.google.com/document/d/1Ldh30KuSGC8kUuCZxUsivA1deQp63nKxliEw_Qe396M/edit?tab=t.0",
+          tipo: "Google Doc",
+          color: "#2563eb",
+          icon: "📄"
+        }
+      ]
+    },
+    {
+      categoria: "🎬 Videos de capacitación — Vicidial",
+      items: [
+        {
+          titulo: "Llamada Manual Vicidial",
+          descripcion: "Cómo realizar llamadas manuales desde Vicidial paso a paso.",
+          link: "https://www.loom.com/share/5ee6a817f4d4473ebff952b1534ff1ad",
+          tipo: "Video Loom",
+          color: "#7c3aed",
+          icon: "🎬",
+          duracion: "~3 min"
+        },
+        {
+          titulo: "Conexión Agente Vicidial",
+          descripcion: "Proceso para conectarse como agente en Vicidial correctamente.",
+          link: "https://www.loom.com/share/f591868dfad74cd99f0053330cf5f20c",
+          tipo: "Video Loom",
+          color: "#7c3aed",
+          icon: "🎬",
+          duracion: "~3 min"
+        },
+        {
+          titulo: "Transferencia Vicidial",
+          descripcion: "Cómo transferir llamadas dentro de Vicidial.",
+          link: "https://www.loom.com/share/317a039a9e53441ab765b97c3370e2cc",
+          tipo: "Video Loom",
+          color: "#7c3aed",
+          icon: "🎬",
+          duracion: "~3 min"
+        }
+      ]
+    }
+  ];
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {/* Header */}
+      <div style={{background:"linear-gradient(135deg,#1e3a5f,#2563eb)",borderRadius:14,
+        padding:"18px 22px",display:"flex",alignItems:"center",gap:14}}>
+        <div style={{fontSize:32}}>📁</div>
+        <div>
+          <div style={{fontSize:17,fontWeight:800,color:"#fff"}}>Documentos SegurosFly</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.75)",marginTop:2}}>
+            Recursos, manuales y videos de capacitación del equipo
+          </div>
+        </div>
+      </div>
+
+      {/* Secciones */}
+      {DOCS.map(function(sec){
+        return (
+          <div key={sec.categoria}>
+            <div style={{fontSize:13,fontWeight:800,color:"#374151",marginBottom:10,
+              paddingBottom:6,borderBottom:"1.5px solid #e2e8f0"}}>
+              {sec.categoria}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:10}}>
+              {sec.items.map(function(doc){
+                return (
+                  <div key={doc.titulo} style={{background:"#fff",border:"1.5px solid "+doc.color+"33",
+                    borderRadius:14,padding:"16px 18px",display:"flex",flexDirection:"column",gap:10,
+                    boxShadow:"0 2px 8px "+doc.color+"10"}}>
+                    <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                      <div style={{width:40,height:40,borderRadius:10,background:doc.color+"12",
+                        display:"flex",alignItems:"center",justifyContent:"center",
+                        fontSize:20,flexShrink:0}}>
+                        {doc.icon}
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:800,color:"#1e293b",marginBottom:2}}>
+                          {doc.titulo}
+                        </div>
+                        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                          <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,
+                            background:doc.color+"15",color:doc.color}}>
+                            {doc.tipo}
+                          </span>
+                          {doc.duracion&&(
+                            <span style={{fontSize:10,color:"#94a3b8"}}>{doc.duracion}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{fontSize:12,color:"#64748b",lineHeight:1.5}}>
+                      {doc.descripcion}
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <a href={doc.link} target="_blank" rel="noopener noreferrer"
+                        style={{flex:1,height:36,borderRadius:8,border:"none",
+                          background:doc.color,color:"#fff",fontWeight:700,fontSize:12,
+                          cursor:"pointer",textDecoration:"none",display:"flex",
+                          alignItems:"center",justifyContent:"center",gap:5}}>
+                        {doc.tipo.includes("Video")?"▶ Ver video":"📄 Abrir documento"}
+                      </a>
+                      <button onClick={()=>{try{navigator.clipboard.writeText(doc.link);}catch(e){}}}
+                        style={{height:36,padding:"0 12px",borderRadius:8,
+                          border:"1.5px solid "+doc.color+"44",background:"#fff",
+                          color:doc.color,fontWeight:700,fontSize:11,cursor:"pointer"}}>
+                        📋
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
+// ── ALIANZAS TAB ─────────────────────────────────────────────────────────────
+function AlianzasTab() {
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      {/* Header */}
+      <div style={{background:"linear-gradient(135deg,#0c4a6e,#0891b2)",borderRadius:14,
+        padding:"18px 22px",display:"flex",alignItems:"center",gap:14}}>
+        <div style={{fontSize:32}}>🤝</div>
+        <div>
+          <div style={{fontSize:17,fontWeight:800,color:"#fff"}}>Alianzas SegurosFly</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,0.75)",marginTop:2}}>
+            Servicios complementarios · eSIM, reclamos, autos, salas VIP y más
+          </div>
+        </div>
+      </div>
+      {/* eSIM */}
+      <EsimCalc />
+      {/* Alianzas */}
+      <AlianzasPanel />
+    </div>
+  );
+}
+
+// ── CALCULADORAS DE VIAJE ──────────────────────────────────────────────────────
+function CalcCard({ index, label, color, accent, pasajeros, dias, onPasajerosChange, onDiasChange, link }) {
+  const [valor, setValor] = useState("");
+  let v=parseFloat(valor)||0, p=parseInt(pasajeros)||1, d=parseInt(dias)||1;
+  let porPasajero=p>0?v/p:0, porDia=d>0?v/d:0, porPaxDia=(p>0&&d>0)?v/p/d:0;
+  let fmtUSD=(n)=>n>0?"$"+n.toLocaleString("es-CO",{minimumFractionDigits:2,maximumFractionDigits:2}):"—";
+  let inputBase={height:40,border:"2px solid #e2e8f0",borderRadius:10,padding:"0 12px",fontSize:14,color:"#1e293b",background:"#fff",outline:"none",width:"100%",fontFamily:"'Sora',sans-serif",fontWeight:600,transition:"border-color .15s"};
+  return (
+    <div style={{background:"#fff",border:"2px solid "+accent+"44",borderRadius:16,overflow:"hidden",boxShadow:"0 4px 20px "+accent+"18",flex:1,minWidth:260,display:"flex",flexDirection:"column"}}>
+      <div style={{background:"linear-gradient(135deg,"+color+" 0%,"+accent+" 100%)",padding:"12px 18px",display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:32,height:32,borderRadius:10,background:"rgba(255,255,255,0.25)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:800,color:"#fff",flexShrink:0}}>{index}</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{label}</div>
+          <div style={{fontSize:10,color:"rgba(255,255,255,0.75)",fontWeight:600}}>Calculadora de inversión</div>
+        </div>
+        <img src={LOGO_WEB_SRC} alt="Seguros Fly"
+          style={{height:28,objectFit:"contain",opacity:0.92,filter:"brightness(0) invert(1)",flexShrink:0}} />
+      </div>
+      <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12,flex:1}}>
+        <div>
+          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>💰 Valor Total</div>
+          <div style={{position:"relative"}}>
+            <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"#64748b",fontWeight:700,fontSize:14,pointerEvents:"none"}}>$</span>
+            <input type="number" min="0" placeholder="0.00" value={valor} onChange={e=>setValor(e.target.value)}
+              style={Object.assign({},inputBase,{paddingLeft:24,borderColor:v>0?accent:"#e2e8f0",boxShadow:v>0?"0 0 0 3px "+accent+"18":"none",fontSize:16,fontWeight:700})} />
+          </div>
+        </div>
+        <div>
+          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>👥 Pasajeros</div>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <button onClick={()=>onPasajerosChange(Math.max(1,p-1))} style={{width:34,height:34,border:"2px solid #e2e8f0",borderRadius:8,background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:16,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+            <input type="number" min="1" max="20" value={pasajeros} onChange={e=>onPasajerosChange(Math.max(1,parseInt(e.target.value)||1))}
+              style={Object.assign({},inputBase,{textAlign:"center",fontWeight:700,fontSize:15})} />
+            <button onClick={()=>onPasajerosChange(Math.min(20,p+1))} style={{width:34,height:34,border:"2px solid #e2e8f0",borderRadius:8,background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:16,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+          </div>
+        </div>
+        <div>
+          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>📅 Días de viaje</div>
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            <button onClick={()=>onDiasChange(Math.max(1,d-1))} style={{width:34,height:34,border:"2px solid #e2e8f0",borderRadius:8,background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:16,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+            <input type="number" min="1" max="365" value={dias} onChange={e=>onDiasChange(Math.max(1,parseInt(e.target.value)||1))}
+              style={Object.assign({},inputBase,{textAlign:"center",fontWeight:700,fontSize:15})} />
+            <button onClick={()=>onDiasChange(Math.min(365,d+1))} style={{width:34,height:34,border:"2px solid #e2e8f0",borderRadius:8,background:"#f8fafc",color:"#64748b",fontWeight:800,fontSize:16,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+          </div>
+        </div>
+        <div style={{borderTop:"1px dashed #e2e8f0",margin:"4px 0"}} />
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:2}}>✅ Resultados</div>
+          {[{label:"por pasajero",val:porPasajero,color:accent,icon:"👤"},{label:"por día",val:porDia,color:"#0891b2",icon:"📆"},{label:"por pax / por día",val:porPaxDia,color:"#7c3aed",icon:"🧮"}].map(r=>(
+            <div key={r.label} style={{background:v>0?r.color+"0f":"#f8fafc",border:"1px solid "+(v>0?r.color+"33":"#e2e8f0"),borderRadius:10,padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:10,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.06em"}}>{r.label}</div>
+                <div style={{fontSize:20,fontWeight:800,color:v>0?r.color:"#94a3b8",lineHeight:1.1,marginTop:2}}>{fmtUSD(r.val)}</div>
+              </div>
+              <div style={{fontSize:22,opacity:0.35}}>{r.icon}</div>
+            </div>
+          ))}
+        </div>
+        {v>0&&<button onClick={()=>setValor("")} style={{height:32,border:"1px solid #fca5a5",borderRadius:8,background:"#fff5f5",color:"#ef4444",fontWeight:700,fontSize:11,cursor:"pointer",marginTop:2}}>🗑️ Limpiar</button>}
+
+        {/* Botón copiar link — disponible en las 3 opciones */}
+        {link&&(()=>{
+          let [copied,setCopied]=useState(false);
+          let planName=(label.split("·")[1]||label).trim();
+          let doCopy=()=>{
+            try{navigator.clipboard.writeText(link).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2200);});}
+            catch(e){
+              let el=document.createElement("textarea");el.value=link;document.body.appendChild(el);el.select();
+              document.execCommand("copy");document.body.removeChild(el);
+              setCopied(true);setTimeout(()=>setCopied(false),2200);
+            }
+          };
+          return (
+            <div style={{marginTop:4,borderTop:"1px dashed #e2e8f0",paddingTop:10,display:"flex",flexDirection:"column",gap:6}}>
+              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.07em"}}>
+                🔗 Brochure digital
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={doCopy}
+                  style={{flex:1,height:36,borderRadius:10,border:"none",
+                    background:copied?"#ecfdf5":"linear-gradient(135deg,"+color+","+accent+")",
+                    color:copied?"#059669":"#fff",fontWeight:700,fontSize:12,cursor:"pointer",
+                    transition:"all .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                  {copied?"✅ ¡Link copiado!":"📋 Copiar link del "+planName}
+                </button>
+                <a href={link} target="_blank" rel="noopener noreferrer"
+                  style={{width:36,height:36,borderRadius:10,border:"1.5px solid "+accent,
+                    background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",
+                    fontSize:16,textDecoration:"none",flexShrink:0}} title="Abrir brochure">
+                  ↗
+                </a>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+// Datos eSIM embebidos + sync desde Sheets (pestaña "Discover Global Esim")
+let ESIM_DEFAULT = [
+  {plan:"1 GB - 5 días",  precio:7},
+  {plan:"1 GB - 7 días",  precio:14},
+  {plan:"2 GB - 15 días", precio:20},
+  {plan:"3 GB - 30 días", precio:30},
+  {plan:"5 GB - 30 días", precio:38},
+  {plan:"5 GB - 60 días", precio:38},
+  {plan:"10 GB - 180 días",precio:68},
+  {plan:"10 GB - 30 días", precio:68},
+  {plan:"20 GB - 30 días", precio:76},
+  {plan:"20 GB - 365 días",precio:76},
+];
+
+function EsimCalc() {
+  const [planes,  setPlanes]  = useState(ESIM_DEFAULT);
+  const [loading, setLoading] = useState(false);
   const [qty,     setQty]     = useState({});  // {plan: cantidad}
   const [moneda,  setMoneda]  = useState("USD");
   const [tasa,    setTasa]    = useState(1);   // tasa respecto a USD
 
-  const MONEDAS = [
+  let MONEDAS = [
     {code:"USD", label:"USD — Dólar", tasa:1},
     {code:"COP", label:"COP — Peso Colombiano", tasa:4200},
     {code:"MXN", label:"MXN — Peso Mexicano",  tasa:19.5},
@@ -3858,7 +4465,7 @@ function EsimCalc() {
       .then(r=>r.json())
       .then(function(data){
         if(data&&data.ok&&Array.isArray(data.rows)&&data.rows.length>0){
-          const mapped=data.rows
+          let mapped=data.rows
             .filter(r=>r.asesor&&r.valorUsd>0)
             .map(r=>({plan:String(r.asesor||"").trim(), precio:parseFloat(r.valorUsd)||0}));
           if(mapped.length>0) setPlanes(mapped);
@@ -3867,8 +4474,8 @@ function EsimCalc() {
       }).catch(()=>setLoading(false));
   },[]);
 
-  const total = planes.reduce((s,p)=>{
-    const q=qty[p.plan]||0;
+  let total = planes.reduce((s,p)=>{
+    let q=qty[p.plan]||0;
     return s+q*p.precio;
   },0);
   const totalMoneda = total*tasa;
@@ -3882,7 +4489,7 @@ function EsimCalc() {
     setQty(prev=>({...prev,[plan]:Math.max(0,v)}));
   }
 
-  const hasItems = Object.values(qty).some(v=>v>0);
+  let hasItems = Object.values(qty).some(v=>v>0);
 
   return (
     <div style={{background:"#fff",border:"1.5px solid #0891b222",borderRadius:16,overflow:"hidden",marginTop:16}}>
@@ -3901,7 +4508,7 @@ function EsimCalc() {
         {/* Selector moneda */}
         <select value={moneda}
           onChange={e=>{
-            const m=MONEDAS.find(x=>x.code===e.target.value);
+            let m=MONEDAS.find(x=>x.code===e.target.value);
             setMoneda(e.target.value);
             setTasa(m?m.tasa:1);
           }}
@@ -3928,8 +4535,8 @@ function EsimCalc() {
           </thead>
           <tbody>
             {planes.map(function(p,i){
-              const q=qty[p.plan]||0;
-              const sub=q*p.precio*tasa;
+              let q=qty[p.plan]||0;
+              let sub=q*p.precio*tasa;
               return (
                 <tr key={i} style={{borderBottom:"1px solid #f0f9ff",
                   background:q>0?"#e0f2fe22":"#fff",transition:"background .15s"}}>
@@ -4056,7 +4663,7 @@ function saveTosspile(data) {
 // Sync Trustpilot reviews to Google Sheets (pestaña "Reseñas")
 async function syncReviewToSheets(review, action) {
   try {
-    const params = new URLSearchParams({
+    let params = new URLSearchParams({
       accion: action==="delete" ? "delete_review" : "save_review",
       sheet: "Resenas",
       reviewId: review.id,
@@ -4074,10 +4681,10 @@ async function syncReviewToSheets(review, action) {
 // Carga reseñas desde Sheets al arrancar el tab
 async function fetchReviewsFromSheets(setReviews) {
   try {
-    const res = await fetch(SHEETS_URL+"?accion=read&sheet=Resenas", { method:"GET", cache:"no-store" });
-    const data = await res.json();
+    let res = await fetch(SHEETS_URL+"?accion=read&sheet=Resenas", { method:"GET", cache:"no-store" });
+    let data = await res.json();
     if (data && data.ok && Array.isArray(data.rows) && data.rows.length > 0) {
-      const mapped = data.rows
+      let mapped = data.rows
         .filter(r => r.nota !== "eliminado" && r.reviewId)
         .map(r => ({
           id:        String(r.reviewId||r.orden||Date.now()),
@@ -4168,7 +4775,7 @@ function TpReviewCard({ review, onEdit, onDelete, COLOR, nombreAsesor }) {
   const initials = review.email ? review.email[0].toUpperCase() : "?";
   const fechaFmt = (f) => {
     try {
-      const d=new Date(f+"T12:00:00");
+      let d=new Date(f+"T12:00:00");
       return d.toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"});
     } catch(e){ return f; }
   };
@@ -4245,7 +4852,7 @@ function TosspileTab({ store, onUpdate }) {
   const COLOR = { guillermo:"#2563eb", carolina:"#7c3aed", daniel:"#0f766e", wilmary:"#be185d" };
   const nombreAsesor = (a) => { const names={guillermo:"Guillermo",carolina:"Carolina",daniel:"Daniel R.",wilmary:"Wilmary"}; return names[a]||( a?a[0].toUpperCase()+a.slice(1):a); };
 
-  const totales = TP_ASESORES.reduce((acc, a) => {
+  let totales = TP_ASESORES.reduce((acc, a) => {
     acc[a] = visibles.filter(r => r.asesor===a).length * REVIEW_VALUE;
     return acc;
   }, {});
@@ -4278,7 +4885,7 @@ function TosspileTab({ store, onUpdate }) {
     } else {
       updated = [{ id:Date.now().toString(), ...form, valor:REVIEW_VALUE }, ...reviews];
     }
-    const lastRev = editId ? updated.find(r=>r.id===editId) : updated[0];
+    let lastRev = editId ? updated.find(r=>r.id===editId) : updated[0];
     persist(updated, lastRev, "save");
     setForm({ fecha: new Date().toISOString().slice(0,10), email:"", asesor: TP_ASESORES[0] });
     setSaved(true); setTimeout(()=>setSaved(false), 2000);
@@ -4292,7 +4899,7 @@ function TosspileTab({ store, onUpdate }) {
 
   const handleDelConfirm = () => {
     if (delPin===TOSSPILE_PIN) {
-      const deletedRev = reviews.find(r=>r.id===delId);
+      let deletedRev = reviews.find(r=>r.id===delId);
       persist(reviews.filter(r=>r.id!==delId), deletedRev, "delete");
       setDelId(null); setDelPin(""); setDelErr(false);
     } else {
@@ -4385,12 +4992,12 @@ function TosspileTab({ store, onUpdate }) {
             </linearGradient>
           </defs>
           {(() => {
-            const W=560,H=120,PL=12,PR=12,PT=28,PB=36;
-            const colW=(W-PL-PR)/6;
-            const pts = reviewsByDow.map((d,i)=>({
+            let W=560,H=120,PL=12,PR=12,PT=28,PB=36;
+            let colW=(W-PL-PR)/6;
+            let pts = reviewsByDow.map((d,i)=>({
               ...d, x:PL+i*colW, y:PT+(1-(d.count/maxDow))*(H-PT-PB)
             }));
-            const poly = pts.map(p=>p.x+","+p.y).join(" ");
+            let poly = pts.map(p=>p.x+","+p.y).join(" ");
             return (
               <g>
                 {[0,0.5,1].map((t,i)=>(
@@ -4401,7 +5008,7 @@ function TosspileTab({ store, onUpdate }) {
                 <polyline points={poly} fill="none" stroke="#00b67a" strokeWidth="2.5"
                   strokeLinejoin="round" strokeLinecap="round"/>
                 {pts.map((p,i)=>{
-                  const isTop=p.dow===topDow.dow&&totalGeneral>0&&p.count>0;
+                  let isTop=p.dow===topDow.dow&&totalGeneral>0&&p.count>0;
                   return (
                     <g key={i}>
                       {p.count>0&&(
@@ -4697,7 +5304,7 @@ function App() {
     }
     loadConfig();
     // Refresca la config remota cada 60s (los datos de config cambian poco)
-    const id = setInterval(function() {
+    let id = setInterval(function() {
       _remoteConfigLoading = false; // permitir re-fetch
       loadConfig();
     }, 60000);
@@ -4708,9 +5315,9 @@ function App() {
   useEffect(function() {
     let cancelled = false;
     let lastSig = "";
-    const REMOTE_URL = SHEETS_URL + "?accion=read";
+    let REMOTE_URL = SHEETS_URL + "?accion=read";
 
-    const buildStoreFromRows = function(rows) {
+    let buildStoreFromRows = function(rows) {
       var prev = storeRef.current || {};
       var next = {};
       // CAMBIO METAS: preservar configs locales mientras llegan las remotas
@@ -4787,10 +5394,10 @@ function App() {
       return next;
     };
 
-    const cargarYRefrescar = async function() {
+    let cargarYRefrescar = async function() {
       try {
-        const res = await fetch(REMOTE_URL, { method:"GET", cache:"no-store" });
-        const data = await res.json();
+        let res = await fetch(REMOTE_URL, { method:"GET", cache:"no-store" });
+        let data = await res.json();
         if (cancelled) return;
         if (!data || !data.ok || !Array.isArray(data.rows)) return;
 
@@ -4827,7 +5434,7 @@ function App() {
         }
         // ─────────────────────────────────────────────────────────────────────
 
-        const newStore = buildStoreFromRows(data.rows);
+        let newStore = buildStoreFromRows(data.rows);
         // FIX METAS: merge inteligente — la edición LOCAL más reciente prevalece sobre la remota
         if (data.configs && typeof data.configs === "object") {
           // NUEVO: también poblar el cache remoto de Config del Sheet
@@ -4867,7 +5474,7 @@ function App() {
           });
           newStore.config = mergedCfg;
         }
-        const sig = JSON.stringify(newStore);
+        let sig = JSON.stringify(newStore);
         if (sig === lastSig) return;
         lastSig = sig;
         storeRef.current = newStore;
@@ -4877,7 +5484,7 @@ function App() {
     };
 
     cargarYRefrescar();
-    const id = setInterval(cargarYRefrescar, 4000);
+    let id = setInterval(cargarYRefrescar, 4000);
     // FIX SYNC: exponer refresh manual para que onUpdate dispare lectura inmediata
     window.__SF_refreshNow = function(){ try { lastSig = ""; cargarYRefrescar(); } catch(e){} };
     return function() { cancelled = true; clearInterval(id); window.__SF_refreshNow = null; };
@@ -4896,7 +5503,7 @@ function App() {
     // FIX METAS: marcar la config con timestamp local para que el polling no la sobrescriba
     var nowIso = new Date().toISOString();
     var cfgConTs = Object.assign({}, cfg, { updatedAt: nowIso, _localUpdatedAt: nowIso });
-    const next = setConfigStore(storeRef.current, mesId, cfgConTs);
+    let next = setConfigStore(storeRef.current, mesId, cfgConTs);
     onUpdate(next);
     // FIX METAS: enviar al backend con reintentos; el polling verificará persistencia
     try { enviarConfigRT(cfgConTs, mesId, "", nowIso); } catch(e) {}
@@ -4909,10 +5516,10 @@ function App() {
     await sincronizarConSheets(storeRef.current, false);
   };
 
-  const cfg      = getConfig(store,mesId);
-  const mesInfo  = getMesInfo(mesId);
-  const diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
-  const diasRest = Math.max(1,mesInfo.dias-diaHoy);
+  let cfg      = getConfig(store,mesId);
+  let mesInfo  = getMesInfo(mesId);
+  let diaHoy   = mesId===getMesActual()?getDiaHoy():mesInfo.dias;
+  let diasRest = Math.max(1,mesInfo.dias-diaHoy);
 
   return (
     <div style={{fontFamily:"'Sora',system-ui,sans-serif",background:"#f0f4f8",minHeight:"100vh",color:"#1e293b"}}>
