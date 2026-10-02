@@ -549,6 +549,7 @@ const enviarEliminacion = async (fila, mesId) => {
       mes:getMesInfo(mesId).label, asesor:cap(fila.asesor||""),
       dia:String(fila.dia||""), orden:fila.orden||"-", plan:fila.plan||"-",
       valor:String(parseFloat(fila.valor)||0), deletedAt:fila.deletedAt||new Date().toISOString(),
+      ts: tsMs(fila.ts) ? new Date(tsMs(fila.ts)).toISOString() : "",
       nota:"eliminado de real"
     });
     await fetch(SHEETS_URL+"?"+params.toString(), { method:"GET", mode:"no-cors" });
@@ -2144,6 +2145,89 @@ const MALLA_TURNOS   = [
 const MESES_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
                   "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
+// Lee la pestaña "Malla de SegurosFly" tal como la entrega el Apps Script (celda por celda).
+// Formato esperado: una fila de encabezado con las fechas (1/10, 2/10, …) y debajo una fila por
+// turno: columna A = nombre del turno, columna B = horario, y en cada fecha quién lo cubre.
+// Reconoce Turno 1/2/3, Nocturno, Fin de semana (o Sáb/Dom), Break y Descanso/Libre.
+const MALLA_KEYS = ["fecha","mes","asesor","dia","orden","plan","valorUsd","ts","nota"];
+const MALLA_COLORES = { T1:"#2563eb", T2:"#0f766e", T3:"#7c3aed", T4:"#475569", FDS1:"#b45309", FDS2:"#be185d" };
+function mallaFilaArray(r) {
+  const out = MALLA_KEYS.map(k => r[k] == null ? "" : String(r[k]));
+  Object.keys(r).filter(k=>/^col\d+$/.test(k)).forEach(k=>{ out[parseInt(k.slice(3))] = String(r[k]==null?"":r[k]); });
+  for (let i=0;i<out.length;i++) if (out[i]===undefined) out[i]="";
+  return out;
+}
+function mallaNombre(txt) {
+  const t = String(txt||"").trim(); if (!t) return "";
+  const todos = MALLA_AGENTES.concat(MALLA_SOCIOS).concat(["Bot Madruga"]);
+  const low = t.toLowerCase();
+  const exacto = todos.find(n=>n.toLowerCase()===low); if (exacto) return exacto;
+  const porNombre = todos.filter(n=>n.toLowerCase().split(" ")[0]===low.split(" ")[0]);
+  if (porNombre.length===1) return porNombre[0];
+  return t;
+}
+function mallaDesdeSheet(rows, mesId) {
+  const filas = (rows||[]).map(mallaFilaArray);
+  const mesNum = parseInt(mesId.split("-")[1]);
+  const esFecha = (v) => { const m = String(v).trim().match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-]\d{2,4})?$/); return m ? { d:+m[1], m:+m[2] } : null; };
+  const out = { mes:mesId, turnos:[], fds:[], breaks:[], descansosFds:[], descansos:[], origen:"sheet" };
+  const porId = {};
+  const descPorAgente = {};
+  let colDia = null, fechasVistas = 0, filasUsadas = 0;
+  filas.forEach(f => {
+    const fechas = f.map(esFecha);
+    const nFechas = fechas.filter(Boolean).length;
+    if (nFechas >= 3) {                        // fila de encabezado: define qué día es cada columna
+      colDia = {};
+      fechas.forEach((x,i)=>{ if (x && x.m===mesNum) colDia[i]=x.d; });
+      fechasVistas += Object.keys(colDia).length;
+      return;
+    }
+    if (!colDia) return;
+    const label = String(f[0]||"").trim(), horario = String(f[1]||"").trim().replace(/\s*-\s*/,"–");
+    if (!label) return;
+    const L = label.toLowerCase();
+    const dias = {};
+    Object.keys(colDia).forEach(i=>{ const v=String(f[i]||"").trim(); if (v && v!=="-" && !/^n\/?a$/i.test(v)) dias[String(colDia[i])] = v.split(/\s*[\/,\n]\s*/).map(mallaNombre).join(" / "); });
+    if (!Object.keys(dias).length) return;
+    filasUsadas++;
+    if (/descans|libre/.test(L)) {
+      Object.keys(dias).forEach(d=>dias[d].split(" / ").forEach(n=>{ (descPorAgente[n]=descPorAgente[n]||[]).push(+d); }));
+      return;
+    }
+    if (/break/.test(L)) { out.breaks.push({ id:label, horario, dias }); return; }
+    let id, grupo = "turnos", etiqueta = label;
+    if (/noct|madrug|t\s*4\b/.test(L)) { id="T4"; etiqueta="Nocturno"; }
+    else if (/fin de semana|fds|s[aá]b|dom|t\s*5\b|t\s*6\b/.test(L)) {
+      grupo="fds"; etiqueta="Fin de Semana";
+      id = (/dom|t\s*6\b/.test(L) || /^1[3-9]/.test(horario)) ? "FDS2" : "FDS1";
+    } else {
+      const n = (L.match(/(?:turno|t)\s*(\d)/)||[])[1];
+      id = n ? "T"+n : label;
+      etiqueta = n ? "Turno "+n : label;
+    }
+    if (porId[id]) { Object.assign(porId[id].dias, dias); return; }
+    const t = { id, label:etiqueta, horario, color:MALLA_COLORES[id]||"#64748b", dias };
+    porId[id] = t; out[grupo].push(t);
+  });
+  out.turnos.sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+  out.fds.sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+  out.descansos = Object.keys(descPorAgente).map(a=>({ agente:a, dias:descPorAgente[a].sort((x,y)=>x-y) }));
+  // Descansos de fin de semana: agentes principales que no aparecen en ningún turno del sábado/domingo
+  const [yy,mm] = mesId.split("-").map(Number), nd = new Date(yy,mm,0).getDate();
+  for (let d=1; d<=nd; d++) {
+    if (new Date(yy,mm-1,d).getDay()!==6) continue;
+    const finde = [d, d+1].filter(x=>x<=nd);
+    const trabajan = new Set();
+    out.turnos.concat(out.fds).forEach(t=>finde.forEach(x=>{ (t.dias[String(x)]||"").split(" / ").forEach(n=>trabajan.add(n)); }));
+    if (!trabajan.size) continue;
+    out.descansosFds.push({ dias:finde, descansan:MALLA_AGENTES.filter(a=>!trabajan.has(a)) });
+  }
+  const ok = out.turnos.length + out.fds.length > 0;
+  return { malla: ok ? out : null, diag: { filas: filas.length, fechasDelMes: fechasVistas, filasUsadas,
+    encabezado: (filas.find(f=>f.map(esFecha).filter(Boolean).length>=3)||filas[0]||[]).slice(0,6).join(" | ") } };
+}
+
 // Parsea las filas crudas del Sheet en estructura útil
 function parseMallaRows(rows) {
   // rows viene del read?sheet=Malla de SegurosFly
@@ -2170,7 +2254,23 @@ function MallaTab({ mesId, store }) {
   const [asesorVista, setAsesorVista] = useState(null);
   const [semanaActiva,setSemanaActiva]= useState(0); // null = vista equipo, string = vista personal
 
-  const malla    = MALLA_POR_MES[mesId] || null;
+  // Malla en vivo desde la pestaña "Malla de SegurosFly" del Drive; si no hay datos del mes, usa la guardada en el código
+  const [remota, setRemota] = useState({ estado:"cargando", porMes:{}, diag:null });
+  useEffect(function(){
+    let vivo = true;
+    setRemota(r=>Object.assign({}, r, { estado:"cargando" }));
+    fetch(SHEETS_URL+"?accion=read&sheet="+encodeURIComponent("Malla de SegurosFly"),{cache:"no-store"})
+      .then(r=>r.json())
+      .then(function(data){
+        if (!vivo) return;
+        if (!data || !data.ok) { setRemota({ estado:"error", porMes:{}, diag:{ error:(data&&data.error)||"Respuesta inválida del Apps Script" } }); return; }
+        const res = mallaDesdeSheet(data.rows||[], mesId);
+        setRemota(r=>({ estado: res.malla?"ok":"sinmes", porMes: Object.assign({}, r.porMes, res.malla?{[mesId]:res.malla}:{}), diag: res.diag, hora: new Date() }));
+      })
+      .catch(function(e){ if (vivo) setRemota({ estado:"error", porMes:{}, diag:{ error:String(e) } }); });
+    return function(){ vivo = false; };
+  },[mesId]);
+  const malla    = remota.porMes[mesId] || MALLA_POR_MES[mesId] || null;
   useEffect(function(){ setSemanaActiva(0); },[mesId]);
 
   // Cargar notas desde Sheets al montar (compartidas entre todos)
@@ -2290,7 +2390,7 @@ function MallaTab({ mesId, store }) {
 
   function TurnoBadge({turno}){
     if(!turno) return <span style={{fontSize:10,color:"#e2e8f0",fontWeight:600}}>libre</span>;
-    let m=TURNO_META[turno.id]||{label:"T"+turno.id,h:turno.horario,c:"#64748b"};
+    let m=Object.assign({},TURNO_META[turno.id]||{label:"T"+turno.id,h:turno.horario,c:"#64748b"},turno.horario?{h:turno.horario}:{});
     return (
       <span style={{display:"inline-flex",flexDirection:"column",alignItems:"center",
         background:m.c+"15",border:"1px solid "+m.c+"44",borderRadius:8,
@@ -2480,13 +2580,23 @@ function MallaTab({ mesId, store }) {
       <div style={{textAlign:"center",padding:48,background:"#fff",borderRadius:14,
         border:"1.5px dashed #e2e8f0",color:"#94a3b8"}}>
         <div style={{fontSize:28,marginBottom:8}}>📭</div>
-        <div style={{fontWeight:700,fontSize:14}}>No hay malla cargada para {mesLabel}</div>
-        <div style={{fontSize:12,marginTop:6}}>Disponible desde Agosto 2026.</div>
+        <div style={{fontWeight:700,fontSize:14}}>{remota.estado==="cargando"?"Leyendo la malla del Drive…":"No hay malla de "+mesLabel+" en el Drive"}</div>
+        {remota.estado==="error"&&<div style={{fontSize:12,marginTop:8}}>No se pudo leer la pestaña "Malla de SegurosFly": {remota.diag&&remota.diag.error}</div>}
+        {remota.estado==="sinmes"&&remota.diag&&<div style={{fontSize:12,marginTop:8,lineHeight:1.6}}>
+          La pestaña "Malla de SegurosFly" respondió con {remota.diag.filas} filas, pero ninguna fecha de {mesLabel}.<br/>
+          Revisa que la primera fila tenga las fechas del mes (1/{mesNum}, 2/{mesNum}…), la columna A el turno y la B el horario.<br/>
+          <span style={{opacity:0.8}}>Encabezado leído: {remota.diag.encabezado||"(vacío)"}</span>
+        </div>}
       </div>
     );
 
     return (
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        <div style={{fontSize:12,color:"#64748b"}}>
+          {remota.porMes[mesId]
+            ? "Malla leída en vivo de la pestaña “Malla de SegurosFly” del Drive"+(remota.hora?", a las "+remota.hora.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"}):"")+"."
+            : "Malla guardada en el dashboard (la pestaña del Drive no tiene este mes)."}
+        </div>
         {/* Aviso breaks */}
         <div style={{background:"#fffbeb",border:"1px solid #fbbf24",borderRadius:10,
           padding:"10px 16px",fontSize:12,color:"#92400e",fontWeight:600,
@@ -2565,7 +2675,7 @@ function MallaTab({ mesId, store }) {
                   <tbody>
                     {/* Turnos semana L-V */}
                     {TURNOS_PRINCIPALES.map(function(turno,ti){
-                      let m=TURNO_META[turno.id]||{label:turno.label,h:turno.horario,c:"#64748b"};
+                      let m=Object.assign({},TURNO_META[turno.id]||{label:turno.label,h:turno.horario,c:"#64748b"},turno.horario?{h:turno.horario}:{});
                       return (
                         <tr key={ti} style={{borderBottom:"1px solid #f1f5f9"}}>
                           <td style={{padding:"8px 14px",borderRight:"1px solid #f1f5f9"}}>
@@ -2590,7 +2700,7 @@ function MallaTab({ mesId, store }) {
                     })}
                     {/* FDS rows — solo en días sáb/dom */}
                     {wkndDays.length>0&&(malla.fds||[]).map(function(fds,fi){
-                      let m=TURNO_META[fds.id]||{label:fds.label,h:fds.horario,c:"#b45309"};
+                      let m=Object.assign({},TURNO_META[fds.id]||{label:fds.label,h:fds.horario,c:"#b45309"},fds.horario?{h:fds.horario}:{});
                       const hasFds=week.some(d=>d&&isWeekend(d)&&getAsign(fds,d));
                       if(!hasFds) return null;
                       return (
@@ -4879,6 +4989,7 @@ function App() {
       var tombs = loadTombs();
       var tombUsado = tombs.map(function(){ return false; });
       var tombsCambio = false;
+      var parsedAct = [], parsedElim = [];
       (rows || []).forEach(function(r) {
         if (!r) return;
         var nota = (r.nota || "").toString().toLowerCase();
@@ -4913,39 +5024,47 @@ function App() {
         if (!dia) return;
         var venta = { orden: r.orden || "-", plan: r.plan || "-", valor: String(parseFloat(r.valorUsd) || 0), ts: r.ts || "" };
         var key = ventaKey(mesId, asesor, dia, venta);
-        if (esEliminado) {
-          // El Sheet ya confirmó el borrado: liberar el tombstone de ESA fila (solo con hora exacta)
-          var tsE = tsMs(venta.ts);
-          if (tsE) tombs.forEach(function(t, i){ if (!tombUsado[i] && t.key === key && tsMs(t.fila && t.fila.ts) && Math.abs(tsMs(t.fila.ts) - tsE) < 1500) { tombUsado[i] = "ok"; tombsCambio = true; } });
-          return;
+        if (esEliminado) { parsedElim.push({ key:key, ts:tsMs(venta.ts) }); return; }
+        parsedAct.push({ mesId:mesId, asesor:asesor, dia:dia, venta:venta, key:key });
+      });
+
+      // FIX BORRADO (Apps Script): hasta ahora "eliminar" agregaba una fila nueva con nota
+      // "eliminado de real" en vez de marcar la venta. Cada una de esas filas descuenta UNA venta
+      // con los mismos datos: primero la de la misma hora de registro; si no, la más reciente
+      // registrada antes del borrado. Así se aplican también los borrados que ya están en el Sheet.
+      var anulada = parsedAct.map(function(){ return false; });
+      parsedElim.forEach(function(e) {
+        var elegido = -1, j;
+        if (e.ts) for (j = 0; j < parsedAct.length; j++) {
+          if (!anulada[j] && parsedAct[j].key === e.key && Math.abs(tsMs(parsedAct[j].venta.ts) - e.ts) < 1500) { elegido = j; break; }
         }
-        // FIX BORRADO: si este navegador ya la eliminó y el Sheet aún no la marca, no mostrarla
+        if (elegido < 0) for (j = 0; j < parsedAct.length; j++) {
+          if (anulada[j] || parsedAct[j].key !== e.key) continue;
+          var ta = tsMs(parsedAct[j].venta.ts);
+          if (!e.ts || !ta || ta <= e.ts + 5000) elegido = j;
+        }
+        if (elegido >= 0) anulada[elegido] = true;
+      });
+
+      parsedAct.forEach(function(x, j) {
+        if (anulada[j]) return;
+        var mesId = x.mesId, asesor = x.asesor, dia = x.dia, venta = x.venta, key = x.key;
+        // Si este navegador ya la eliminó y el Sheet todavía no lo refleja, no mostrarla
         var tsV = tsMs(venta.ts), ti = -1;
         for (var i = 0; i < tombs.length; i++) {
           if (!tombUsado[i] && tombMatch(tombs[i], key, tsV)) { ti = i; break; }
         }
-        if (ti !== -1) {
-          tombUsado[ti] = true;
-          var t = tombs[ti];
-          if (ahora - (t.lastSent || 0) > 20000 && (t.tries || 0) < 6) {
-            t.lastSent = ahora; t.tries = (t.tries || 0) + 1; tombsCambio = true;
-            try { enviarEliminacion(t.fila, t.mesId); } catch(e) {}
-          }
-          return;
-        }
+        if (ti !== -1) { tombUsado[ti] = true; return; }
         next[mesId] = next[mesId] || {};
         next[mesId][asesor] = next[mesId][asesor] || {};
         var lista = next[mesId][asesor][dia] = next[mesId][asesor][dia] || [];
-        // FIX DUPLICADOS: id estable para filas del Sheet (antes no tenían id y
-        // editar una venta creaba una nueva en vez de reemplazarla)
-        var ocurr = lista.filter(function(x){ return x._key === key; }).length;
+        var ocurr = lista.filter(function(y){ return y._key === key; }).length;
         venta._key = key;
         venta.id = "rt|" + key + "|" + String(venta.ts) + "#" + ocurr;
         lista.push(venta);
       });
       // Tombstones resueltos: el Sheet ya no devuelve la fila → limpiar
       var tombsVivos = tombs.filter(function(t, i) {
-        if (tombUsado[i] === "ok") return false;
         return (tombUsado[i] || (ahora - t.deletedAt) < 60000) && (ahora - t.deletedAt) < 2*86400000;
       });
       if (tombsVivos.length !== tombs.length || tombsCambio) saveTombs(tombsVivos);
