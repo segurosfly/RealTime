@@ -56,6 +56,9 @@ th:first-child{text-align:left;}
   #bx-main::-webkit-scrollbar{width:8px;} #bx-main::-webkit-scrollbar-thumb{background:#3a3a3c;border-radius:4px;}
   .bx-row:hover{background:#2c2c2e;}
   .sf-fila:hover td{background-color:#F2F5F9;}
+  .sf-hoja input,.sf-hoja select,.sf-hoja textarea{background-color:#fff;color:#1e293b;border-color:#e2e8f0;}
+  .sf-hoja input::placeholder,.sf-hoja textarea::placeholder{color:#94a3b8;}
+  .sf-hoja .modal-overlay{background:rgba(15,23,42,0.45);}
   .bx-row:focus-visible,.bx-acc button:focus-visible,[role=tab]:focus-visible{outline:2px solid #0a84ff;outline-offset:2px;}
   .bx-mes{height:32px;border:none!important;border-radius:8px;background-color:#3a3a3c!important;color:#f5f5f7;font-weight:600;font-size:13px;padding:0 26px 0 10px;font-family:inherit;}
   .bx-acc{display:flex;align-items:center;border:1px solid #3a3a3c;border-radius:20px;background:#2c2c2e;}
@@ -132,8 +135,27 @@ th:first-child{text-align:left;}
       } else out[k]=v; }
     return changed?out:st; }
   var ce=React.createElement;
+  // Modo claro heredable: dentro de una vista clara, cada componente hijo se envuelve para que
+  // también se pinte en claro (las vistas de herramientas usan sus colores originales).
+  var CLARO=new WeakMap();
+  function aClaro(C){
+    var w=CLARO.get(C); if(w) return w;
+    w=function(pp){ var prev=window.__sfClaro; window.__sfClaro=true; try{ return C(pp); } finally{ window.__sfClaro=prev; } };
+    w.displayName=(C.displayName||C.name||"Vista")+"Claro";
+    CLARO.set(C,w); CLARO.set(w,w); return w;
+  }
+  window.__sfAClaro=aClaro;
+  var SYS_FONT="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif";
   React.createElement=function(type,props){
-    if(window.__sfClaro) return ce.apply(React,arguments);
+    if(window.__sfClaro){
+      var a2=Array.prototype.slice.call(arguments);
+      if(typeof type==="function" && !(type.prototype&&type.prototype.isReactComponent)) a2[0]=aClaro(type);
+      // En claro solo se unifica la tipografía
+      if(props&&props.style&&typeof props.style.fontFamily==="string"&&/Sora/.test(props.style.fontFamily)){
+        a2[1]=Object.assign({},props,{style:Object.assign({},props.style,{fontFamily:SYS_FONT})});
+      }
+      return ce.apply(React,a2);
+    }
     if(props){
       var p=props, np=null;
       if(p.style&&typeof p.style==="object"){ var ms=mapStyle(p.style); if(ms!==p.style){ np=Object.assign({},p); np.style=ms; } }
@@ -2132,8 +2154,8 @@ const MALLA_POR_MES = {
 };
 // ── MALLA SEGUROSFLY ─────────────────────────────────────────────────────────
 // Agentes principales y socios de fin de semana
-const MALLA_AGENTES  = ["Guillermo González","Wilmary Antolinez","Daniel Romero","Edwin Herrera"];
-const MALLA_SOCIOS   = ["Jhojan Torres","Wilker Casadiego","Otoniel Martell","Ricardo Torres"];
+const MALLA_AGENTES  = ["Guillermo González","Wilmary Antolinez","Daniel Romero","Edwin Herrera","Christian Torres"];
+const MALLA_SOCIOS   = ["Jhojan Torres","Wilker Casadiego","Otoniel Martell","Ricardo Torres","Daniel Torres"];
 const MALLA_TURNOS   = [
   { id:"1", label:"Turno 1", horario:"08:00–16:00", color:"#2563eb" },
   { id:"3", label:"Turno 3", horario:"10:00–18:00", color:"#0f766e" },
@@ -2162,69 +2184,172 @@ function mallaNombre(txt) {
   const todos = MALLA_AGENTES.concat(MALLA_SOCIOS).concat(["Bot Madruga"]);
   const low = t.toLowerCase();
   const exacto = todos.find(n=>n.toLowerCase()===low); if (exacto) return exacto;
-  const porNombre = todos.filter(n=>n.toLowerCase().split(" ")[0]===low.split(" ")[0]);
-  if (porNombre.length===1) return porNombre[0];
+  if (low.indexOf(" ")===-1) {
+    const porNombre = todos.filter(n=>n.toLowerCase().split(" ")[0]===low);
+    if (porNombre.length===1) return porNombre[0];
+  }
   return t;
 }
+// Velocidad: la última malla leída se guarda en el navegador para mostrarla al instante,
+// y todas las vistas comparten una sola petición al Apps Script.
+const MALLA_CACHE_KEY = "sfly_malla_cache_v1";
+function leerCacheMalla() { try { return JSON.parse(localStorage.getItem(MALLA_CACHE_KEY)) || null; } catch(e) { return null; } }
+let mallaPeticion = null;
+function pedirMalla(fresca) {
+  if (mallaPeticion && !fresca) return mallaPeticion;
+  const url = SHEETS_URL+"?accion=read&sheet="+encodeURIComponent("Malla de SegurosFly")+(fresca?"&fresh=1":"");
+  const prom = fetch(url,{cache:"no-store"}).then(r=>r.json()).then(function(data){
+    if (data && data.ok && Array.isArray(data.rows)) { try { localStorage.setItem(MALLA_CACHE_KEY, JSON.stringify({ rows:data.rows, hora:Date.now() })); } catch(e) {} }
+    return data;
+  });
+  mallaPeticion = prom;
+  prom.then(function(){ setTimeout(function(){ if (mallaPeticion===prom) mallaPeticion=null; }, 30000); },
+            function(){ if (mallaPeticion===prom) mallaPeticion=null; });
+  return prom;
+}
+function mallaDesdeCache(mesId) {
+  const c = leerCacheMalla(); if (!c) return null;
+  const res = mallaDesdeSheet(c.rows, mesId);
+  return res.malla ? { malla:res.malla, diag:res.diag, crudo:res.filas.slice(0,20), hora:new Date(c.hora) } : null;
+}
+
 function mallaDesdeSheet(rows, mesId) {
   const filas = (rows||[]).map(mallaFilaArray);
-  const mesNum = parseInt(mesId.split("-")[1]);
+  const [yy, mesNum] = mesId.split("-").map(Number);
+  const nd = new Date(yy, mesNum, 0).getDate();
+  const esFinde = (d) => { const w = new Date(yy, mesNum-1, d).getDay(); return w===0 || w===6; };
   const esFecha = (v) => { const m = String(v).trim().match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-]\d{2,4})?$/); return m ? { d:+m[1], m:+m[2] } : null; };
-  const out = { mes:mesId, turnos:[], fds:[], breaks:[], descansosFds:[], descansos:[], origen:"sheet" };
-  const porId = {};
-  const descPorAgente = {};
-  let colDia = null, fechasVistas = 0, filasUsadas = 0;
-  filas.forEach(f => {
+  // Horario en texto ("08:00 - 16:00", "8am a 4pm", "08:00–16:00") o como horas sueltas
+  const RE_HORA = /(\d{1,2})(?::(\d{2}))?\s*(a\.?\s?m\.?|p\.?\s?m\.?)?/i;
+  const esHorario = (v) => /\d{1,2}(:\d{2})?\s*(a\.?\s?m\.?|p\.?\s?m\.?)?\s*(-|–|—|a|al|hasta)\s*\d{1,2}(:\d{2})?/i.test(String(v));
+  const horaInicio = (h) => { const m = String(h).match(RE_HORA); if (!m) return 99; let x = +m[1]; const ap = (m[3]||"").toLowerCase(); if (ap.startsWith("p") && x<12) x+=12; if (ap.startsWith("a") && x===12) x=0; return x + (m[2]?+m[2]/60:0); };
+  const limpiaHorario = (h) => String(h).trim().replace(/\s*(-|–|—|\ba\b|\bal\b|hasta)\s*/i, "–");
+  let colDia = null, fechasVistas = 0, seccion = "";
+  const brutos = []; // filas con asignaciones, antes de agrupar
+  const personasHoja = [];
+  const descFindeHoja = {}; // descansos escritos en la hoja para sábados y domingos
+  // ¿Formato vertical? (fechas hacia abajo en una columna, personas en el encabezado)
+  const esFilaFechas = (f) => f.map(esFecha).filter(Boolean).length >= 3;
+  const conteoCol = {};
+  filas.forEach(f => f.forEach((v,j) => { if (esFecha(v)) conteoCol[j] = (conteoCol[j]||0) + 1; }));
+  const colFecha = Object.keys(conteoCol).sort((a,b)=>conteoCol[b]-conteoCol[a])[0];
+  const vertical = !filas.some(esFilaFechas) && colFecha !== undefined && conteoCol[colFecha] >= 3;
+  if (vertical) {
+    const cf = +colFecha;
+    const primera = filas.findIndex(f => esFecha(f[cf]));
+    let hdr = -1;
+    for (let i = primera-1; i >= 0; i--) { if (filas[i].filter((v,j)=>j!==cf && String(v).trim()).length >= 2) { hdr = i; break; } }
+    const encabezado = hdr >= 0 ? filas[hdr] : [];
+    const porHorario = {}, especiales = {};
+    const junta = (obj, d, n) => { obj[d] = obj[d] ? obj[d] + " / " + n : n; };
+    filas.forEach((f, i) => {
+      if (i <= hdr) return;
+      const fe = esFecha(f[cf]); if (!fe || fe.m !== mesNum) return;
+      fechasVistas++;
+      encabezado.forEach((h, j) => {
+        const H = String(h||"").trim(), v = String(f[j]||"").trim();
+        if (j === cf || !H || /^(d[ií]a|fecha|turno|horario|semana)$/i.test(H)) return;
+        if (!/break|pausa|almuerzo|descans|libre/i.test(H) && !esFecha(H)) { const pn = mallaNombre(H); if (personasHoja.indexOf(pn)===-1) personasHoja.push(pn); }
+        if (!v || v === "-") return;
+        if (/break|pausa|almuerzo|descans|libre/i.test(H)) {          // columna especial: la celda tiene nombres
+          const e = especiales[H] = especiales[H] || { nombre:H, horario:(String(H).match(/\d{1,2}(:\d{2})?\s*(-|–|a)\s*\d{1,2}(:\d{2})?/)||[""])[0], dias:{} };
+          v.split(/\s*[\/,\n]\s*/).forEach(n => junta(e.dias, fe.d, mallaNombre(n)));
+          return;
+        }
+        if (esFecha(H) || /^(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)$/i.test(H)) return;
+        const persona = mallaNombre(H);
+        if (esHorario(v)) {
+          const hor = limpiaHorario(v);
+          const b = porHorario[hor] = porHorario[hor] || { nombre:"", horario:hor, dias:{} };
+          junta(b.dias, fe.d, persona);
+        } else if (/^(descanso|libre)$/i.test(v) && esFinde(fe.d)) {
+          (descFindeHoja[fe.d] = descFindeHoja[fe.d] || []).push(persona);
+        } else if (/^(n\/?a|descanso|libre)$/i.test(v) && MALLA_SOCIOS.indexOf(persona) === -1 && !esFinde(fe.d)) {
+          const e = especiales.__desc = especiales.__desc || { nombre:"Descanso", horario:"", dias:{} };
+          junta(e.dias, fe.d, persona);
+        }
+      });
+    });
+    Object.values(porHorario).forEach(b => brutos.push(b));
+    Object.values(especiales).forEach(b => brutos.push(b));
+  }
+  if (!vertical) filas.forEach(f => {
     const fechas = f.map(esFecha);
-    const nFechas = fechas.filter(Boolean).length;
-    if (nFechas >= 3) {                        // fila de encabezado: define qué día es cada columna
+    if (fechas.filter(Boolean).length >= 3) {               // fila de encabezado con fechas
       colDia = {};
       fechas.forEach((x,i)=>{ if (x && x.m===mesNum) colDia[i]=x.d; });
       fechasVistas += Object.keys(colDia).length;
       return;
     }
     if (!colDia) return;
-    const label = String(f[0]||"").trim(), horario = String(f[1]||"").trim().replace(/\s*-\s*/,"–");
-    if (!label) return;
-    const L = label.toLowerCase();
+    const a = String(f[0]||"").trim(), b = String(f[1]||"").trim();
+    let horario = "", label = "";
+    if (esHorario(b)) { horario = b; label = a; }
+    else if (esHorario(a)) { horario = a; label = b; }
+    else { label = a || b; }
+    if (label && !esHorario(label)) seccion = label;         // celdas combinadas: el nombre solo está en la primera fila
+    const nombre = label || seccion;
     const dias = {};
-    Object.keys(colDia).forEach(i=>{ const v=String(f[i]||"").trim(); if (v && v!=="-" && !/^n\/?a$/i.test(v)) dias[String(colDia[i])] = v.split(/\s*[\/,\n]\s*/).map(mallaNombre).join(" / "); });
+    Object.keys(colDia).forEach(i=>{ const v=String(f[i]||"").trim(); if (v && v!=="-" && !/^n\/?a$/i.test(v)) dias[colDia[i]] = v.split(/\s*[\/,\n]\s*/).map(mallaNombre).join(" / "); });
     if (!Object.keys(dias).length) return;
-    filasUsadas++;
-    if (/descans|libre/.test(L)) {
-      Object.keys(dias).forEach(d=>dias[d].split(" / ").forEach(n=>{ (descPorAgente[n]=descPorAgente[n]||[]).push(+d); }));
-      return;
-    }
-    if (/break/.test(L)) { out.breaks.push({ id:label, horario, dias }); return; }
-    let id, grupo = "turnos", etiqueta = label;
-    if (/noct|madrug|t\s*4\b/.test(L)) { id="T4"; etiqueta="Nocturno"; }
-    else if (/fin de semana|fds|s[aá]b|dom|t\s*5\b|t\s*6\b/.test(L)) {
-      grupo="fds"; etiqueta="Fin de Semana";
-      id = (/dom|t\s*6\b/.test(L) || /^1[3-9]/.test(horario)) ? "FDS2" : "FDS1";
-    } else {
-      const n = (L.match(/(?:turno|t)\s*(\d)/)||[])[1];
-      id = n ? "T"+n : label;
-      etiqueta = n ? "Turno "+n : label;
-    }
-    if (porId[id]) { Object.assign(porId[id].dias, dias); return; }
-    const t = { id, label:etiqueta, horario, color:MALLA_COLORES[id]||"#64748b", dias };
-    porId[id] = t; out[grupo].push(t);
+    brutos.push({ nombre, horario: horario ? limpiaHorario(horario) : "", dias });
   });
-  out.turnos.sort((a,b)=>String(a.id).localeCompare(String(b.id)));
-  out.fds.sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+  const out = { mes:mesId, turnos:[], fds:[], breaks:[], descansosFds:[], descansos:[], origen:"sheet" };
+  const descPorAgente = {}, semana = {}, finde = {};
+  brutos.forEach(r => {
+    const L = r.nombre.toLowerCase();
+    if (/descans|libre/.test(L)) { Object.keys(r.dias).forEach(d=>r.dias[d].split(" / ").forEach(n=>{ (descPorAgente[n]=descPorAgente[n]||[]).push(+d); })); return; }
+    if (/break|almuerzo|pausa/.test(L)) { out.breaks.push({ id:r.nombre, horario:r.horario, dias:r.dias }); return; }
+    const nocturno = /noct|madrug/.test(L) || horaInicio(r.horario) >= 21;
+    // Se separan los días hábiles de los de fin de semana: una misma fila puede tener ambos
+    [false,true].forEach(fin => {
+      const dias = {}; Object.keys(r.dias).forEach(d=>{ if (esFinde(+d)===fin || nocturno) dias[d]=r.dias[d]; });
+      if (!Object.keys(dias).length) return;
+      const grupo = nocturno ? semana : (fin ? finde : semana);
+      const clave = nocturno ? "NOCT" : (r.horario || r.nombre);
+      if (!grupo[clave]) grupo[clave] = { nombre:r.nombre, horario:r.horario, dias:{}, nocturno };
+      Object.assign(grupo[clave].dias, dias);
+    });
+  });
+  // Turnos de lunes a viernes: el número del nombre manda ("Turno 2" → T2); si no hay, se ordenan por hora de inicio
+  const usados = new Set();
+  const lista = Object.values(semana).sort((x,y)=>horaInicio(x.horario)-horaInicio(y.horario));
+  lista.forEach(t => {
+    if (t.nocturno) { t.id = "T4"; usados.add("T4"); return; }
+    const n = (t.nombre.toLowerCase().match(/(?:turno|t)\s*(\d)/)||t.nombre.trim().match(/^(\d)$/)||[])[1];
+    if (n && !usados.has("T"+n)) { t.id = "T"+n; usados.add(t.id); }
+  });
+  let sig = 1;
+  lista.forEach(t => { if (t.id) return; while (usados.has("T"+sig) || sig===4) sig++; t.id = "T"+sig; usados.add(t.id); });
+  lista.forEach(t => out.turnos.push({ id:t.id, label:t.nocturno?"Nocturno":"Turno "+t.id.slice(1), labelSheet:t.nombre, horario:t.horario, color:MALLA_COLORES[t.id]||"#64748b", dias:t.dias }));
+  out.turnos.sort((x,y)=>x.id.localeCompare(y.id, undefined, {numeric:true}));
+  Object.values(finde).sort((x,y)=>horaInicio(x.horario)-horaInicio(y.horario)).forEach((t,i) => {
+    const id = "FDS"+(i+1);
+    out.fds.push({ id, label:"FDS", labelSheet:t.nombre, horario:t.horario, color:MALLA_COLORES[id]||"#9a3412", dias:t.dias });
+  });
   out.descansos = Object.keys(descPorAgente).map(a=>({ agente:a, dias:descPorAgente[a].sort((x,y)=>x-y) }));
-  // Descansos de fin de semana: agentes principales que no aparecen en ningún turno del sábado/domingo
-  const [yy,mm] = mesId.split("-").map(Number), nd = new Date(yy,mm,0).getDate();
+  // Quiénes están en la malla del Drive: los agentes (no socios ni bot) y los socios
+  const presentes = new Set(personasHoja);
+  out.turnos.concat(out.fds).forEach(t=>Object.values(t.dias).forEach(v=>v.split(" / ").forEach(n=>presentes.add(n))));
+  Object.keys(descPorAgente).forEach(n=>presentes.add(n));
+  presentes.delete("Bot Madruga"); presentes.delete("");
+  const orden = (lista) => lista.slice().sort((a,b)=>{ const ia=MALLA_AGENTES.indexOf(a), ib=MALLA_AGENTES.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
+  out.agentes = orden([...presentes].filter(n=>MALLA_SOCIOS.indexOf(n)===-1 && !/break|descans|libre/i.test(n)));
+  out.socios  = MALLA_SOCIOS.filter(n=>presentes.has(n));
+  // Descanso de fin de semana DÍA POR DÍA: agentes que no tienen turno ese sábado o domingo
+  const hayDescFinde = Object.keys(descFindeHoja).length > 0;
   for (let d=1; d<=nd; d++) {
-    if (new Date(yy,mm-1,d).getDay()!==6) continue;
-    const finde = [d, d+1].filter(x=>x<=nd);
+    if (!esFinde(d)) continue;
+    if (hayDescFinde) { out.descansosFds.push({ dias:[d], descansan: orden(descFindeHoja[d]||[]) }); continue; } // lo que dice la hoja
     const trabajan = new Set();
-    out.turnos.concat(out.fds).forEach(t=>finde.forEach(x=>{ (t.dias[String(x)]||"").split(" / ").forEach(n=>trabajan.add(n)); }));
+    out.turnos.concat(out.fds).forEach(t=>{ (t.dias[String(d)]||"").split(" / ").forEach(n=>trabajan.add(n)); });
     if (!trabajan.size) continue;
-    out.descansosFds.push({ dias:finde, descansan:MALLA_AGENTES.filter(a=>!trabajan.has(a)) });
+    out.descansosFds.push({ dias:[d], descansan:out.agentes.filter(a=>!trabajan.has(a)) });
   }
   const ok = out.turnos.length + out.fds.length > 0;
-  return { malla: ok ? out : null, diag: { filas: filas.length, fechasDelMes: fechasVistas, filasUsadas,
+  return { malla: ok ? out : null, filas, diag: { filas: filas.length, fechasDelMes: fechasVistas, filasUsadas: brutos.length,
+    turnosSemana: out.turnos.length, turnosFinde: out.fds.length,
+    formato: (filas.some(f=>f.map(esFecha).filter(Boolean).length>=3) ? "horizontal" : "vertical"),
     encabezado: (filas.find(f=>f.map(esFecha).filter(Boolean).length>=3)||filas[0]||[]).slice(0,6).join(" | ") } };
 }
 
@@ -2255,23 +2380,31 @@ function MallaTab({ mesId, store }) {
   const [semanaActiva,setSemanaActiva]= useState(0); // null = vista equipo, string = vista personal
 
   // Malla en vivo desde la pestaña "Malla de SegurosFly" del Drive; si no hay datos del mes, usa la guardada en el código
-  const [remota, setRemota] = useState({ estado:"cargando", porMes:{}, diag:null });
+  const [remota, setRemota] = useState(function(){
+    const c = mallaDesdeCache(mesId);
+    return c ? { estado:"cargando", porMes:{[mesId]:c.malla}, diag:c.diag, hora:c.hora, deCache:true } : { estado:"cargando", porMes:{}, diag:null };
+  });
+  const [intento, setIntento] = useState(0);
   useEffect(function(){
     let vivo = true;
-    setRemota(r=>Object.assign({}, r, { estado:"cargando" }));
-    fetch(SHEETS_URL+"?accion=read&sheet="+encodeURIComponent("Malla de SegurosFly"),{cache:"no-store"})
-      .then(r=>r.json())
+    setRemota(function(r){
+      const n = Object.assign({}, r, { estado:"cargando" });
+      if (!n.porMes[mesId]) { const c = mallaDesdeCache(mesId); if (c) { n.porMes = Object.assign({}, n.porMes, {[mesId]:c.malla}); n.hora = c.hora; n.deCache = true; } }
+      return n;
+    });
+    const limite = setTimeout(function(){ if (vivo) setRemota(r=>Object.assign({}, r, { estado:"error", diag:{ error:"El Apps Script no respondió en 20 segundos." } })); }, 20000);
+    pedirMalla(intento>0)
       .then(function(data){
         if (!vivo) return;
         if (!data || !data.ok) { setRemota({ estado:"error", porMes:{}, diag:{ error:(data&&data.error)||"Respuesta inválida del Apps Script" } }); return; }
         const res = mallaDesdeSheet(data.rows||[], mesId);
-        setRemota(r=>({ estado: res.malla?"ok":"sinmes", porMes: Object.assign({}, r.porMes, res.malla?{[mesId]:res.malla}:{}), diag: res.diag, hora: new Date() }));
+        setRemota(r=>({ estado: res.malla?"ok":"sinmes", porMes: Object.assign({}, r.porMes, res.malla?{[mesId]:res.malla}:{}), diag: res.diag, crudo: res.filas.slice(0,20), hora: new Date(), deCache:false }));
       })
-      .catch(function(e){ if (vivo) setRemota({ estado:"error", porMes:{}, diag:{ error:String(e) } }); });
-    return function(){ vivo = false; };
-  },[mesId]);
+      .catch(function(e){ if (vivo) setRemota(r=>r.estado==="error"?r:Object.assign({}, r, { estado:"error", diag:{ error:"No se pudo conectar con el Apps Script ("+String(e&&e.message||e)+")." } })); })
+      .finally(function(){ clearTimeout(limite); });
+    return function(){ vivo = false; clearTimeout(limite); };
+  },[mesId, intento]);
   const malla    = remota.porMes[mesId] || MALLA_POR_MES[mesId] || null;
-  useEffect(function(){ setSemanaActiva(0); },[mesId]);
 
   // Cargar notas desde Sheets al montar (compartidas entre todos)
   useEffect(function(){
@@ -2328,9 +2461,17 @@ function MallaTab({ mesId, store }) {
     }
     return weeks;
   },[malla,mesId]);
+  useEffect(function(){
+    // Abre en la semana actual (lunes a domingo) si se está viendo el mes en curso
+    const hoy = new Date();
+    if (hoy.getFullYear()===year && hoy.getMonth()+1===mesNum) {
+      const i = semanas.findIndex(w=>w.indexOf(hoy.getDate())!==-1);
+      setSemanaActiva(i>=0?i:0);
+    } else setSemanaActiva(0);
+  },[mesId, semanas.length]);
 
   // Turnos principales (sin breaks)
-  const TURNOS_PRINCIPALES = malla ? malla.turnos.filter(t=>["T1","T2","T3"].includes(t.id)) : [];
+  const TURNOS_PRINCIPALES = malla ? malla.turnos.filter(t=>t.id!=="T4") : [];
   // Turno labels correctos
   const TURNO_META = {"T1":{label:"Turno 1",h:"08:00–16:00",c:"#2563eb"},"T2":{label:"Turno 2",h:"10:00–18:00",c:"#0f766e"},"T3":{label:"Turno 3",h:"14:00–22:00",c:"#7c3aed"},"T4":{label:"Nocturno",h:"22:00–08:00",c:"#475569"},"FDS1":{label:"FDS",h:"08:00–15:00",c:"#b45309"},"FDS2":{label:"FDS",h:"13:00–20:00",c:"#be185d"}};
 
@@ -2361,28 +2502,36 @@ function MallaTab({ mesId, store }) {
   }
 
   // Colors
-  const AGENTE_COLORS={"Guillermo González":"#2563eb","Wilmary Antolinez":"#be185d","Daniel Romero":"#0f766e","Edwin Herrera":"#ea580c","Jhojan Torres":"#b45309","Wilker Casadiego":"#0891b2","Otoniel Martell":"#7c3aed","Ricardo Torres":"#059669","Bot Madruga":"#475569"};
+  const AGENTE_COLORS={"Guillermo González":"#2563eb","Wilmary Antolinez":"#be185d","Daniel Romero":"#0f766e","Edwin Herrera":"#ea580c","Jhojan Torres":"#b45309","Wilker Casadiego":"#0891b2","Otoniel Martell":"#7c3aed","Ricardo Torres":"#059669","Daniel Torres":"#4f46e5","Christian Torres":"#0369a1","Bot Madruga":"#475569"};
   let DOW = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
 
   function AgenteBadge({name, size="md", onClick, active}){
     if(!name||name==="N/A"||name==="") return <span style={{color:"#cbd5e1",fontSize:11}}>—</span>;
     if(name==="Bot Madruga") return <span style={{fontSize:10,color:"#94a3b8"}}>🤖 Bot</span>;
+    // Varias personas en el mismo turno: un chip por persona
+    if(name.indexOf(" / ")!==-1) return (
+      <span style={{display:"inline-flex",flexDirection:"column",gap:3,alignItems:"center"}}>
+        {name.split(" / ").map(n=><AgenteBadge key={n} name={n} size={size} onClick={onClick} active={active} />)}
+      </span>
+    );
     let c=AGENTE_COLORS[name]||"#6366f1";
     const isSocio=MALLA_SOCIOS.includes(name);
-    const firstName=name.split(" ")[0];
-    const sz=size==="sm"?{fs:10,pad:"2px 6px",av:14}:{fs:11,pad:"3px 9px",av:18};
+    // Nombre completo e iniciales: evita confundir a personas con el mismo nombre (Daniel Romero / Daniel Torres)
+    const iniciales=name.split(" ").filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+    const sz=size==="sm"?{fs:10,pad:"2px 7px",av:16}:{fs:11,pad:"3px 9px",av:20};
     return (
       <span onClick={onClick} style={{display:"inline-flex",alignItems:"center",gap:4,
         background:active?c:c+"18",border:"1.5px solid "+c+(active?"":"44"),borderRadius:20,
         padding:sz.pad,fontSize:sz.fs,fontWeight:700,color:active?"#fff":c,
-        cursor:onClick?"pointer":"default",transition:"all .15s",whiteSpace:"nowrap"}}>
+        cursor:onClick?"pointer":"default",transition:"all .15s",whiteSpace:size==="sm"?"normal":"nowrap",
+        lineHeight:size==="sm"?1.15:"normal",textAlign:"left",maxWidth:size==="sm"?"100%":"none"}}>
         <span style={{width:sz.av,height:sz.av,borderRadius:"50%",
           background:active?"rgba(255,255,255,0.3)":c,
           display:"inline-flex",alignItems:"center",justifyContent:"center",
-          fontSize:sz.av-8,color:"#fff",fontWeight:800,flexShrink:0}}>
-          {name[0]}
+          fontSize:sz.av-10,color:"#fff",fontWeight:800,flexShrink:0,letterSpacing:"-0.02em"}}>
+          {iniciales}
         </span>
-        {firstName}
+        {name}
         {isSocio&&<span style={{fontSize:9,opacity:0.8}}>·socio</span>}
       </span>
     );
@@ -2581,7 +2730,8 @@ function MallaTab({ mesId, store }) {
         border:"1.5px dashed #e2e8f0",color:"#94a3b8"}}>
         <div style={{fontSize:28,marginBottom:8}}>📭</div>
         <div style={{fontWeight:700,fontSize:14}}>{remota.estado==="cargando"?"Leyendo la malla del Drive…":"No hay malla de "+mesLabel+" en el Drive"}</div>
-        {remota.estado==="error"&&<div style={{fontSize:12,marginTop:8}}>No se pudo leer la pestaña "Malla de SegurosFly": {remota.diag&&remota.diag.error}</div>}
+        {remota.estado==="error"&&<div style={{fontSize:12.5,marginTop:8,color:"#475569"}}>No se pudo leer la pestaña "Malla de SegurosFly". {remota.diag&&remota.diag.error}</div>}
+        {remota.estado!=="cargando"&&<button onClick={()=>setIntento(i=>i+1)} style={{marginTop:14,padding:"8px 16px",borderRadius:8,border:"1.5px solid #12304A",background:"#12304A",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>Volver a leer el Drive</button>}
         {remota.estado==="sinmes"&&remota.diag&&<div style={{fontSize:12,marginTop:8,lineHeight:1.6}}>
           La pestaña "Malla de SegurosFly" respondió con {remota.diag.filas} filas, pero ninguna fecha de {mesLabel}.<br/>
           Revisa que la primera fila tenga las fechas del mes (1/{mesNum}, 2/{mesNum}…), la columna A el turno y la B el horario.<br/>
@@ -2594,8 +2744,22 @@ function MallaTab({ mesId, store }) {
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
         <div style={{fontSize:12,color:"#64748b"}}>
           {remota.porMes[mesId]
-            ? "Malla leída en vivo de la pestaña “Malla de SegurosFly” del Drive"+(remota.hora?", a las "+remota.hora.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"}):"")+"."
+            ? (remota.deCache
+                ? "Mostrando la última copia del Drive ("+(remota.hora?remota.hora.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"}):"")+")"+(remota.estado==="cargando"?". Actualizando…":".")
+                : "Malla leída de la pestaña “Malla de SegurosFly” del Drive"+(remota.hora?", a las "+remota.hora.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"}):"")+".")
             : "Malla guardada en el dashboard (la pestaña del Drive no tiene este mes)."}
+          {remota.estado!=="cargando"&&<button onClick={()=>setIntento(i=>i+1)} style={{marginLeft:8,background:"none",border:"none",color:"#1d4ed8",fontWeight:700,cursor:"pointer",fontSize:12,padding:0}}>Actualizar ahora</button>}
+          {remota.diag&&<span style={{marginLeft:8}}>{remota.diag.turnosSemana||0} turnos de lunes a viernes y {remota.diag.turnosFinde||0} de fin de semana.</span>}
+          {remota.crudo&&<details style={{marginTop:6}}>
+            <summary style={{cursor:"pointer",color:"#1d4ed8",fontWeight:700}}>Ver lo que llegó del Drive</summary>
+            <div style={{overflowX:"auto",marginTop:6,background:"#fff",border:"1px solid #e2e8f0",borderRadius:8}}>
+              <table style={{borderCollapse:"collapse",fontSize:11}}>
+                <tbody>{remota.crudo.map((f,i)=>(
+                  <tr key={i}>{f.slice(0,12).map((c,j)=><td key={j} style={{border:"1px solid #e2e8f0",padding:"3px 6px",whiteSpace:"nowrap",color:"#334155",background:j<2?"#f8fafc":"#fff"}}>{c}</td>)}</tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </details>}
         </div>
         {/* Aviso breaks */}
         <div style={{background:"#fffbeb",border:"1px solid #fbbf24",borderRadius:10,
@@ -2610,8 +2774,7 @@ function MallaTab({ mesId, store }) {
             let realDays=week.filter(Boolean);
             if(!realDays.length) return null;
             let wkndDays=realDays.filter(d=>isWeekend(d));
-            const lunes=realDays.find(d=>!isWeekend(d));
-            const vie=realDays.filter(d=>!isWeekend(d)).pop();
+            const MES3=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"][mesNum-1];
             return (
               <button key={wi}
                 onClick={()=>setSemanaActiva(wi)}
@@ -2619,8 +2782,7 @@ function MallaTab({ mesId, store }) {
                   cursor:"pointer",border:"1.5px solid "+(semanaActiva===wi?"#6d28d9":"#e2e8f0"),
                   background:semanaActiva===wi?"#6d28d9":"#fff",
                   color:semanaActiva===wi?"#fff":"#64748b",transition:"all .15s"}}>
-                S{wi+1} {lunes&&mesNum+"/"+lunes}–{vie&&mesNum+"/"+vie}
-                {wkndDays.length>0&&" 🏖"}
+                S{wi+1} · {realDays[0]===realDays[realDays.length-1]?realDays[0]:realDays[0]+"–"+realDays[realDays.length-1]} {MES3}
               </button>
             );
           })}
@@ -2656,7 +2818,7 @@ function MallaTab({ mesId, store }) {
                   <thead>
                     <tr style={{background:"#f8fafc"}}>
                       <th style={{padding:"8px 14px",fontSize:11,fontWeight:700,color:"#94a3b8",
-                        textAlign:"left",borderBottom:"1px solid #e2e8f0",width:110}}>Turno</th>
+                        textAlign:"left",borderBottom:"1px solid #e2e8f0",width:96}}>Turno</th>
                       {week.map(function(d,di){
                         if(d===null) return <th key={di} style={{borderBottom:"1px solid #e2e8f0",width:60}}/>;
                         const wknd=isWeekend(d), dow=getDow(d);
@@ -2680,7 +2842,7 @@ function MallaTab({ mesId, store }) {
                         <tr key={ti} style={{borderBottom:"1px solid #f1f5f9"}}>
                           <td style={{padding:"8px 14px",borderRight:"1px solid #f1f5f9"}}>
                             <div style={{fontSize:11,fontWeight:800,color:m.c}}>{m.label}</div>
-                            <div style={{fontSize:10,color:"#94a3b8"}}>{m.h}</div>
+                            <div style={{fontSize:10,color:"#94a3b8",whiteSpace:"nowrap"}}>{m.h}</div>
                           </td>
                           {week.map(function(d,di){
                             if(d===null) return <td key={di}/>;
@@ -2707,7 +2869,7 @@ function MallaTab({ mesId, store }) {
                         <tr key={"fds"+fi} style={{borderBottom:"1px solid #fecdd3",background:"#fff8f8"}}>
                           <td style={{padding:"8px 14px",borderRight:"1px solid #fecdd3"}}>
                             <div style={{fontSize:11,fontWeight:800,color:m.c}}>{m.label}</div>
-                            <div style={{fontSize:10,color:m.c+"99"}}>{m.h}</div>
+                            <div style={{fontSize:10,color:m.c+"99",whiteSpace:"nowrap"}}>{m.h}</div>
                           </td>
                           {week.map(function(d,di){
                             if(d===null) return <td key={di} style={{background:"#fff8f8"}}/>;
@@ -2726,22 +2888,24 @@ function MallaTab({ mesId, store }) {
                     })}
                     {/* Descanso FDS — quién libra */}
                     {wkndDays.length>0&&(()=>{
-                      let desc=(malla.descansosFds||[]).find(d=>wkndDays.some(w=>d.dias.includes(w)));
-                      if(!desc||!desc.descansan||!desc.descansan.length) return null;
+                      const descDe=(d)=>((malla.descansosFds||[]).find(x=>x.dias.includes(d))||{}).descansan||[];
+                      if(!wkndDays.some(w=>descDe(w).length)) return null;
                       return (
                         <tr style={{background:"#f0fdf4",borderBottom:"1px solid #bbf7d0"}}>
                           <td style={{padding:"8px 14px",borderRight:"1px solid #bbf7d0"}}>
                             <div style={{fontSize:11,fontWeight:800,color:"#059669"}}>🏖 Descansa</div>
-                            <div style={{fontSize:10,color:"#94a3b8"}}>libre este FDS</div>
+                            <div style={{fontSize:10,color:"#94a3b8"}}>libre ese día</div>
                           </td>
                           {week.map(function(d,di){
                             if(d===null) return <td key={di} style={{background:"#f0fdf4"}}/>;
                             if(!isWeekend(d)) return <td key={di} style={{background:"#f0fdf4"}}/>;
                             return (
                               <td key={di} colSpan={1} style={{padding:"6px 8px",textAlign:"center",background:"#f0fdf4"}}>
-                                {desc.descansan.map(a=>(
-                                  <AgenteBadge key={a} name={a} size="sm"/>
-                                ))}
+                                <div style={{display:"flex",flexDirection:"column",gap:3,alignItems:"center"}}>
+                                  {descDe(d).map(a=>(
+                                    <AgenteBadge key={a} name={a} size="sm"/>
+                                  ))}
+                                </div>
                               </td>
                             );
                           })}
@@ -2837,17 +3001,17 @@ function MallaTab({ mesId, store }) {
           {asesorVista?"Cambiá de asesor:":"Tocá para ver tu malla personal:"}
         </div>
         <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
-          {MALLA_AGENTES.map(a=>(
+          {((malla&&malla.agentes&&malla.agentes.length)?malla.agentes:MALLA_AGENTES).map(a=>(
             <AgenteBadge key={a} name={a} active={asesorVista===a}
               onClick={()=>setAsesorVista(asesorVista===a?null:a)}/>
           ))}
           <div style={{width:1,height:20,background:"#e2e8f0",margin:"0 4px"}}/>
-          {MALLA_SOCIOS.map(a=>(
+          {((malla&&malla.socios)?malla.socios:MALLA_SOCIOS).map(a=>(
             <AgenteBadge key={a} name={a} size="sm"
               onClick={()=>setAsesorVista(asesorVista===a?null:a)}
               active={asesorVista===a}/>
           ))}
-          <span style={{fontSize:10,color:"#94a3b8",marginLeft:"auto"}}>N/A = libre ese día</span>
+          <span style={{fontSize:10,color:"#94a3b8",marginLeft:"auto"}}>Vacío o N/A = libre ese día</span>
         </div>
       </div>
 
@@ -4946,6 +5110,24 @@ function BolsaTitulo({ titulo, sub }) {
   );
 }
 
+// ── Hoja clara para las herramientas (tablas, formularios y contenido para compartir) ──
+const HERRAMIENTAS_CLARAS = ["tracker","malla","duplicados","calc","alianzas","tosspile","docs"];
+const HojaHerramienta = claro(function HojaHerramienta({ tab, store, mesId, onUpdate, onIr }) {
+  const mob = useIsMobile(760);
+  if (tab==="docs") return <DocumentosTab />;
+  return (
+    <div className="sf-hoja" style={{background:"#F3F5F8",color:"#1e293b",colorScheme:"light",borderRadius:mob?14:18,padding:mob?"14px 10px":"22px 24px",
+      boxShadow:"0 12px 40px rgba(0,0,0,0.35)",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif"}}>
+      {tab==="tracker"   &&<TrackerTab store={store} />}
+      {tab==="tosspile"  &&<TosspileTab store={store} onUpdate={onUpdate} />}
+      {tab==="duplicados"&&<DuplicadosTab store={store} mesId={mesId} onIr={onIr} />}
+      {tab==="calc"      &&<CalcTab />}
+      {tab==="malla"     &&<MallaTab mesId={mesId} store={store} />}
+      {tab==="alianzas"  &&<AlianzasTab />}
+    </div>
+  );
+});
+
 function App() {
   const [tab,    setTab]    = useState("global");
   const [mesId,  setMesId]  = useState(getMesActual);
@@ -4953,6 +5135,8 @@ function App() {
   const [showPin,setShowPin] = useState(false);
   const [configSource, setConfigSource] = useState("local"); // "remote" | "local"
   const storeRef = useRef(store);
+  // Precarga de la malla en segundo plano para que la pestaña abra al instante
+  useEffect(function(){ const t = setTimeout(function(){ pedirMalla(false).catch(function(){}); }, 1500); return function(){ clearTimeout(t); }; },[]);
   // Registros duplicados del mes seleccionado (badge en la pestaña Duplicados)
   const dupCount = useMemo(()=>buildDupGroups(store).filter(g=>g.entries.some(x=>x.mesId===mesId)).reduce((s,g)=>s+g.entries.length-1,0),[store,mesId]);
 
@@ -5244,13 +5428,7 @@ function App() {
     <div>
       {tab==="global"    &&<GlobalTab store={store} mesId={mesId} configSource={configSource} sinCabecera />}
       {esAsesor          &&<AdvisorTab key={tab} name={ASESORES_NOMBRES[tab]||cap(tab)} asesor={tab} color={ASESORES_COLORES[tab]||"#6366f1"} store={store} mesId={mesId} onUpdate={onUpdate} configSource={configSource} sinHeader />}
-      {tab==="tracker"   &&<TrackerTab store={store} />}
-      {tab==="tosspile"  &&<TosspileTab store={store} onUpdate={onUpdate} />}
-      {tab==="docs"       &&<DocumentosTab />}
-      {tab==="duplicados" &&<DuplicadosTab store={store} mesId={mesId} onIr={ir} />}
-      {tab==="calc"      &&<CalcTab />}
-      {tab==="malla"     &&<MallaTab mesId={mesId} store={store} />}
-      {tab==="alianzas"  &&<AlianzasTab />}
+      {HERRAMIENTAS_CLARAS.indexOf(tab)!==-1&&<HojaHerramienta tab={tab} store={store} mesId={mesId} onUpdate={onUpdate} onIr={ir} />}
     </div>
   );
   const hero = heroIds ? (
