@@ -182,6 +182,16 @@ const LOGO_SQ_SRC  = "https://raw.githubusercontent.com/segurosfly/RealTime/main
 const DOW      = ["Dom","Lun","Mar","Mie","Jue","Vie","Sab"];
 var ASESORES = ["guillermo","carolina","daniel","wilmary","christian","edwin"];
 var ASESORES_NOMBRES = {guillermo:"Guillermo González",carolina:"Carolina",daniel:"Daniel Romero",wilmary:"Wilmary Antolinez",christian:"Christian Torres",edwin:"Edwin Herrera"};
+// Asesores que salieron de la empresa: desde ese mes no aparecen en el dashboard.
+// Su historial sigue en el Tracker. Si aun así tienen ventas en ese mes, se muestran para no esconder revenue.
+var ASESORES_SALIDA = { carolina:"2026-10", daniel:"2026-10" };
+function asesorVisible(a, mesId, store) {
+  var sal = ASESORES_SALIDA[a];
+  if (!sal || !mesId || mesId < sal) return true;
+  if (!store) return false;
+  var d = getMonthData(store, mesId, a) || {};
+  return Object.keys(d).some(function(k){ return (d[k]||[]).length > 0; });
+}
 var ASESORES_COLORES  = {guillermo:"#2563eb",carolina:"#7c3aed",daniel:"#0f766e",wilmary:"#be185d",christian:"#0891b2",edwin:"#ea580c"};
 // PROTECCION POR ASESOR: contrasenas requeridas para Guardar/Eliminar
 var PIN_ASESORES = { guillermo: "2026", carolina: "2027", daniel: "2028", wilmary: "2029", christian: "2030", edwin: "2031" };
@@ -1842,7 +1852,7 @@ function GlobalTab({store,mesId,configSource,sinCabecera}) {
 
       <Card>
         <SLabel>Comparativa de Asesores</SLabel>
-        {[{name:"Guillermo",acum:gAcum,proy:gProy,prom:gProm,color:"#2563eb",ventas:gVentas},{name:"Carolina",acum:cAcum,proy:cProy,prom:cProm,color:"#7c3aed",ventas:cVentas},{name:"Daniel R.",acum:dAcum,proy:dProy,prom:dProm,color:"#0f766e",ventas:dVentas},{name:"Wilmary",acum:wAcum,proy:wProy,prom:wProm,color:"#be185d",ventas:wVentas},{name:"Christian",acum:chAcum,proy:chProy,prom:chProm,color:"#0891b2",ventas:chVentas},{name:"Edwin",acum:eAcum,proy:eProy,prom:eProm,color:"#ea580c",ventas:eVentas}].sort((a,b)=>b.proy-a.proy).map((a,ai)=>(
+        {[{name:"Guillermo",acum:gAcum,proy:gProy,prom:gProm,color:"#2563eb",ventas:gVentas},{name:"Carolina",acum:cAcum,proy:cProy,prom:cProm,color:"#7c3aed",ventas:cVentas},{name:"Daniel R.",acum:dAcum,proy:dProy,prom:dProm,color:"#0f766e",ventas:dVentas},{name:"Wilmary",acum:wAcum,proy:wProy,prom:wProm,color:"#be185d",ventas:wVentas},{name:"Christian",acum:chAcum,proy:chProy,prom:chProm,color:"#0891b2",ventas:chVentas},{name:"Edwin",acum:eAcum,proy:eProy,prom:eProm,color:"#ea580c",ventas:eVentas}].filter(x=>{ const id={"Carolina":"carolina","Daniel R.":"daniel","Daniel":"daniel"}[x.name]; return !id||asesorVisible(id,mesId,store); }).sort((a,b)=>b.proy-a.proy).map((a,ai)=>(
           <div key={a.name} style={{marginBottom:16}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1865,24 +1875,38 @@ function GlobalTab({store,mesId,configSource,sinCabecera}) {
       </Card>
       <Card>
         <SLabel>Comisiones Proyectadas al Cierre ({normalizePct(cfg.comision||10)}% Base / {normalizePct(cfg.pctBase||11)}% Meta / {normalizePct(cfg.pctSfly||12)}% SFly)</SLabel>
-        <div className="mob-g4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:10}}>
-          {(()=>{
-            // Piso proyectado — si el equipo proyecta superar la meta, usa el % del piso siguiente
-            let pisoProy = totProy>=(cfg.metaSfly||13000)?3:totProy>=(cfg.metaBase||10000)?2:1;
-            const comProy  = pisoProy===3?pct3eq:pisoProy===2?pct2eq:pct1eq;
-            return [{l:"G actual",v:gAcum*comPct,c:"#2563eb"},{l:"G proyectada",v:gProy*comProy,c:"#2563eb"},
-              {l:"C actual",v:cAcum*comPct,c:"#7c3aed"},{l:"C proyectada",v:cProy*comProy,c:"#7c3aed"},
-              {l:"D actual",v:dAcum*comPct,c:"#0f766e"},{l:"D proyectada",v:dProy*comProy,c:"#0f766e"},
-              {l:"W actual",v:wAcum*comPct,c:"#be185d"},{l:"W proyectada",v:wProy*comProy,c:"#be185d"},
-              {l:"Ch actual",v:chAcum*comPct,c:"#0891b2"},{l:"Ch proyectada",v:chProy*comProy,c:"#0891b2"},
-              {l:"E actual",v:eAcum*comPct,c:"#ea580c"},{l:"E proyectada",v:eProy*comProy,c:"#ea580c"}];
-          })().map(x=>(
-            <div key={x.l} style={{background:x.c+"08",border:"1px solid "+x.c+"22",borderRadius:10,padding:"12px 14px"}}>
-              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>{x.l}</div>
-              <div style={{fontSize:18,fontWeight:800,color:x.c}}>{usd(x.v,0)}</div>
+        {(()=>{
+          // Piso proyectado — si el equipo proyecta superar la meta, usa el % del piso siguiente
+          let pisoProy = totProy>=(cfg.metaSfly||13000)?3:totProy>=(cfg.metaBase||10000)?2:1;
+          const comProy  = pisoProy===3?pct3eq:pisoProy===2?pct2eq:pct1eq;
+          const filas = [["guillermo",gAcum,gProy],["carolina",cAcum,cProy],["daniel",dAcum,dProy],["wilmary",wAcum,wProy],["christian",chAcum,chProy],["edwin",eAcum,eProy]]
+            .filter(([id])=>asesorVisible(id,mesId,store))
+            .map(([id,acum,proy])=>({ id, nombre:ASESORES_NOMBRES[id]||id, c:ASESORES_COLORES[id]||"#6366f1", actual:acum*comPct, proy:proy*comProy }))
+            .sort((x,y)=>y.proy-x.proy);
+          const maxP = Math.max(1, ...filas.map(f=>f.proy));
+          return (
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:10,marginBottom:10}}>
+              {filas.map(f=>(
+                <div key={f.id} style={{border:"1px solid #e2e8f0",borderTop:"3px solid "+f.c,borderRadius:10,padding:"12px 14px",background:"#fff"}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#1e293b",marginBottom:8}}>{f.nombre}</div>
+                  <div style={{display:"flex",justifyContent:"space-between",gap:10}}>
+                    <div>
+                      <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase"}}>Actual</div>
+                      <div style={{fontSize:17,fontWeight:800,color:"#1e293b"}}>{usd(f.actual,0)}</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase"}}>Proyectada</div>
+                      <div style={{fontSize:17,fontWeight:800,color:f.c}}>{usd(f.proy,0)}</div>
+                    </div>
+                  </div>
+                  <div style={{height:5,background:"#f1f5f9",borderRadius:3,marginTop:10,overflow:"hidden"}}>
+                    <div style={{width:(f.proy/maxP*100)+"%",height:"100%",background:f.c,borderRadius:3}}/>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          );
+        })()}
         <div style={{padding:"10px 14px",background:"#ecfdf5",border:"1px solid #a7f3d0",borderRadius:8,display:"flex",justifyContent:"space-between"}}>
           <span style={{fontSize:12,fontWeight:700,color:"#059669"}}>Total comisiones equipo proyectadas</span>
           <span style={{fontSize:17,fontWeight:800,color:"#059669"}}>{usd((()=>{
@@ -2172,7 +2196,7 @@ const MESES_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
 // turno: columna A = nombre del turno, columna B = horario, y en cada fecha quién lo cubre.
 // Reconoce Turno 1/2/3, Nocturno, Fin de semana (o Sáb/Dom), Break y Descanso/Libre.
 const MALLA_KEYS = ["fecha","mes","asesor","dia","orden","plan","valorUsd","ts","nota"];
-const MALLA_COLORES = { T1:"#2563eb", T2:"#0f766e", T3:"#7c3aed", T4:"#475569", FDS1:"#b45309", FDS2:"#be185d" };
+const MALLA_COLORES = { T1:"#12304A", T2:"#12304A", T3:"#12304A", T4:"#12304A", FDS1:"#12304A", FDS2:"#12304A" };
 function mallaFilaArray(r) {
   const out = MALLA_KEYS.map(k => r[k] == null ? "" : String(r[k]));
   Object.keys(r).filter(k=>/^col\d+$/.test(k)).forEach(k=>{ out[parseInt(k.slice(3))] = String(r[k]==null?"":r[k]); });
@@ -2473,7 +2497,7 @@ function MallaTab({ mesId, store }) {
   // Turnos principales (sin breaks)
   const TURNOS_PRINCIPALES = malla ? malla.turnos.filter(t=>t.id!=="T4") : [];
   // Turno labels correctos
-  const TURNO_META = {"T1":{label:"Turno 1",h:"08:00–16:00",c:"#2563eb"},"T2":{label:"Turno 2",h:"10:00–18:00",c:"#0f766e"},"T3":{label:"Turno 3",h:"14:00–22:00",c:"#7c3aed"},"T4":{label:"Nocturno",h:"22:00–08:00",c:"#475569"},"FDS1":{label:"FDS",h:"08:00–15:00",c:"#b45309"},"FDS2":{label:"FDS",h:"13:00–20:00",c:"#be185d"}};
+  const TURNO_META = {"T1":{label:"Turno 1",h:"08:00–16:00",c:"#12304A"},"T2":{label:"Turno 2",h:"10:00–18:00",c:"#12304A"},"T3":{label:"Turno 3",h:"14:00–22:00",c:"#12304A"},"T4":{label:"Nocturno",h:"22:00–08:00",c:"#12304A"},"FDS1":{label:"FDS",h:"08:00–15:00",c:"#12304A"},"FDS2":{label:"FDS",h:"13:00–20:00",c:"#12304A"}};
 
   // Get turno of an agent on a day
   function getTurnoAgente(agente, dayNum){
@@ -2521,8 +2545,8 @@ function MallaTab({ mesId, store }) {
     const sz=size==="sm"?{fs:10,pad:"2px 7px",av:16}:{fs:11,pad:"3px 9px",av:20};
     return (
       <span onClick={onClick} style={{display:"inline-flex",alignItems:"center",gap:4,
-        background:active?c:c+"18",border:"1.5px solid "+c+(active?"":"44"),borderRadius:20,
-        padding:sz.pad,fontSize:sz.fs,fontWeight:700,color:active?"#fff":c,
+        background:active?c:"#f1f5f9",border:"1px solid "+(active?c:"#e2e8f0"),borderRadius:20,
+        padding:sz.pad,fontSize:sz.fs,fontWeight:600,color:active?"#fff":"#1e293b",
         cursor:onClick?"pointer":"default",transition:"all .15s",whiteSpace:size==="sm"?"normal":"nowrap",
         lineHeight:size==="sm"?1.15:"normal",textAlign:"left",maxWidth:size==="sm"?"100%":"none"}}>
         <span style={{width:sz.av,height:sz.av,borderRadius:"50%",
@@ -2573,7 +2597,7 @@ function MallaTab({ mesId, store }) {
       const fdsList = allDays.filter(d=>isWeekend(d));
       return (
         <div>
-          <div style={{background:"linear-gradient(135deg,"+c+","+c+"bb)",borderRadius:14,
+          <div style={{background:c,borderRadius:14,
             padding:"16px 20px",marginBottom:14,display:"flex",alignItems:"center",gap:14}}>
             <div style={{width:48,height:48,borderRadius:"50%",background:"rgba(255,255,255,0.25)",
               display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:"#fff"}}>
@@ -2603,8 +2627,8 @@ function MallaTab({ mesId, store }) {
                 const t=getTurnoAgente(agente,d);
                 const isLibre=!t;
                 return (
-                  <div key={d} style={{background:isLibre?"#f0fdf4":c+"0d",
-                    border:"1.5px solid "+(isLibre?"#bbf7d0":c+"44"),
+                  <div key={d} style={{background:isLibre?"#ffffff":c+"0d",
+                    border:"1.5px solid "+(isLibre?"#e2e8f0":c+"44"),
                     borderRadius:12,padding:"12px 14px",textAlign:"center"}}>
                     <div style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>{DOW[getDow(d)]}</div>
                     <div style={{fontSize:22,fontWeight:800,color:isLibre?"#059669":c,margin:"6px 0"}}>{d}</div>
@@ -2649,12 +2673,12 @@ function MallaTab({ mesId, store }) {
               const desc=descansosDias.includes(d);
               return (
                 <div key={d} style={{textAlign:"center",
-                  background:desc?"#f0fdf4":t?(TURNO_META[t.id]?.c||c)+"0d":"#f8fafc",
-                  border:"1px solid "+(desc?"#bbf7d0":t?(TURNO_META[t.id]?.c||c)+"33":"#e2e8f0"),
+                  background:desc?"#ffffff":t?(TURNO_META[t.id]?.c||c)+"0d":"#f8fafc",
+                  border:"1px solid "+(desc?"#e2e8f0":t?(TURNO_META[t.id]?.c||c)+"33":"#e2e8f0"),
                   borderRadius:10,padding:"8px 6px"}}>
                   <div style={{fontSize:10,color:"#94a3b8",fontWeight:700}}>{DOW[getDow(d)]}</div>
                   <div style={{fontSize:16,fontWeight:800,color:desc?"#059669":t?TURNO_META[t.id]?.c||c:"#94a3b8",margin:"4px 0"}}>{d}</div>
-                  {desc?<span style={{fontSize:9,fontWeight:700,color:"#059669",background:"#dcfce7",borderRadius:6,padding:"2px 5px"}}>🏖 Libre</span>
+                  {desc?<span style={{fontSize:9,fontWeight:700,color:"#059669",background:"#f1f5f9",borderRadius:6,padding:"2px 5px"}}>🏖 Libre</span>
                   :t?<TurnoBadge turno={t}/>
                   :<span style={{fontSize:10,color:"#cbd5e1"}}>—</span>}
                 </div>
@@ -2663,8 +2687,8 @@ function MallaTab({ mesId, store }) {
           </div>
           {/* FDS */}
           {wkndDays.length>0&&(
-            <div style={{borderTop:"1px solid #fecdd3",background:"#fff1f2",padding:"10px 14px",display:"flex",flexDirection:"column",gap:8}}>
-              <span style={{fontSize:10,fontWeight:700,color:"#be185d",textTransform:"uppercase"}}>🏖 Fin de semana</span>
+            <div style={{borderTop:"1px solid #e2e8f0",background:"#f8fafc",padding:"10px 14px",display:"flex",flexDirection:"column",gap:8}}>
+              <span style={{fontSize:10,fontWeight:700,color:"#475569",textTransform:"uppercase"}}>🏖 Fin de semana</span>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {wkndDays.map(function(d){
                 let t=getTurnoAgente(agente,d);
@@ -2672,7 +2696,7 @@ function MallaTab({ mesId, store }) {
                 let isLibre=fdsDesc||!t;
                 return (
                   <div key={d} style={{display:"flex",alignItems:"center",gap:6,
-                    background:isLibre?"#dcfce7":"#fff",border:"1px solid "+(isLibre?"#bbf7d0":"#fecdd3"),
+                    background:isLibre?"#f1f5f9":"#fff",border:"1px solid "+(isLibre?"#e2e8f0":"#e2e8f0"),
                     borderRadius:10,padding:"8px 12px"}}>
                     <span style={{fontSize:11,fontWeight:700,color:"#64748b"}}>{DOW[getDow(d)]} {d}</span>
                     {isLibre?<span style={{fontSize:11,fontWeight:800,color:"#059669"}}>🟢 LIBRE</span>:<TurnoBadge turno={t}/>}
@@ -2689,7 +2713,7 @@ function MallaTab({ mesId, store }) {
     return (
       <div>
         {/* Header con métricas */}
-        <div style={{background:"linear-gradient(135deg,"+c+","+c+"cc)",borderRadius:14,
+        <div style={{background:c,borderRadius:14,
           padding:"16px 20px",marginBottom:14,display:"flex",alignItems:"center",gap:14}}>
           <div style={{width:48,height:48,borderRadius:"50%",background:"rgba(255,255,255,0.25)",
             display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:800,color:"#fff"}}>
@@ -2713,8 +2737,8 @@ function MallaTab({ mesId, store }) {
             ))}
           </div>
         </div>
-        <div style={{background:"#fffbeb",border:"1px solid #fbbf24",borderRadius:10,
-          padding:"10px 16px",marginBottom:14,fontSize:12,color:"#92400e",fontWeight:600,
+        <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:10,
+          padding:"10px 16px",marginBottom:14,fontSize:12,color:"#334155",fontWeight:600,
           display:"flex",alignItems:"center",gap:8}}>
           ☕ <strong>Breaks:</strong> Coordinalos. No pueden salir dos personas al mismo tiempo — siempre debe haber cobertura en Easydial y chat.
         </div>
@@ -2762,8 +2786,8 @@ function MallaTab({ mesId, store }) {
           </details>}
         </div>
         {/* Aviso breaks */}
-        <div style={{background:"#fffbeb",border:"1px solid #fbbf24",borderRadius:10,
-          padding:"10px 16px",fontSize:12,color:"#92400e",fontWeight:600,
+        <div style={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:10,
+          padding:"10px 16px",fontSize:12,color:"#334155",fontWeight:600,
           display:"flex",alignItems:"center",gap:8}}>
           ☕ <strong>Regla de breaks:</strong> No pueden salir dos personas al mismo tiempo al break ni al auxiliar. Coordinalos entre el equipo para que siempre haya cobertura en Easydial y chat.
         </div>
@@ -2779,8 +2803,8 @@ function MallaTab({ mesId, store }) {
               <button key={wi}
                 onClick={()=>setSemanaActiva(wi)}
                 style={{height:32,padding:"0 14px",borderRadius:20,fontWeight:700,fontSize:11,
-                  cursor:"pointer",border:"1.5px solid "+(semanaActiva===wi?"#6d28d9":"#e2e8f0"),
-                  background:semanaActiva===wi?"#6d28d9":"#fff",
+                  cursor:"pointer",border:"1.5px solid "+(semanaActiva===wi?"#12304A":"#e2e8f0"),
+                  background:semanaActiva===wi?"#12304A":"#fff",
                   color:semanaActiva===wi?"#fff":"#64748b",transition:"all .15s"}}>
                 S{wi+1} · {realDays[0]===realDays[realDays.length-1]?realDays[0]:realDays[0]+"–"+realDays[realDays.length-1]} {MES3}
               </button>
@@ -2795,18 +2819,18 @@ function MallaTab({ mesId, store }) {
           let wkndDays=realDays.filter(d=>isWeekend(d));
 
           return (
-            <div key={wi} style={{background:"#fff",border:"1.5px solid #6d28d9",borderRadius:14,overflow:"hidden"}}>
+            <div key={wi} style={{background:"#fff",border:"1.5px solid #12304A",borderRadius:14,overflow:"hidden"}}>
               {/* Header */}
-              <div style={{background:"#f5f3ff",borderBottom:"1px solid #e2e8f0",
+              <div style={{background:"#f8fafc",borderBottom:"1px solid #e2e8f0",
                 padding:"10px 16px",display:"flex",alignItems:"center",gap:10}}>
-                <span style={{fontSize:12,fontWeight:800,color:"#6d28d9"}}>Semana {wi+1}</span>
+                <span style={{fontSize:12,fontWeight:800,color:"#12304A"}}>Semana {wi+1}</span>
                 <span style={{fontSize:11,color:"#94a3b8"}}>
                   {realDays.filter(d=>!isWeekend(d)).length} días hábiles
                   {wkndDays.length>0&&" · "+wkndDays.length+" fin de semana"}
                 </span>
                 {wkndDays.length>0&&(
-                  <span style={{marginLeft:"auto",background:"#fef3c7",border:"1px solid #fbbf24",
-                    borderRadius:20,padding:"2px 10px",fontSize:10,fontWeight:700,color:"#b45309"}}>
+                  <span style={{marginLeft:"auto",background:"#f1f5f9",border:"1px solid #e2e8f0",
+                    borderRadius:20,padding:"2px 10px",fontSize:10,fontWeight:700,color:"#475569"}}>
                     🏖 FDS incluido
                   </span>
                 )}
@@ -2824,11 +2848,11 @@ function MallaTab({ mesId, store }) {
                         const wknd=isWeekend(d), dow=getDow(d);
                         return (
                           <th key={di} style={{padding:"6px 8px",fontSize:11,fontWeight:700,
-                            color:wknd?"#be185d":"#475569",textAlign:"center",
+                            color:wknd?"#64748b":"#475569",textAlign:"center",
                             borderBottom:"1px solid #e2e8f0",minWidth:70,
-                            background:wknd?"#fff1f2":"transparent"}}>
+                            background:wknd?"#f8fafc":"transparent"}}>
                             <div>{DOW[dow]}</div>
-                            <div style={{fontSize:14,color:wknd?"#be185d":"#1e293b",fontWeight:800}}>{d}</div>
+                            <div style={{fontSize:14,color:wknd?"#475569":"#1e293b",fontWeight:800}}>{d}</div>
                           </th>
                         );
                       })}
@@ -2862,22 +2886,22 @@ function MallaTab({ mesId, store }) {
                     })}
                     {/* FDS rows — solo en días sáb/dom */}
                     {wkndDays.length>0&&(malla.fds||[]).map(function(fds,fi){
-                      let m=Object.assign({},TURNO_META[fds.id]||{label:fds.label,h:fds.horario,c:"#b45309"},fds.horario?{h:fds.horario}:{});
+                      let m=Object.assign({},TURNO_META[fds.id]||{label:fds.label,h:fds.horario,c:"#12304A"},fds.horario?{h:fds.horario}:{});
                       const hasFds=week.some(d=>d&&isWeekend(d)&&getAsign(fds,d));
                       if(!hasFds) return null;
                       return (
-                        <tr key={"fds"+fi} style={{borderBottom:"1px solid #fecdd3",background:"#fff8f8"}}>
-                          <td style={{padding:"8px 14px",borderRight:"1px solid #fecdd3"}}>
+                        <tr key={"fds"+fi} style={{borderBottom:"1px solid #e2e8f0",background:"#fcfcfd"}}>
+                          <td style={{padding:"8px 14px",borderRight:"1px solid #e2e8f0"}}>
                             <div style={{fontSize:11,fontWeight:800,color:m.c}}>{m.label}</div>
                             <div style={{fontSize:10,color:m.c+"99",whiteSpace:"nowrap"}}>{m.h}</div>
                           </td>
                           {week.map(function(d,di){
-                            if(d===null) return <td key={di} style={{background:"#fff8f8"}}/>;
+                            if(d===null) return <td key={di} style={{background:"#fcfcfd"}}/>;
                             let wknd=isWeekend(d);
                             if(!wknd) return <td key={di} style={{background:"#f8fafc",padding:"6px 8px",textAlign:"center"}}><span style={{color:"#e2e8f0",fontSize:10}}>—</span></td>;
                             let asign=getAsign(fds,d);
                             return (
-                              <td key={di} style={{padding:"6px 8px",textAlign:"center",background:"#fff8f8"}}>
+                              <td key={di} style={{padding:"6px 8px",textAlign:"center",background:"#fcfcfd"}}>
                                 <AgenteBadge name={asign} size="sm"
                                   onClick={asign&&asign!=="N/A"?()=>setAsesorVista(asign):null}/>
                               </td>
@@ -2891,16 +2915,16 @@ function MallaTab({ mesId, store }) {
                       const descDe=(d)=>((malla.descansosFds||[]).find(x=>x.dias.includes(d))||{}).descansan||[];
                       if(!wkndDays.some(w=>descDe(w).length)) return null;
                       return (
-                        <tr style={{background:"#f0fdf4",borderBottom:"1px solid #bbf7d0"}}>
-                          <td style={{padding:"8px 14px",borderRight:"1px solid #bbf7d0"}}>
+                        <tr style={{background:"#ffffff",borderBottom:"1px solid #e2e8f0"}}>
+                          <td style={{padding:"8px 14px",borderRight:"1px solid #e2e8f0"}}>
                             <div style={{fontSize:11,fontWeight:800,color:"#059669"}}>🏖 Descansa</div>
                             <div style={{fontSize:10,color:"#94a3b8"}}>libre ese día</div>
                           </td>
                           {week.map(function(d,di){
-                            if(d===null) return <td key={di} style={{background:"#f0fdf4"}}/>;
-                            if(!isWeekend(d)) return <td key={di} style={{background:"#f0fdf4"}}/>;
+                            if(d===null) return <td key={di} style={{background:"#ffffff"}}/>;
+                            if(!isWeekend(d)) return <td key={di} style={{background:"#ffffff"}}/>;
                             return (
-                              <td key={di} colSpan={1} style={{padding:"6px 8px",textAlign:"center",background:"#f0fdf4"}}>
+                              <td key={di} colSpan={1} style={{padding:"6px 8px",textAlign:"center",background:"#ffffff"}}>
                                 <div style={{display:"flex",flexDirection:"column",gap:3,alignItems:"center"}}>
                                   {descDe(d).map(a=>(
                                     <AgenteBadge key={a} name={a} size="sm"/>
@@ -2927,8 +2951,8 @@ function MallaTab({ mesId, store }) {
                 });
                 if(!socios.length) return null;
                 return (
-                  <div style={{borderTop:"1px solid #fecdd3",background:"#fff1f2",padding:"12px 16px"}}>
-                    <div style={{fontSize:11,fontWeight:800,color:"#be185d",marginBottom:10,
+                  <div style={{borderTop:"1px solid #e2e8f0",background:"#f8fafc",padding:"12px 16px"}}>
+                    <div style={{fontSize:11,fontWeight:800,color:"#475569",marginBottom:10,
                       textTransform:"uppercase",letterSpacing:"0.06em"}}>
                       📋 Socios FDS · Notas de turno
                     </div>
@@ -2938,7 +2962,7 @@ function MallaTab({ mesId, store }) {
                         const nota=notas[key]||"";
                         const isEditing=editNota&&editNota.key===key;
                         return (
-                          <div key={key} style={{background:"#fff",border:"1px solid #fecdd3",
+                          <div key={key} style={{background:"#fff",border:"1px solid #e2e8f0",
                             borderRadius:10,padding:"10px 12px"}}>
                             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                               <AgenteBadge name={socio} size="sm"/>
@@ -2952,14 +2976,14 @@ function MallaTab({ mesId, store }) {
                                   onChange={e=>setEditNota({...editNota,value:e.target.value})}
                                   rows={3} placeholder="Pendientes, promesas, novedades..."
                                   dir="ltr"
-                                  style={{width:"100%",border:"1.5px solid #6d28d9",borderRadius:8,
+                                  style={{width:"100%",border:"1.5px solid #12304A",borderRadius:8,
                                     padding:"6px 10px",fontSize:12,fontFamily:"'Sora',sans-serif",
                                     resize:"vertical",outline:"none",textAlign:"left",
                                     direction:"ltr",unicodeBidi:"plaintext"}}/>
                                 <div style={{display:"flex",gap:6,marginTop:6}}>
                                   <button onClick={()=>{saveNota(key,editNota.value);setEditNota(null);}}
                                     style={{flex:1,height:30,borderRadius:8,border:"none",
-                                      background:"#6d28d9",color:"#fff",fontWeight:700,fontSize:11,cursor:"pointer"}}>
+                                      background:"#12304A",color:"#fff",fontWeight:700,fontSize:11,cursor:"pointer"}}>
                                     ✅ Guardar
                                   </button>
                                   <button onClick={()=>setEditNota(null)}
@@ -4041,10 +4065,11 @@ async function fetchReviewsFromSheets(setReviews) {
         .map(r => ({
           id:        String(r.reviewId||r.orden||Date.now()),
           fecha:     String(r.fecha||"").slice(0,10),
-          email:     String(r.asesor2||r.nota||r.mes||""),
+          email:     String(r.email||"").trim(),           // FIX: antes se leía de "nota" y llegaba vacío
           asesor:    String(r.asesor||"guillermo").toLowerCase().trim(),
-          estrellas: parseInt(r.dia||r.valorUsd||5)||5,
+          estrellas: parseInt(r.estrellas)||5,
           valor:     REVIEW_VALUE,
+          guardadoEn: String(r.guardadoEn||""),
         }));
       if (mapped.length > 0) {
         saveTosspile(mapped);
@@ -4122,7 +4147,7 @@ function TpRatingBar({ star, count, total }) {
 }
 
 // Tarjeta de reseña individual estilo Trustpilot
-function TpReviewCard({ review, onEdit, onDelete, COLOR, nombreAsesor }) {
+function TpReviewCard({ review, onEdit, onDelete, COLOR, nombreAsesor, ultima, subida }) {
   const ac = COLOR[review.asesor]||"#6366f1";
   const initials = review.email ? review.email[0].toUpperCase() : "?";
   const fechaFmt = (f) => {
@@ -4143,12 +4168,16 @@ function TpReviewCard({ review, onEdit, onDelete, COLOR, nombreAsesor }) {
             {initials}
           </div>
           <div style={{minWidth:0}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#1a1a2e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-              {review.email}
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+              <span style={{fontSize:13.5,fontWeight:700,color:"#1a1a2e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>
+                {review.email || "Sin correo registrado"}
+              </span>
+              {ultima&&<span style={{fontSize:10,fontWeight:800,color:"#fff",background:"#12304A",borderRadius:20,padding:"2px 8px"}}>Última subida</span>}
             </div>
             <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
               <TpStars n={review.estrellas||5} size={14}/>
               <span style={{fontSize:11,color:"#6b7280"}}>{fechaFmt(review.fecha)}</span>
+              {subida>0&&<span style={{fontSize:11,color:"#94a3b8"}}>· subida {new Date(subida).toLocaleString("es-CO",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</span>}
             </div>
             <div style={{marginTop:8}}>
               <span style={{background:ac+"15",color:ac,borderRadius:20,padding:"3px 10px",
@@ -4200,7 +4229,7 @@ function TosspileTab({ store, onUpdate }) {
   useEffect(function(){ fetchReviewsFromSheets(setReviews); }, []);
   const visibles = reviews.filter(r => !r.deleted);
 
-  const TP_ASESORES = ["guillermo","daniel","wilmary","christian","edwin"]; // Asesores activos en Trustpilot — editar aquí para agregar más
+  const TP_ASESORES = ["guillermo","daniel","wilmary","christian","edwin"].filter(a=>asesorVisible(a,getMesActual())); // Asesores activos en Trustpilot — editar aquí para agregar más
   const COLOR = { guillermo:"#2563eb", carolina:"#7c3aed", daniel:"#0f766e", wilmary:"#be185d", christian:"#0891b2", edwin:"#ea580c" };
   const nombreAsesor = (a) => { const names={guillermo:"Guillermo",carolina:"Carolina",daniel:"Daniel R.",wilmary:"Wilmary",christian:"Christian",edwin:"Edwin"}; return names[a]||( a?a[0].toUpperCase()+a.slice(1):a); };
 
@@ -4226,7 +4255,10 @@ function TosspileTab({ store, onUpdate }) {
   let topDow = reviewsByDow.reduce((a,b)=>b.count>a.count?b:a, reviewsByDow[0]);
 
   // Reviews filtradas para la lista
-  const reviewsFiltradas = visibles.filter(r => filterAsesor==="todos" || r.asesor===filterAsesor);
+  const subidaMs = (r) => { const t = Date.parse(r.guardadoEn||""); if (!isNaN(t)) return t; const n = parseInt(r.id); return n > 1e12 ? n : Date.parse((r.fecha||"")+"T12:00:00")||0; };
+  const reviewsFiltradas = visibles.filter(r => filterAsesor==="todos" || r.asesor===filterAsesor)
+    .slice().sort((a,b)=>subidaMs(b)-subidaMs(a));             // lo último que se subió, primero
+  const ultimaId = reviewsFiltradas.length ? reviewsFiltradas[0].id : null;
 
   const handleSave = () => {
     if (!form.email || !form.fecha || !form.asesor) return;
@@ -4235,7 +4267,7 @@ function TosspileTab({ store, onUpdate }) {
       updated = reviews.map(r => r.id===editId ? {...r,...form} : r);
       setEditId(null);
     } else {
-      updated = [{ id:Date.now().toString(), ...form, valor:REVIEW_VALUE }, ...reviews];
+      updated = [{ id:Date.now().toString(), ...form, valor:REVIEW_VALUE, guardadoEn:new Date().toISOString() }, ...reviews];
     }
     const lastRev = editId ? updated.find(r=>r.id===editId) : updated[0];
     persist(updated, lastRev, "save");
@@ -4460,7 +4492,7 @@ function TosspileTab({ store, onUpdate }) {
           {/* Cards de reviews */}
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             {reviewsFiltradas.length>0 ? reviewsFiltradas.map(r=>(
-              <TpReviewCard key={r.id} review={r}
+              <TpReviewCard key={r.id} review={r} ultima={r.id===ultimaId} subida={subidaMs(r)}
                 onEdit={handleEdit}
                 onDelete={(id)=>{setDelId(id);setDelPin("");setDelErr(false);}}
                 COLOR={COLOR} nombreAsesor={nombreAsesor}/>
@@ -4806,7 +4838,7 @@ function BolsaSidebar({ store, mesId, tab, onSelect, dupCount, mobile, solo }) {
   const [abiertoH,setAbiertoH] = useState(true);
   const qn = q.trim().toLowerCase();
   const eq = useMemo(()=>bxStats(store,mesId,ASESORES),[store,mesId]);
-  const lista = useMemo(()=>ASESORES.map(a=>({id:a, nombre:ASESORES_NOMBRES[a]||cap(a), color:ASESORES_COLORES[a], st:bxStats(store,mesId,[a])}))
+  const lista = useMemo(()=>ASESORES.filter(a=>asesorVisible(a,mesId,store)).map(a=>({id:a, nombre:ASESORES_NOMBRES[a]||cap(a), color:ASESORES_COLORES[a], st:bxStats(store,mesId,[a])}))
     .sort((x,y)=>y.st.total-x.st.total),[store,mesId]);
   const filtrados = lista.filter(a=>!qn || a.nombre.toLowerCase().includes(qn));
   const tools = BX_TOOLS.filter(t=>!qn || t.label.toLowerCase().includes(qn));
